@@ -53,6 +53,17 @@ cd /home/ubuntu/openclaw
 ./docker-setup-tenant.sh <client_id>
 ```
 
+
+cd /home/ubuntu/openclaw
+./docker-setup-tenant.sh edgar
+# (responda ao onboarding)
+clawdock-fix-token
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml up -d
+
+
+
+
+
 O script vai:
 - Criar os diretórios `state/`, `workspace/` e `home/` se não existirem
 - Carregar o `.env` do tenant e respeitar os valores já definidos
