@@ -257,3 +257,27 @@ ONLY_ONBOARD=1 ./docker-setup-tenant.sh edgar
 docker compose --env-file /opt/openclaw/edgar/.env down
 sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
 NODE_OPTIONS="--max-old-space-size=1024" ./docker-setup-tenant.sh edgar
+
+
+
+
+## A parte mais importante para o seu caso é esta linha:
+
+```
+DM security: default is pairing; unknown DMs get a pairing code.
+```
+
+Já passamos por isso — o pareamento via Telegram já foi feito, então está ok.
+
+O que vale atenção para multitenancy:
+
+**`session.dmScope`** — se o mesmo bot atender múltiplos usuários, configure isso para isolar as sessões por usuário:
+
+```bash
+docker compose --env-file /opt/openclaw/edgar/.env run --rm openclaw-cli \
+  config set session.dmScope "per-channel-peer"
+```
+
+Sem isso, todos os usuários que falam com o bot compartilham a mesma sessão — o que num contexto multitenancy pode ser um problema de privacidade.
+
+O restante da lista são apenas canais disponíveis — você só precisa se preocupar com os que for usar.
