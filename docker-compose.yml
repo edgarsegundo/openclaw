@@ -1,5 +1,5 @@
 services:
-  openclaw-gateway:
+  openclaw-gateway-${CLIENT_ID}:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     user: ${OPENCLAW_UID}:${OPENCLAW_GID}
     environment:
@@ -10,8 +10,8 @@ services:
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - /opt/openclaw/${CLIENT_ID}/state:/home/node/.openclaw
+      - /opt/openclaw/${CLIENT_ID}/workspace:/home/node/.openclaw/workspace
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
@@ -28,7 +28,7 @@ services:
         "18789",
       ]
 
-  openclaw-cli:
+  openclaw-cli-${CLIENT_ID}:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     user: ${OPENCLAW_UID}:${OPENCLAW_GID}
     environment:
@@ -40,8 +40,8 @@ services:
       CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - /opt/openclaw/${CLIENT_ID}/state:/home/node/.openclaw
+      - /opt/openclaw/${CLIENT_ID}/workspace:/home/node/.openclaw/workspace
     stdin_open: true
     tty: true
     init: true
