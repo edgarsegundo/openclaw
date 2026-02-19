@@ -249,21 +249,21 @@ if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
 fi
 
-# Sincronizar token gerado pelo onboarding para o .env
-if ! command -v jq >/dev/null 2>&1; then
-  echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
-  echo "    Instale com: sudo apt-get install -y jq"
-  echo "    Depois sincronize manualmente: jq -r '.gateway.auth.token' ${OPENCLAW_CONFIG_DIR}/openclaw.json"
-else
-  GENERATED_TOKEN=$(jq -r '.gateway.auth.token // empty' "${OPENCLAW_CONFIG_DIR}/openclaw.json" 2>/dev/null || true)
-  if [[ -n "$GENERATED_TOKEN" ]]; then
-    OPENCLAW_GATEWAY_TOKEN="$GENERATED_TOKEN"
-    upsert_env "$ENV_FILE" OPENCLAW_GATEWAY_TOKEN
-    echo "==> Token sincronizado do openclaw.json para o .env"
-  else
-    echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
-  fi
-fi
+# # Sincronizar token gerado pelo onboarding para o .env
+# if ! command -v jq >/dev/null 2>&1; then
+#   echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
+#   echo "    Instale com: sudo apt-get install -y jq"
+#   echo "    Depois sincronize manualmente: jq -r '.gateway.auth.token' ${OPENCLAW_CONFIG_DIR}/openclaw.json"
+# else
+#   GENERATED_TOKEN=$(jq -r '.gateway.auth.token // empty' "${OPENCLAW_CONFIG_DIR}/openclaw.json" 2>/dev/null || true)
+#   if [[ -n "$GENERATED_TOKEN" ]]; then
+#     OPENCLAW_GATEWAY_TOKEN="$GENERATED_TOKEN"
+#     upsert_env "$ENV_FILE" OPENCLAW_GATEWAY_TOKEN
+#     echo "==> Token sincronizado do openclaw.json para o .env"
+#   else
+#     echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
+#   fi
+# fi
 
 # ----------------------------------------
 # 📡 Canais (opcional)

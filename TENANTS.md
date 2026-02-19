@@ -104,7 +104,7 @@ docker compose --env-file /opt/openclaw/<client_id>/.env run --rm openclaw-cli \
   channels add --channel telegram --token <bot_token>
 
 # Derrubar openclaw
-docker compose --env-file /opt/openclaw/edgar/.env down
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml down
 
 # Colocar permissões corretas, o script docker-setup-tenant.sh já está fazendo isso
 sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
@@ -285,6 +285,10 @@ ONLY_ONBOARD=1 ./docker-setup-tenant.sh <client_id>
 Telegram — simplest way to get started — register a bot with @BotFather and get going.  
 
 Send a `/start`
+
+
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODE>
+
 
 
 
