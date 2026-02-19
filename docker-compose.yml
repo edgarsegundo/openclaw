@@ -66,7 +66,7 @@ services:
       resources:
         limits:
           cpus: "${OPENCLAW_CLI_CPU_LIMIT:-0.5}"
-          memory: "${OPENCLAW_CLI_MEMORY_LIMIT:-512M}"
+          memory: "${OPENCLAW_CLI_MEMORY_LIMIT:-1G}"
         reservations:
           cpus: "${OPENCLAW_CLI_CPU_RESERVATION:-0.1}"
-          memory: "${OPENCLAW_CLI_MEMORY_RESERVATION:-128M}"
+          memory: "${OPENCLAW_CLI_MEMORY_RESERVATION:-256M}"
