@@ -102,7 +102,22 @@ docker compose --env-file /opt/openclaw/<client_id>/.env down
 # Adicionar canal Telegram
 docker compose --env-file /opt/openclaw/<client_id>/.env run --rm openclaw-cli \
   channels add --channel telegram --token <bot_token>
+
+# Derrubar openclaw
+docker compose --env-file /opt/openclaw/edgar/.env down
+
+# Colocar permissões corretas, o script docker-setup-tenant.sh já está fazendo isso
+sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
+
+# Limpar o log do docker
+sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' <CONTAINER_ID>)
+
+# Reiniciar openclaw:
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml restart openclaw-gateway
 ```
+
+
+
 
 ---
 
@@ -242,22 +257,55 @@ OPENCLAW_GID=1000
 
 ## Re-executando o script
 
+**Rodar full** - instala tudo:
+```bash
+./docker-setup-tenant.sh <client_id>
+```
+
 **Pular onboarding** — para atualizar configurações ou reiniciar o gateway quando o onboarding já foi feito:
 ```bash
-SKIP_ONBOARD=1 ./docker-setup-tenant.sh edgar
+SKIP_ONBOARD=1 ./docker-setup-tenant.sh <client_id>
 ```
 
 **Rodar apenas o onboarding** — útil quando você quer reconfigurar o agente sem rebuildar a imagem ou reiniciar o gateway:
 ```bash
-ONLY_ONBOARD=1 ./docker-setup-tenant.sh edgar
+ONLY_ONBOARD=1 ./docker-setup-tenant.sh <client_id>
 ```
 
-## 
 
-docker compose --env-file /opt/openclaw/edgar/.env down
-sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
-./docker-setup-tenant.sh edgar
 
+
+
+## How to pair
+
+### Telegram
+
+
+
+Telegram — simplest way to get started — register a bot with @BotFather and get going.  
+
+Send a `/start`
+
+
+
+
+### Inside container:
+
+node dist/index.js devices list --token 94554ce79c55f...
+
+### outside container:
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token 94554ce79c55f...
+
+
+### como aprovar o web, esse funcionou
+node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
+
+
+
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
+
+
+sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)
 
 
 
@@ -281,26 +329,3 @@ docker compose --env-file /opt/openclaw/edgar/.env run --rm openclaw-cli \
 Sem isso, todos os usuários que falam com o bot compartilham a mesma sessão — o que num contexto multitenancy pode ser um problema de privacidade.
 
 O restante da lista são apenas canais disponíveis — você só precisa se preocupar com os que for usar.
-
-
-
-## Pairing
-
-
-### Inside container:
-
-node dist/index.js devices list --token 94554ce79c55f...
-
-### outside container:
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token 94554ce79c55f...
-
-
-### como aprovar o web, esse funcionou
-node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
-
-
-
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
-
-
-sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)
