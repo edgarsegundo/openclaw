@@ -218,13 +218,15 @@ done
 # ----------------------------------------
 # 🐳 Build da imagem
 # ----------------------------------------
-echo ""
-echo "==> Building Docker image: $IMAGE_NAME"
-docker build \
-  --build-arg "OPENCLAW_DOCKER_APT_PACKAGES=${OPENCLAW_DOCKER_APT_PACKAGES}" \
-  -t "$IMAGE_NAME" \
-  -f "$ROOT_DIR/Dockerfile" \
-  "$ROOT_DIR"
+if [[ "${ONLY_ONBOARD:-0}" != "1" ]]; then
+  echo ""
+  echo "==> Building Docker image: $IMAGE_NAME"
+  docker build \
+    --build-arg "OPENCLAW_DOCKER_APT_PACKAGES=${OPENCLAW_DOCKER_APT_PACKAGES}" \
+    -t "$IMAGE_NAME" \
+    -f "$ROOT_DIR/Dockerfile" \
+    "$ROOT_DIR"
+fi
 
 # ----------------------------------------
 # 🚀 Onboarding
