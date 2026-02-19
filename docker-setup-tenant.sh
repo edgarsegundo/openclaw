@@ -238,10 +238,14 @@ echo "  - Gateway token: $OPENCLAW_GATEWAY_TOKEN"
 echo "  - Tailscale exposure: Off"
 echo "  - Install Gateway daemon: No"
 echo ""
+if [[ "${ONLY_ONBOARD:-0}" == "1" ]]; then
+  docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  exit 0
+fi
+
 if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
 fi
-
 # ----------------------------------------
 # 📡 Canais (opcional)
 # ----------------------------------------

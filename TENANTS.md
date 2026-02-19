@@ -240,11 +240,20 @@ OPENCLAW_UID=1000
 OPENCLAW_GID=1000
 ```
 
-## Re-executando o script sem onboarding
+## Re-executando o script
 
-Se você já fez o onboarding e quer rodar o script novamente apenas para atualizar configurações ou reiniciar o gateway, use:
+**Pular onboarding** — para atualizar configurações ou reiniciar o gateway quando o onboarding já foi feito:
 ```bash
 SKIP_ONBOARD=1 ./docker-setup-tenant.sh edgar
 ```
 
-Isso pula o onboarding interativo e vai direto para subir o gateway.
+**Rodar apenas o onboarding** — útil quando você quer reconfigurar o agente sem rebuildar a imagem ou reiniciar o gateway:
+```bash
+ONLY_ONBOARD=1 ./docker-setup-tenant.sh edgar
+```
+
+## 
+
+docker compose --env-file /opt/openclaw/edgar/.env down
+sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
+NODE_OPTIONS="--max-old-space-size=1024" ./docker-setup-tenant.sh edgar
