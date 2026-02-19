@@ -1,17 +1,17 @@
 services:
-  openclaw-gateway-${CLIENT_ID}:
+  openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     user: ${OPENCLAW_UID}:${OPENCLAW_GID}
     environment:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
     volumes:
-      - /opt/openclaw/${CLIENT_ID}/state:/home/node/.openclaw
-      - /opt/openclaw/${CLIENT_ID}/workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
@@ -25,10 +25,24 @@ services:
         "--bind",
         "${OPENCLAW_GATEWAY_BIND:-lan}",
         "--port",
-        "18789",
+        "${OPENCLAW_GATEWAY_PORT:-18789}",
       ]
+    deploy:
+      resources:
+        limits:
+          cpus: "${OPENCLAW_GATEWAY_CPU_LIMIT:-2}"
+          memory: "${OPENCLAW_GATEWAY_MEMORY_LIMIT:-2G}"
+        reservations:
+          cpus: "${OPENCLAW_GATEWAY_CPU_RESERVATION:-0.5}"
+          memory: "${OPENCLAW_GATEWAY_MEMORY_RESERVATION:-512M}"
+    healthcheck:
+      test: ["CMD", "node", "dist/index.js", "health", "--token", "${OPENCLAW_GATEWAY_TOKEN}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
-  openclaw-cli-${CLIENT_ID}:
+  openclaw-cli:
     image: ${OPENCLAW_IMAGE:-openclaw:local}
     user: ${OPENCLAW_UID}:${OPENCLAW_GID}
     environment:
@@ -36,13 +50,21 @@ services:
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       BROWSER: echo
-      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
-      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
-      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY:-}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
     volumes:
-      - /opt/openclaw/${CLIENT_ID}/state:/home/node/.openclaw
-      - /opt/openclaw/${CLIENT_ID}/workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
     stdin_open: true
     tty: true
     init: true
     entrypoint: ["node", "dist/index.js"]
+    deploy:
+      resources:
+        limits:
+          cpus: "${OPENCLAW_CLI_CPU_LIMIT:-0.5}"
+          memory: "${OPENCLAW_CLI_MEMORY_LIMIT:-512M}"
+        reservations:
+          cpus: "${OPENCLAW_CLI_CPU_RESERVATION:-0.1}"
+          memory: "${OPENCLAW_CLI_MEMORY_RESERVATION:-128M}"
