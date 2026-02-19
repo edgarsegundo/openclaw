@@ -45,7 +45,12 @@ mkdir -p "${TENANT_DIR}/home"
 
 OPENCLAW_UID=$(id -u)
 OPENCLAW_GID=$(id -g)
-chown -R "${OPENCLAW_UID}:${OPENCLAW_GID}" "${TENANT_DIR}"
+for dir in "${TENANT_DIR}/state" "${TENANT_DIR}/workspace" "${TENANT_DIR}/home"; do
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir"
+    chown "${OPENCLAW_UID}:${OPENCLAW_GID}" "$dir"
+  fi
+done
 
 # ----------------------------------------
 # 🔑 Gerar token se não existir
@@ -233,7 +238,9 @@ echo "  - Gateway token: $OPENCLAW_GATEWAY_TOKEN"
 echo "  - Tailscale exposure: Off"
 echo "  - Install Gateway daemon: No"
 echo ""
-docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
+  docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+fi
 
 # ----------------------------------------
 # 📡 Canais (opcional)

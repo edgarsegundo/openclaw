@@ -239,3 +239,12 @@ OPENCLAW_EXTRA_MOUNTS=
 OPENCLAW_UID=1000
 OPENCLAW_GID=1000
 ```
+
+## Re-executando o script sem onboarding
+
+Se você já fez o onboarding e quer rodar o script novamente apenas para atualizar configurações ou reiniciar o gateway, use:
+```bash
+SKIP_ONBOARD=1 ./docker-setup-tenant.sh edgar
+```
+
+Isso pula o onboarding interativo e vai direto para subir o gateway.
