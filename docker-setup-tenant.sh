@@ -210,7 +210,7 @@ for compose_file in "${COMPOSE_FILES[@]}"; do
   COMPOSE_ARGS+=("-f" "$compose_file")
 done
 
-COMPOSE_HINT="docker compose --env-file ${ENV_FILE}"
+COMPOSE_HINT="docker compose --env-file ${ENV_FILE} --project-directory ${TENANT_DIR}"
 for compose_file in "${COMPOSE_FILES[@]}"; do
   COMPOSE_HINT+=" -f ${compose_file}"
 done
@@ -241,13 +241,14 @@ echo "  - Tailscale exposure: Off"
 echo "  - Install Gateway daemon: No"
 echo ""
 if [[ "${ONLY_ONBOARD:-0}" == "1" ]]; then
-  docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
   exit 0
 fi
 
 if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
-  docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
 fi
+
 # ----------------------------------------
 # 📡 Canais (opcional)
 # ----------------------------------------
@@ -266,7 +267,7 @@ echo "Docs: https://docs.openclaw.ai/channels"
 # ----------------------------------------
 echo ""
 echo "==> Starting gateway for tenant: $CLIENT_ID"
-docker compose --env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}" up -d openclaw-gateway
+docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" up -d openclaw-gateway
 
 # ----------------------------------------
 # ✅ Resumo
