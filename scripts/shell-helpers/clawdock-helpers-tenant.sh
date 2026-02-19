@@ -46,7 +46,7 @@ _clawdock_tenant_compose() {
   # Usa o nome do diretório do tenant como project name
   local project_name
   project_name="$(basename "$TENANT_DIR")"
-  command docker compose -p "$project_name" -f "$TENANT_DIR/docker-compose.yml" --env-file "$TENANT_DIR/.env" "$@"
+  command docker compose --env-file "$TENANT_DIR/.env" -p "$project_name" -f "$TENANT_DIR/docker-compose.yml" "$@"
 }
 
 # Lê o token do .env do tenant
