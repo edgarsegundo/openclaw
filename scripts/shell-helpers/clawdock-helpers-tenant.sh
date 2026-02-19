@@ -40,10 +40,13 @@ _clawdock_tenant_ensure_dir() {
   fi
 }
 
-# Wrapper para docker compose
+# Wrapper para docker compose, sempre usando --project-name único por tenant
 _clawdock_tenant_compose() {
   _clawdock_tenant_ensure_dir || return 1
-  command docker compose -f "$TENANT_DIR/docker-compose.yml" --env-file "$TENANT_DIR/.env" "$@"
+  # Usa o nome do diretório do tenant como project name
+  local project_name
+  project_name="$(basename "$TENANT_DIR")"
+  command docker compose -p "$project_name" -f "$TENANT_DIR/docker-compose.yml" --env-file "$TENANT_DIR/.env" "$@"
 }
 
 # Lê o token do .env do tenant

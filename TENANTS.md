@@ -53,12 +53,47 @@ cd /home/ubuntu/openclaw
 ./docker-setup-tenant.sh <client_id>
 ```
 
+### 3. Crie um link simbólico e execute o script `clawdock-tenant-fix-token`
+ln -s /home/ubuntu/openclaw/docker-compose.yml /opt/openclaw/edgar/docker-compose.yml
 
-cd /home/ubuntu/openclaw
-./docker-setup-tenant.sh edgar
-# (responda ao onboarding)
-clawdock-fix-token
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml up -d
+export TENANT_DIR=/opt/openclaw/edgar
+source ~/openclaw/scripts/shell-helpers/clawdock-helpers-tenant.sh
+clawdock-tenant-fix-token
+
+
+### 4. Configure o Telegram
+
+Telegram — simplest way to get started — register a bot with @BotFather and get going.  
+
+Send a `/start` with the newly bot created 
+
+Pegue o código que o bot vai lhe dar e substitua o <CODE> e rode:
+
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODE>
+
+
+
+
+
+### Inside container:
+
+node dist/index.js devices list --token 94554ce79c55f...
+
+### outside container:
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token 94554ce79c55f...
+
+
+### como aprovar o web, esse funcionou
+node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
+
+
+
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
+
+
+sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)
+
+
 
 
 
@@ -288,40 +323,6 @@ ONLY_ONBOARD=1 ./docker-setup-tenant.sh <client_id>
 
 
 ## How to pair
-
-### Telegram
-
-
-
-Telegram — simplest way to get started — register a bot with @BotFather and get going.  
-
-Send a `/start`
-
-
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODE>
-
-
-
-
-
-### Inside container:
-
-node dist/index.js devices list --token 94554ce79c55f...
-
-### outside container:
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token 94554ce79c55f...
-
-
-### como aprovar o web, esse funcionou
-node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
-
-
-
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
-
-
-sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)
-
 
 
 ## A parte mais importante para o seu caso é esta linha:
