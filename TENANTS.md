@@ -256,7 +256,7 @@ ONLY_ONBOARD=1 ./docker-setup-tenant.sh edgar
 
 docker compose --env-file /opt/openclaw/edgar/.env down
 sudo chown -R ubuntu:ubuntu /opt/openclaw/edgar
-NODE_OPTIONS="--max-old-space-size=1024" ./docker-setup-tenant.sh edgar
+./docker-setup-tenant.sh edgar
 
 
 
@@ -281,3 +281,26 @@ docker compose --env-file /opt/openclaw/edgar/.env run --rm openclaw-cli \
 Sem isso, todos os usuários que falam com o bot compartilham a mesma sessão — o que num contexto multitenancy pode ser um problema de privacidade.
 
 O restante da lista são apenas canais disponíveis — você só precisa se preocupar com os que for usar.
+
+
+
+## Pairing
+
+
+### Inside container:
+
+node dist/index.js devices list --token 94554ce79c55f...
+
+### outside container:
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token 94554ce79c55f...
+
+
+### como aprovar o web, esse funcionou
+node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
+
+
+
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
+
+
+sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)

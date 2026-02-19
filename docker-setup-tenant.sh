@@ -249,6 +249,14 @@ if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
 fi
 
+# Sincronizar token gerado pelo onboarding para o .env
+GENERATED_TOKEN=$(cat "${OPENCLAW_CONFIG_DIR}/openclaw.json" 2>/dev/null | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+if [[ -n "$GENERATED_TOKEN" ]]; then
+  OPENCLAW_GATEWAY_TOKEN="$GENERATED_TOKEN"
+  upsert_env "$ENV_FILE" OPENCLAW_GATEWAY_TOKEN
+  echo "==> Token sincronizado do openclaw.json para o .env"
+fi
+
 # ----------------------------------------
 # 📡 Canais (opcional)
 # ----------------------------------------
