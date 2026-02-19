@@ -57,11 +57,6 @@ if [[ -f "$ENV_FILE" ]]; then
   set +o allexport
 fi
 
-# ⚙️ Configurações do tenant        <-- aqui, logo abaixo do source
-OPENCLAW_CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-${TENANT_DIR}/state}"
-OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${TENANT_DIR}/workspace}"
-OPENCLAW_HOME_VOLUME="${OPENCLAW_HOME_VOLUME:-${TENANT_DIR}/home}"
-
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   if command -v openssl >/dev/null 2>&1; then
     OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 32)"
@@ -75,19 +70,15 @@ PY
 fi
 
 # ----------------------------------------
-# 🌐 Portas — cada tenant deve usar portas únicas
-# Por padrão incrementa baseado num offset se definido
+# ⚙️ Configurações do tenant
+# Usa valor do .env se existir, senão aplica default baseado no TENANT_DIR
 # ----------------------------------------
 OPENCLAW_GATEWAY_PORT="${OPENCLAW_GATEWAY_PORT:-18789}"
 OPENCLAW_BRIDGE_PORT="${OPENCLAW_BRIDGE_PORT:-18790}"
-
-# ----------------------------------------
-# ⚙️ Configurações do tenant
-# ----------------------------------------
-OPENCLAW_CONFIG_DIR="${TENANT_DIR}/state"
-OPENCLAW_WORKSPACE_DIR="${TENANT_DIR}/workspace"
-OPENCLAW_HOME_VOLUME="${TENANT_DIR}/home"
 OPENCLAW_GATEWAY_BIND="${OPENCLAW_GATEWAY_BIND:-lan}"
+OPENCLAW_CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-${TENANT_DIR}/state}"
+OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-${TENANT_DIR}/workspace}"
+OPENCLAW_HOME_VOLUME="${OPENCLAW_HOME_VOLUME:-${TENANT_DIR}/home}"
 OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-}"
 OPENCLAW_EXTRA_MOUNTS="${OPENCLAW_EXTRA_MOUNTS:-}"
 
