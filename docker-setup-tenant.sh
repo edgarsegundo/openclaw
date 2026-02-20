@@ -250,24 +250,6 @@ if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
 fi
 
 # ----------------------------------------
-# 🔄 Sincronizar token do openclaw.json para o .env
-# Removido: set +e / 2>/dev/null / || true — erros agora abortam o script normalmente
-# ----------------------------------------
-# if ! command -v jq >/dev/null 2>&1; then
-#   echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
-#   echo "    Instale com: sudo apt-get install -y jq"
-# else
-#   GENERATED_TOKEN=$(jq -r '.gateway.auth.token // empty' "${OPENCLAW_CONFIG_DIR}/openclaw.json")
-#   if [[ -n "$GENERATED_TOKEN" ]]; then
-#     OPENCLAW_GATEWAY_TOKEN="$GENERATED_TOKEN"
-#     upsert_env "$ENV_FILE" OPENCLAW_GATEWAY_TOKEN
-#     echo "==> Token sincronizado do openclaw.json para o .env"
-#   else
-#     echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
-#   fi
-# fi
-
-# ----------------------------------------
 # 📡 Canais (opcional)
 # ----------------------------------------
 echo ""

@@ -53,18 +53,16 @@ cd /home/ubuntu/openclaw
 ./docker-setup-tenant.sh <client_id>
 ```
 
-### 3. Crie um link simbólico e execute o script `clawdock-tenant-fix-token`
+### 3. Crie um link simbólico e prepara o ambiente para clawdock-helpers funcionar
 
 ln -s /home/ubuntu/openclaw/docker-compose.yml /opt/openclaw/edgar/docker-compose.yml
-
 export TENANT_DIR=/opt/openclaw/edgar
 source ~/openclaw/scripts/shell-helpers/clawdock-helpers-tenant.sh
-clawdock-tenant-fix-token
 
 ### Test if the tokens are sync
 
-echo $OPENCLAW_CONFIG_DIR
-cat .env | grep  OPENCLAW_CONFIG_DIR
+grep OPENCLAW_GATEWAY_TOKEN /opt/openclaw/edgar/.env
+cat /opt/openclaw/edgar/state/openclaw.json | grep '"token"'
 
 
 
@@ -78,29 +76,14 @@ Pegue o código que o bot vai lhe dar e substitua o <CODE> e rode:
 
 docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODE>
 
-### 5. 
+### 5. Aprovando o openclaw site
 
 docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices list --token "$(clawdock-tenant-token)"
 
-
 docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices approve <CODIGO> --token "$(clawdock-tenant-token)"
 
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices approve <CODIGO> --token "$(clawdock-tenant-token)"
+docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices approve f1505e2e-2115-4227-99c5-59a052d06a07
 
-
-### como aprovar o web, esse funcionou
-node dist/index.js devices approve e704ab42-8e4f-4e81-9aa2-5c58ff801e2b
-
-
-
-docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js pairing approve --channel telegram <CODIGO>
-
-
-
-echo $OPENCLAW_CONFIG_DIR
-cat .env | grep  OPENCLAW_CONFIG_DIR
-
-sudo truncate -s 0 $(docker inspect --format='{{.LogPath}}' cde0f0e6e671)
 
 
 
