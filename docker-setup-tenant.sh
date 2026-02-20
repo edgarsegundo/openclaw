@@ -251,7 +251,7 @@ if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   set -e
 fi
 
-# Sincronizar token gerado pelo onboarding para o .env
+set +e
 if ! command -v jq >/dev/null 2>&1; then
   echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
   echo "    Instale com: sudo apt-get install -y jq"
@@ -265,6 +265,7 @@ else
     echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
   fi
 fi
+set -e
 
 # ----------------------------------------
 # 📡 Canais (opcional)
