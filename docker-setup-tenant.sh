@@ -242,18 +242,16 @@ echo "  - Install Gateway daemon: No"
 echo ""
 if [[ "${ONLY_ONBOARD:-0}" == "1" ]]; then
   docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
-  # docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon --skip-health
   exit 0
 fi
 
 if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
-  # docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon --skip-health
 fi
 
-sleep 30  # Aguarda 30 segundos para garantir que o onboarding finalize e o arquivo seja criado
+# sleep 30  # Aguarda 30 segundos para garantir que o onboarding finalize e o arquivo seja criado
 
-set +e
+# set +e
 if ! command -v jq >/dev/null 2>&1; then
   echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
   echo "    Instale com: sudo apt-get install -y jq"
@@ -267,7 +265,7 @@ else
     echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
   fi
 fi
-set -e
+# set -e
 
 # ----------------------------------------
 # 📡 Canais (opcional)
