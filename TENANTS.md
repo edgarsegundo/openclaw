@@ -53,6 +53,13 @@ cd /home/ubuntu/openclaw
 ./docker-setup-tenant.sh <client_id>
 ```
 
+O script vai:
+- Criar os diretórios `state/`, `workspace/` e `home/` se não existirem
+- Carregar o `.env` do tenant e respeitar os valores já definidos
+- Fazer o build da imagem Docker
+- Rodar o onboarding interativo
+- Subir o gateway
+
 ### 3. Crie um link simbólico e prepara o ambiente para clawdock-helpers funcionar
 
 ln -s /home/ubuntu/openclaw/docker-compose.yml /opt/openclaw/edgar/docker-compose.yml
@@ -63,8 +70,6 @@ source ~/openclaw/scripts/shell-helpers/clawdock-helpers-tenant.sh
 
 grep OPENCLAW_GATEWAY_TOKEN /opt/openclaw/edgar/.env
 cat /opt/openclaw/edgar/state/openclaw.json | grep '"token"'
-
-
 
 ### 4. Configure o Telegram
 
@@ -83,20 +88,6 @@ docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/open
 docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices approve <CODIGO> --token "$(clawdock-tenant-token)"
 
 docker compose --env-file /opt/openclaw/edgar/.env --project-directory /opt/openclaw/edgar -f /home/ubuntu/openclaw/docker-compose.yml exec openclaw-gateway node dist/index.js devices approve f1505e2e-2115-4227-99c5-59a052d06a07
-
-
-
-
-
-
-
-
-O script vai:
-- Criar os diretórios `state/`, `workspace/` e `home/` se não existirem
-- Carregar o `.env` do tenant e respeitar os valores já definidos
-- Fazer o build da imagem Docker
-- Rodar o onboarding interativo
-- Subir o gateway
 
 ### 3. Durante o onboarding, responda:
 
@@ -337,3 +328,22 @@ docker compose --env-file /opt/openclaw/edgar/.env run --rm openclaw-cli \
 Sem isso, todos os usuários que falam com o bot compartilham a mesma sessão — o que num contexto multitenancy pode ser um problema de privacidade.
 
 O restante da lista são apenas canais disponíveis — você só precisa se preocupar com os que for usar.
+
+
+## `clawdock-helpers.sh` helpers?
+
+clawdock-tenant-token
+
+
+
+## `clawhub` tips
+
+```bash
+
+# to see how to use it
+npx clawhub
+
+npx clawhub search "calendar"
+
+
+```
