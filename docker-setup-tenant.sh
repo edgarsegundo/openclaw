@@ -241,13 +241,15 @@ echo "  - Tailscale exposure: Off"
 echo "  - Install Gateway daemon: No"
 echo ""
 if [[ "${ONLY_ONBOARD:-0}" == "1" ]]; then
-  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  # docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon --skip-health
   exit 0
 fi
 
 if [[ "${SKIP_ONBOARD:-0}" != "1" ]]; then
   set +e
-  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  # docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon
+  docker compose --env-file "$ENV_FILE" --project-directory "$TENANT_DIR" "${COMPOSE_ARGS[@]}" run --rm openclaw-cli onboard --no-install-daemon --skip-health
   set -e
 fi
 
@@ -308,3 +310,7 @@ echo "  ${COMPOSE_HINT} down"
 echo ""
 echo "⚠️  Se adicionar outro tenant, use portas diferentes:"
 echo "  OPENCLAW_GATEWAY_PORT=18791 OPENCLAW_BRIDGE_PORT=18792 ./docker-setup-tenant.sh outro-cliente"
+
+echo "Acesse via SSH tunnel:"
+echo "  ssh -N -L ${OPENCLAW_GATEWAY_PORT}:127.0.0.1:${OPENCLAW_GATEWAY_PORT} ubuntu@<IP_DO_SERVIDOR>"
+echo "  http://localhost:${OPENCLAW_GATEWAY_PORT}/#token=${OPENCLAW_GATEWAY_TOKEN}"
