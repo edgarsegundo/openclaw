@@ -251,7 +251,7 @@ fi
 
 # sleep 30  # Aguarda 30 segundos para garantir que o onboarding finalize e o arquivo seja criado
 
-# set +e
+set +e
 if ! command -v jq >/dev/null 2>&1; then
   echo "==> Aviso: jq não instalado — token não sincronizado automaticamente."
   echo "    Instale com: sudo apt-get install -y jq"
@@ -265,7 +265,7 @@ else
     echo "==> Aviso: token não encontrado no openclaw.json, mantendo token atual do .env"
   fi
 fi
-# set -e
+set -e
 
 # ----------------------------------------
 # 📡 Canais (opcional)
