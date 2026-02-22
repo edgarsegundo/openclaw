@@ -43,6 +43,12 @@ pm2 save
 pm2 startup
 ```
 
+> Se está tentando instalar de novo, precisa limpar tudo:
+```bash
+pm2 kill
+rm -rf ~/.pm2
+```
+
 ### 4. Registrar no startup do sistema
 
 O comando `pm2 startup` vai gerar um comando personalizado para o seu ambiente. Copie e execute o comando gerado, que terá este formato:
