@@ -33,11 +33,14 @@ const IMAP_CONFIG = {
 
 const SEARCH_CONFIG = {
   email: "todomundo@nubank.com.br",
-  subject: "transferencia", // sem acento, mais específico
+  subjectContains: "transfer", // filtro local flexível, sem acento
+  subjectExpected: "transferência pelo pix", // referência para detectar variações
 };
 
 const DEBUG_SINCE_DATE = new Date("2025-12-26T00:00:00.000-03:00"); // TODO: remove before production
-const USE_DEBUG_SINCE_DATE = true; // TODO: set to false before production
+const USE_DEBUG_SINCE_DATE = false; // TODO: set to false before production
+
+const CUTOFF_LOOKBACK_DAYS = 2; // subtrai X dias do cutoff para evitar gaps
 
 const RETRY_CONFIG = {
   attempts: 3,
@@ -85,7 +88,7 @@ const aiClient = new AIClient({
   logger,
 });
 
-// ─── Discord Notification (mockup) ───────────────────────────────────────────
+// ─── Discord Notification ─────────────────────────────────────────────────────
 
 async function notifyDiscord(message) {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
@@ -129,11 +132,39 @@ function openDatabase() {
       parse_sources    TEXT NOT NULL,
       body             TEXT NOT NULL,
       created_at       DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
-    )
+    );
+
+    CREATE TABLE IF NOT EXISTS runs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      started_at  DATETIME NOT NULL,
+      finished_at DATETIME,
+      status      TEXT NOT NULL CHECK(status IN ('running', 'success', 'partial', 'failed')),
+      found       INTEGER,
+      saved       INTEGER,
+      skipped     INTEGER,
+      discarded   INTEGER
+    );
   `);
 
   logger.debug("Database opened and table ensured.");
   return db;
+}
+
+function insertRun(db, startedAt) {
+  const result = db
+    .prepare(`
+    INSERT INTO runs (started_at, status)
+    VALUES (?, 'running')
+  `)
+    .run(startedAt.toISOString());
+  return result.lastInsertRowid;
+}
+
+function finishRun(db, runId, status, { found, saved, skipped, discarded }) {
+  db.prepare(`
+    UPDATE runs SET finished_at = ?, status = ?, found = ?, saved = ?, skipped = ?, discarded = ?
+    WHERE id = ?
+  `).run(new Date().toISOString(), status, found, saved, skipped, discarded, runId);
 }
 
 function getLatestTransactionDate(db) {
@@ -142,7 +173,8 @@ function getLatestTransactionDate(db) {
 
   if (row?.latest) {
     const date = new Date(row.latest);
-    logger.info(`Cutoff date from DB: ${date.toISOString()}`);
+    date.setDate(date.getDate() - CUTOFF_LOOKBACK_DAYS); // subtrai 2 dias para evitar gaps
+    logger.info(`Cutoff date from DB (minus ${CUTOFF_LOOKBACK_DAYS} days): ${date.toISOString()}`);
     return date;
   }
 
@@ -218,8 +250,9 @@ function stripHtmlToText(html) {
 
 // ── Individual field extractors ──────────────────────────────────────────────
 
-function extractCnpj(rawBody) {
-  const match = rawBody.match(/^To:\s*([\d.]+)\s*</m);
+function extractCnpj(decoded) {
+  const match =
+    decoded.match(/Ol[aá],\s*([^<\n\r]+)/i) || decoded.match(/Ol=C3=A1,\s*([^<\n\r]+)/i);
   if (!match?.[1]) {
     return { value: null, source: "failed" };
   }
@@ -335,7 +368,7 @@ async function parseEmail(email) {
   const bodyForStorage = htmlBody.slice(0, BODY_MAX_LENGTH);
 
   // ── Regex extraction
-  let cnpjResult = extractCnpj(rawBody);
+  let cnpjResult = extractCnpj(decoded);
   let personNameResult = extractPersonName(decoded);
   let amountResult = extractAmount(decoded);
   let transactionDateResult = extractTransactionDate(htmlBody, email.date);
@@ -459,37 +492,56 @@ async function fetchEmailsFromImap(cutoffDate) {
         logger.debug(`Total messages in INBOX (no filter): ${allMessages.length}`);
         const bySender = await client.search({ from: SEARCH_CONFIG.email });
         logger.debug(`Messages matching from="${SEARCH_CONFIG.email}": ${bySender.length}`);
-        const bySubject = await client.search({ subject: SEARCH_CONFIG.subject });
-        logger.debug(`Messages matching subject="${SEARCH_CONFIG.subject}": ${bySubject.length}`);
         const byDate = await client.search({ since: cutoffDate });
         logger.debug(`Messages matching since=${cutoffDate.toISOString()}: ${byDate.length}`);
 
-        const filter = {
-          from: SEARCH_CONFIG.email,
-          subject: SEARCH_CONFIG.subject,
-          since: cutoffDate,
-        };
+        // IMAP filter: from + since only (subject filtered locally for reliability)
+        const filter = { from: SEARCH_CONFIG.email, since: cutoffDate };
         logger.debug(
-          `Applying combined filter: ${JSON.stringify({ ...filter, since: cutoffDate.toISOString() })}`,
+          `Applying IMAP filter: from="${SEARCH_CONFIG.email}" since=${cutoffDate.toISOString()}`,
         );
 
         const messageIds = await client.search(filter);
-        logger.info(`Found ${messageIds.length} matching message(s) with combined filter.`);
+        logger.info(`Found ${messageIds.length} candidate(s) from IMAP filter.`);
 
         const emails = [];
+        const subjectsSeen = new Set();
+
         for await (const msg of client.fetch(messageIds, { envelope: true, source: true })) {
+          const subject = msg.envelope.subject ?? "";
+          const subjectLower = subject.toLowerCase();
+
+          // Local subject filter
+          if (!subjectLower.includes(SEARCH_CONFIG.subjectContains)) {
+            logger.debug(`uid=${msg.uid} skipped — subject does not match: "${subject}"`);
+            continue;
+          }
+
+          // Detect unexpected subject variation
+          if (!subjectLower.includes(SEARCH_CONFIG.subjectExpected)) {
+            logger.warn(`uid=${msg.uid} — unexpected subject variation: "${subject}"`);
+            await notifyDiscord(
+              `⚠️ check-nubank-emails: New subject variation: "${subject}" — review needed`,
+            );
+          }
+
+          subjectsSeen.add(subject);
           const body = msg.source?.toString("utf8") ?? "";
           logger.debug(
-            `Fetched uid=${msg.uid} subject="${msg.envelope.subject}" date=${String(msg.envelope.date)}`,
+            `Fetched uid=${msg.uid} subject="${subject}" date=${String(msg.envelope.date)}`,
           );
+
           emails.push({
             uid: msg.uid,
-            subject: msg.envelope.subject,
+            subject,
             from: msg.envelope.from?.map((f) => `${f.name} <${f.mailbox}@${f.host}>`).join(", "),
             date: msg.envelope.date,
             body,
           });
         }
+
+        logger.info(`Matched ${emails.length} email(s) after local subject filter.`);
+        logger.info(`Subjects seen this run: ${[...subjectsSeen].join(" | ") || "none"}`);
 
         return emails;
       } finally {
@@ -530,19 +582,23 @@ async function main() {
   } catch (err) {
     logger.error(`Failed to open database: ${err.message}`);
     await notifyDiscord(`❌ check-nubank-emails: Failed to open database — ${err.message}`);
-    process.exit(1);
+    process.exit(1); // sem banco não tem nada a fazer
   }
+
+  const startedAt = new Date();
+  const runId = insertRun(db, startedAt);
 
   const cutoffDate = getLatestTransactionDate(db);
 
-  let emails;
+  let emails = [];
   try {
     emails = await fetchEmailsFromImap(cutoffDate);
   } catch (err) {
     logger.error(`IMAP failed after all retries: ${err.message}`);
     await notifyDiscord(`❌ check-nubank-emails: IMAP failed after all retries — ${err.message}`);
+    finishRun(db, runId, "failed", { found: 0, saved: 0, skipped: 0, discarded: 0 });
     db.close();
-    process.exit(1);
+    return; // não aborta o processo, termina graciosamente
   }
 
   let saved = 0;
@@ -590,6 +646,8 @@ async function main() {
     }
   }
 
+  const status = discarded > 0 ? "partial" : "success";
+  finishRun(db, runId, status, { found: emails.length, saved, skipped, discarded });
   db.close();
 
   logger.info(
@@ -600,5 +658,5 @@ async function main() {
 main().catch(async (err) => {
   logger.error(`Unexpected error: ${err.message}`);
   await notifyDiscord(`❌ check-nubank-emails: Unexpected error — ${err.message}`);
-  process.exit(1);
+  // não chama process.exit — termina graciosamente
 });
