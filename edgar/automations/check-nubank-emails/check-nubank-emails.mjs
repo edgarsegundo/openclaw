@@ -1,12 +1,17 @@
-"use strict";
+import path from "path";
+import { fileURLToPath } from "url";
+import Database from "better-sqlite3";
+import { config } from "dotenv";
+import { convert } from "html-to-text";
+import { ImapFlow } from "imapflow";
+import "winston-daily-rotate-file";
+import OpenAI from "openai";
+import winston from "winston";
+import { z } from "zod";
+import { AIClient } from "../ai-client/ai-client.js";
 
-const { ImapFlow } = require("imapflow");
-const Database = require("better-sqlite3");
-const { convert } = require("html-to-text");
-const path = require("path");
-const winston = require("winston");
-require("winston-daily-rotate-file");
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.join(__dirname, ".env") });
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -58,6 +63,26 @@ const logger = winston.createLogger({
       tailable: true,
     }),
   ],
+});
+
+// ─── OpenAI + AIClient setup ─────────────────────────────────────────────────
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const aiClient = new AIClient({
+  aiCallback: async ({ prompt, temperature }) => {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature,
+      messages: [{ role: "user", content: prompt }],
+    });
+    return response.choices[0].message.content ?? "";
+  },
+  defaultTemperature: 0.1,
+  maxRetries: 2,
+  maxRepairAttempts: 1,
+  timeoutMs: 30_000,
+  logger,
 });
 
 // ─── Discord Notification (mockup) ───────────────────────────────────────────
@@ -154,7 +179,6 @@ function decodeQuotedPrintable(str) {
     .replace(/=([0-9A-F]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
-// Extract HTML body (strip SMTP headers)
 function extractHtmlBody(rawBody) {
   const htmlStart = rawBody.indexOf("<!doctype html");
   if (htmlStart !== -1) {
@@ -167,7 +191,6 @@ function extractHtmlBody(rawBody) {
   return rawBody;
 }
 
-// Strip HTML to plain text for LLM
 function stripHtmlToText(html) {
   return convert(html, {
     wordwrap: false,
@@ -209,7 +232,6 @@ function extractAmount(decoded) {
 }
 
 function extractTransactionDate(rawBody, emailDate) {
-  // Match on raw body before QP decode since =C3=A0 (à) decodes incorrectly in Latin-1 context
   const match =
     rawBody.match(/(\d{1,2})\s+([A-Z]{3})\s*=C3=A0s\s*(\d{2}:\d{2})/i) ||
     rawBody.match(/(\d{1,2})\s+([A-Z]{3})\s*às\s*(\d{2}:\d{2})/i);
@@ -233,14 +255,59 @@ function extractTransactionDate(rawBody, emailDate) {
   return { value: d.toISOString(), source: "regex" };
 }
 
-// ── LLM fallback stub ────────────────────────────────────────────────────────
+// ── LLM extraction schema ────────────────────────────────────────────────────
 
-async function extractWithLLM(fieldName, plainText, email) {
-  // TODO: implement real LLM extraction
-  // Example fields: 'cnpj', 'person_name', 'amount', 'transaction_date'
-  logger.warn(`[LLM STUB] Would extract field="${fieldName}" from email uid=${email.uid}`);
-  logger.debug(`[LLM STUB] Plain text snippet:\n${plainText.slice(0, 500)}`);
-  return { value: null, source: "failed" };
+const llmExtractionSchema = z.object({
+  cnpj: z.string().nullable(),
+  person_name: z.string().nullable(),
+  amount: z.number().positive().nullable(),
+  transaction_date: z.string().datetime().nullable(),
+});
+
+async function extractFailedFieldsWithLLM(failedFields, plainText, email) {
+  const fieldDescriptions = {
+    cnpj: 'partial CNPJ (e.g. "62.462.272") — digits and dots only, no slash or dash',
+    person_name: "full name of the person or company that sent the Pix transfer",
+    amount: "numeric value of the transfer amount (e.g. 852.00)",
+    transaction_date: 'ISO 8601 datetime of the transaction (e.g. "2025-12-26T17:02:00.000Z")',
+  };
+
+  const fieldsToExtract = failedFields.map((f) => `- "${f}": ${fieldDescriptions[f]}`).join("\n");
+
+  const prompt = `
+You are a data extraction assistant for Brazilian bank email notifications.
+
+Extract the following fields from the email text below:
+${fieldsToExtract}
+
+Rules:
+- Return ONLY valid JSON with exactly these keys: ${failedFields.map((f) => `"${f}"`).join(", ")}
+- If a field cannot be found, return null for that field
+- For "amount": return a number, not a string (e.g. 852.00 not "R$ 852,00")
+- For "transaction_date": return ISO 8601 format in UTC
+- For "cnpj": return only the partial number as shown (e.g. "62.462.272")
+- Do NOT add explanations
+- Return ONLY valid JSON
+
+Email text:
+${plainText.slice(0, 3000)}
+`;
+
+  logger.warn(`[LLM] Extracting fields [${failedFields.join(", ")}] for uid=${email.uid}`);
+
+  try {
+    const result = await aiClient.generateStructured({
+      prompt,
+      schema: llmExtractionSchema.pick(Object.fromEntries(failedFields.map((f) => [f, true]))),
+      temperature: 0.1,
+    });
+
+    logger.info(`[LLM] Extraction result for uid=${email.uid}: ${JSON.stringify(result)}`);
+    return result;
+  } catch (err) {
+    logger.error(`[LLM] Extraction failed for uid=${email.uid}: ${err.message}`);
+    return null;
+  }
 }
 
 // ── Main parse orchestrator ───────────────────────────────────────────────────
@@ -250,24 +317,26 @@ async function parseEmail(email) {
   const htmlBody = extractHtmlBody(rawBody);
   const decoded = decodeQuotedPrintable(htmlBody);
   const plainText = stripHtmlToText(decoded);
-
-  // Truncated HTML body for storage (no SMTP headers)
   const bodyForStorage = htmlBody.slice(0, BODY_MAX_LENGTH);
 
-  // ── Extract all fields
+  // ── Regex extraction
   let cnpjResult = extractCnpj(rawBody);
   let personNameResult = extractPersonName(decoded);
   let amountResult = extractAmount(decoded);
   let transactionDateResult = extractTransactionDate(htmlBody, email.date);
 
-  // ── Fixed fields (no extraction needed)
+  // // 🧪 FORCE LLM TEST — remove after testing
+  // cnpjResult            = { value: null, source: 'failed' };
+  // personNameResult      = { value: null, source: 'failed' };
+  // amountResult          = { value: null, source: 'failed' };
+  // transactionDateResult = { value: null, source: 'failed' };
+
   const operation = "in";
   const type = "pix";
   const name = "Nubank Pagamentos S.A.";
 
-  // ── Log extraction results
   logger.debug(
-    `uid=${email.uid} extraction: cnpj=${cnpjResult.source} person=${personNameResult.source} amount=${amountResult.source} date=${transactionDateResult.source}`,
+    `uid=${email.uid} regex: cnpj=${cnpjResult.source} person=${personNameResult.source} amount=${amountResult.source} date=${transactionDateResult.source}`,
   );
 
   // ── Identify failed fields
@@ -285,34 +354,31 @@ async function parseEmail(email) {
     failedFields.push("transaction_date");
   }
 
-  // ── Delegate failed fields to LLM
+  // ── Delegate ALL failed fields to LLM in a single call
   if (failedFields.length > 0) {
     logger.warn(
-      `uid=${email.uid} — regex failed for fields: [${failedFields.join(", ")}]. Delegating to LLM...`,
+      `uid=${email.uid} — regex failed for: [${failedFields.join(", ")}]. Delegating to LLM...`,
     );
 
-    for (const field of failedFields) {
-      let llmResult;
-      if (field === "cnpj") {
-        llmResult = await extractWithLLM("cnpj", plainText, email);
-        cnpjResult = llmResult;
+    const llmResult = await extractFailedFieldsWithLLM(failedFields, plainText, email);
+
+    if (llmResult) {
+      if (failedFields.includes("cnpj") && llmResult.cnpj != null) {
+        cnpjResult = { value: llmResult.cnpj, source: "llm" };
       }
-      if (field === "person_name") {
-        llmResult = await extractWithLLM("person_name", plainText, email);
-        personNameResult = llmResult;
+      if (failedFields.includes("person_name") && llmResult.person_name != null) {
+        personNameResult = { value: llmResult.person_name, source: "llm" };
       }
-      if (field === "amount") {
-        llmResult = await extractWithLLM("amount", plainText, email);
-        amountResult = llmResult;
+      if (failedFields.includes("amount") && llmResult.amount != null) {
+        amountResult = { value: llmResult.amount, source: "llm" };
       }
-      if (field === "transaction_date") {
-        llmResult = await extractWithLLM("transaction_date", plainText, email);
-        transactionDateResult = llmResult;
+      if (failedFields.includes("transaction_date") && llmResult.transaction_date != null) {
+        transactionDateResult = { value: llmResult.transaction_date, source: "llm" };
       }
     }
   }
 
-  // ── Check if any field is still failed after LLM
+  // ── Check if any field is still null after LLM
   const stillFailed = [];
   if (cnpjResult.value === null) {
     stillFailed.push("cnpj");
@@ -328,13 +394,12 @@ async function parseEmail(email) {
   }
 
   if (stillFailed.length > 0) {
-    const msg = `uid=${email.uid} — extraction failed after LLM for fields: [${stillFailed.join(", ")}]. Discarding.`;
+    const msg = `uid=${email.uid} — extraction failed after LLM for: [${stillFailed.join(", ")}]. Discarding.`;
     logger.error(msg);
     await notifyDiscord(`❌ check-nubank-emails: ${msg}`);
     return null;
   }
 
-  // ── Build parse_sources JSON
   const parse_sources = JSON.stringify({
     cnpj: cnpjResult.source,
     person_name: personNameResult.source,
@@ -375,7 +440,6 @@ async function fetchEmailsFromImap(cutoffDate) {
       const lock = await client.getMailboxLock("INBOX");
 
       try {
-        // Debug searches
         const allMessages = await client.search({ all: true });
         logger.debug(`Total messages in INBOX (no filter): ${allMessages.length}`);
         const bySender = await client.search({ from: SEARCH_CONFIG.email });

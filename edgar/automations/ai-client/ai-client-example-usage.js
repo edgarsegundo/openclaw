@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import { AIClient } from "./AIClient.js";
+import { AIClient } from "./ai-client.js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
