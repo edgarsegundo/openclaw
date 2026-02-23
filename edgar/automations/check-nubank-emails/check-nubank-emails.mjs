@@ -37,7 +37,7 @@ const SEARCH_CONFIG = {
 };
 
 const DEBUG_SINCE_DATE = new Date("2025-12-26T00:00:00.000-03:00"); // TODO: remove before production
-const USE_DEBUG_SINCE_DATE = false; // TODO: set to false before production
+const USE_DEBUG_SINCE_DATE = true; // TODO: set to false before production
 
 const RETRY_CONFIG = {
   attempts: 3,
@@ -88,10 +88,25 @@ const aiClient = new AIClient({
 // ─── Discord Notification (mockup) ───────────────────────────────────────────
 
 async function notifyDiscord(message) {
-  // TODO: implement Discord webhook notification
-  // const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  // await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ content: message }) });
-  logger.warn(`[DISCORD MOCKUP] ${message}`);
+  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) {
+    logger.warn("DISCORD_WEBHOOK_URL not set, skipping notification");
+    return;
+  }
+
+  try {
+    const res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: message }),
+    });
+
+    if (!res.ok) {
+      logger.error(`Discord notification failed: ${res.status} ${res.statusText}`);
+    }
+  } catch (err) {
+    logger.error(`Discord notification error: ${err.message}`);
+  }
 }
 
 // ─── Database ────────────────────────────────────────────────────────────────
@@ -506,6 +521,7 @@ function sleep(ms) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
+  // throw new Error('teste de notificação Discord'); // 🧪 remove after testing
   logger.info("=== check-nubank-emails started ===");
 
   let db;
