@@ -1238,3 +1238,53 @@ VocÃª recebeu uma transferÃªncia pelo Pix de GOBBI PAVAN EDUCACAO LTDA e o v
 [23/02/2026 17:21:10] [ERROR] uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
 [23/02/2026 17:21:10] [WARN] [DISCORD MOCKUP] ❌ check-nubank-emails: uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
 [23/02/2026 17:21:10] [INFO] === Done. Found: 1 | Saved: 0 | Skipped: 0 | Discarded: 1 ===
+[23/02/2026 18:11:17] [INFO] === check-nubank-emails started ===
+[23/02/2026 18:11:17] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 18:11:17] [DEBUG] Database opened and table ensured.
+[23/02/2026 18:11:17] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 18:11:17] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 18:11:17] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 18:11:20] [DEBUG] IMAP connected successfully.
+[23/02/2026 18:11:23] [DEBUG] Total messages in INBOX (no filter): 122339
+[23/02/2026 18:11:23] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 18:11:24] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 18:11:24] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3097
+[23/02/2026 18:11:24] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 18:11:24] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 18:11:25] [DEBUG] Fetched uid=259298 subject="Você recebeu uma transferência pelo Pix" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 18:11:25] [DEBUG] IMAP disconnected.
+[23/02/2026 18:11:25] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 18:11:25] [DEBUG] uid=259298 extraction: cnpj=regex person=regex amount=regex date=failed
+[23/02/2026 18:11:25] [WARN] uid=259298 — regex failed for fields: [transaction_date]. Delegating to LLM...
+[23/02/2026 18:11:25] [WARN] [LLM STUB] Would extract field="transaction_date" from email uid=259298
+[23/02/2026 18:11:25] [DEBUG] [LLM STUB] Plain text snippet:
+O valor jÃ¡ estÃ¡ disponÃ­vel na sua conta Nu Empresas  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ 
+
+TransferÃªncia recebida
+
+OlÃ¡, 62.462.272
+
+VocÃª recebeu uma transferÃªncia pelo Pix de GOBBI PAVAN EDUCACAO LTDA e o v
+[23/02/2026 18:11:25] [ERROR] uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
+[23/02/2026 18:11:25] [WARN] [DISCORD MOCKUP] ❌ check-nubank-emails: uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
+[23/02/2026 18:11:25] [INFO] === Done. Found: 1 | Saved: 0 | Skipped: 0 | Discarded: 1 ===
+[23/02/2026 18:14:08] [INFO] === check-nubank-emails started ===
+[23/02/2026 18:14:08] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 18:14:08] [DEBUG] Database opened and table ensured.
+[23/02/2026 18:14:08] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 18:14:08] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 18:14:08] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 18:14:11] [DEBUG] IMAP connected successfully.
+[23/02/2026 18:14:14] [DEBUG] Total messages in INBOX (no filter): 122339
+[23/02/2026 18:14:14] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 18:14:14] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 18:14:15] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3097
+[23/02/2026 18:14:15] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 18:14:15] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 18:14:15] [DEBUG] Fetched uid=259298 subject="Você recebeu uma transferência pelo Pix" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 18:14:16] [DEBUG] IMAP disconnected.
+[23/02/2026 18:14:16] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 18:14:16] [DEBUG] uid=259298 extraction: cnpj=regex person=regex amount=regex date=regex
+[23/02/2026 18:14:16] [INFO] uid=259298 parsed OK — person=GOBBI PAVAN EDUCACAO LTDA amount=852 cnpj=62.462.272 date=2025-12-26T20:02:00.000Z
+[23/02/2026 18:14:16] [INFO] Saved uid=259298 — GOBBI PAVAN EDUCACAO LTDA R$852 sources={"cnpj":"regex","person_name":"regex","amount":"regex","transaction_date":"regex"}
+[23/02/2026 18:14:16] [INFO] === Done. Found: 1 | Saved: 1 | Skipped: 0 | Discarded: 0 ===

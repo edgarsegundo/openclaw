@@ -208,8 +208,11 @@ function extractAmount(decoded) {
   return { value: amount, source: "regex" };
 }
 
-function extractTransactionDate(decoded, emailDate) {
-  const match = decoded.match(/(\d{1,2})\s+([A-Z]{3})\s*(?:às|=C3=A0s)\s*(\d{2}:\d{2})/i);
+function extractTransactionDate(rawBody, emailDate) {
+  // Match on raw body before QP decode since =C3=A0 (à) decodes incorrectly in Latin-1 context
+  const match =
+    rawBody.match(/(\d{1,2})\s+([A-Z]{3})\s*=C3=A0s\s*(\d{2}:\d{2})/i) ||
+    rawBody.match(/(\d{1,2})\s+([A-Z]{3})\s*às\s*(\d{2}:\d{2})/i);
   if (!match) {
     return { value: null, source: "failed" };
   }
@@ -255,7 +258,7 @@ async function parseEmail(email) {
   let cnpjResult = extractCnpj(rawBody);
   let personNameResult = extractPersonName(decoded);
   let amountResult = extractAmount(decoded);
-  let transactionDateResult = extractTransactionDate(decoded, email.date);
+  let transactionDateResult = extractTransactionDate(htmlBody, email.date);
 
   // ── Fixed fields (no extraction needed)
   const operation = "in";
