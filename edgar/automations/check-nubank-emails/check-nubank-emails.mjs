@@ -33,7 +33,7 @@ const IMAP_CONFIG = {
 
 const SEARCH_CONFIG = {
   email: "todomundo@nubank.com.br",
-  subject: "Você recebeu uma transferência pelo Pix",
+  subject: "transferencia", // sem acento, mais específico
 };
 
 const DEBUG_SINCE_DATE = new Date("2025-12-26T00:00:00.000-03:00"); // TODO: remove before production
