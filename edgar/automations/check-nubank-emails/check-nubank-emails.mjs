@@ -37,7 +37,7 @@ const SEARCH_CONFIG = {
 };
 
 const DEBUG_SINCE_DATE = new Date("2025-12-26T00:00:00.000-03:00"); // TODO: remove before production
-const USE_DEBUG_SINCE_DATE = false; // TODO: set to false before production
+const USE_DEBUG_SINCE_DATE = true; // TODO: set to false before production
 
 const RETRY_CONFIG = {
   attempts: 3,
