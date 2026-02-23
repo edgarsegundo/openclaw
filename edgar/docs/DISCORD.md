@@ -46,7 +46,7 @@ openclaw agents add fastvistos
 
 O wizard vai perguntar:
 
-- **Workspace directory** → aceita o padrão ou define um caminho (ex: `/opt/openclaw/edgar/state/workspace-fastvistos`)
+- **Workspace directory** → aceita o padrão ou define um caminho (ex: ` /home/ubuntu/.openclaw/workspace-fastvistos`)
 - **Configure chat channels now?** → **Yes**
 - **Select a channel** → seleciona **Discord (Bot API)**
 - **Discord account**:
@@ -127,6 +127,7 @@ openclaw channels status
 ```
 
 Deve aparecer algo como:
+
 ```
 Discord default: enabled, configured, running, bot:@fastvistos
 ```
@@ -148,6 +149,7 @@ pm2 restart openclaw
 > ⚠️ **Problema encontrado:** Ao rodar `openclaw doctor --repair`, o sistema instalou um serviço **systemd** que entrou em conflito com o pm2. Sintoma: erro _"Gateway already running (pid XXXXX); lock timeout"_ nos logs.
 >
 > **Solução:**
+>
 > ```bash
 > systemctl --user stop openclaw-gateway.service
 > systemctl --user disable openclaw-gateway.service
@@ -163,6 +165,7 @@ tail -f /tmp/openclaw/openclaw-2026-02-21.log
 ```
 
 Quando o bot está funcionando corretamente, aparece:
+
 ```
 logged in to discord as <ID_DO_BOT>
 ```
@@ -178,6 +181,7 @@ Quando uma mensagem chega e é processada, aparece o log com o canal e o agente 
 No canal `#fastvistos-financeiro`, manda uma mensagem. O bot deve responder.
 
 Se não responder, verifica:
+
 1. O bot está **online** (ponto verde) na lista de membros do servidor?
 2. As permissões do canal incluem o bot com **View Channel** e **Send Messages**?
 3. O gateway está rodando? (`pm2 list`)
@@ -199,10 +203,10 @@ Se não responder, verifica:
 
 ## Resumo dos Problemas Encontrados
 
-| Problema | Causa | Solução |
-|---|---|---|
-| Erro ao salvar no Developer Portal | Install Link não era None | Installation → Install Link → None |
-| `groupId` inválido no config | Campo não existe no OpenClaw | Remover do JSON, usar apenas `channel` e `accountId` no binding |
-| Conflito gateway systemd + pm2 | `doctor --repair` instalou serviço systemd | Desativar o systemd, manter só pm2 |
-| Bot online mas não responde | Sem permissão de View Channel no canal | Adicionar bot nas permissões do canal com View Channel + Send Messages |
-| `intents:content=limited` | Intents não estavam salvos no Developer Portal | Ativar os 3 Intents na aba Bot e salvar |
+| Problema                           | Causa                                          | Solução                                                                |
+| ---------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Erro ao salvar no Developer Portal | Install Link não era None                      | Installation → Install Link → None                                     |
+| `groupId` inválido no config       | Campo não existe no OpenClaw                   | Remover do JSON, usar apenas `channel` e `accountId` no binding        |
+| Conflito gateway systemd + pm2     | `doctor --repair` instalou serviço systemd     | Desativar o systemd, manter só pm2                                     |
+| Bot online mas não responde        | Sem permissão de View Channel no canal         | Adicionar bot nas permissões do canal com View Channel + Send Messages |
+| `intents:content=limited`          | Intents não estavam salvos no Developer Portal | Ativar os 3 Intents na aba Bot e salvar                                |

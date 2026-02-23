@@ -49,8 +49,8 @@ openclaw agents add work
 
 ## Quick Reference
 
-| Method | Command | When to use |
-|---|---|---|
-| Node directly | `node ~/openclaw/dist/index.js` | Quick test, no setup |
-| Alias | `alias openclaw="node ~/..."` | Daily use, simplest |
-| pnpm link | `pnpm setup && pnpm link --global` | Global command via pnpm |
+| Method        | Command                            | When to use             |
+| ------------- | ---------------------------------- | ----------------------- |
+| Node directly | `node ~/openclaw/dist/index.js`    | Quick test, no setup    |
+| Alias         | `alias openclaw="node ~/..."`      | Daily use, simplest     |
+| pnpm link     | `pnpm setup && pnpm link --global` | Global command via pnpm |

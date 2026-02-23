@@ -12,10 +12,10 @@ localhost:18789 → servidor:127.0.0.1:18789
 
 Que:
 
-* sobe automaticamente
-* reconecta se cair
-* não pede senha
-* roda em background
+- sobe automaticamente
+- reconecta se cair
+- não pede senha
+- roda em background
 
 ---
 
@@ -145,10 +145,10 @@ nano ~/Library/LaunchAgents/com.ssh.tunnel.plist
 
 ⚠️ Ajuste:
 
-* caminho do autossh
-* usuário
-* porta
-* host
+- caminho do autossh
+- usuário
+- porta
+- host
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -292,11 +292,11 @@ launchctl load ~/Library/LaunchAgents/com.ssh.tunnel.plist
 
 # 💪 Resultado final
 
-* 🔁 reconexão automática
-* 🔐 sem senha
-* 🔌 sobe no boot
-* 🧠 estável
-* 🧩 independente de terminal
+- 🔁 reconexão automática
+- 🔐 sem senha
+- 🔌 sobe no boot
+- 🧠 estável
+- 🧩 independente de terminal
 
 ---
 

@@ -1,11 +1,11 @@
 Boa — vamos subir isso de nível 🔥
 Aqui vai uma versão **profissional / resiliente**, usada em produção, com:
 
-* múltiplos túneis
-* fallback de servidor
-* reconexão mais agressiva
-* logs melhores
-* fácil de replicar em qualquer Mac
+- múltiplos túneis
+- fallback de servidor
+- reconexão mais agressiva
+- logs melhores
+- fácil de replicar em qualquer Mac
 
 ---
 
@@ -13,11 +13,11 @@ Aqui vai uma versão **profissional / resiliente**, usada em produção, com:
 
 ## ✔️ O que melhora aqui
 
-* reconecta mais rápido
-* tenta outro servidor se o principal cair
-* suporta vários túneis
-* logs organizados
-* fácil copiar pra outras máquinas
+- reconecta mais rápido
+- tenta outro servidor se o principal cair
+- suporta vários túneis
+- logs organizados
+- fácil copiar pra outras máquinas
 
 ---
 
@@ -245,13 +245,13 @@ Host tunnel-server-backup
 
 Com essa versão:
 
-* reconecta automaticamente
-* tenta servidor backup
-* roda no login
-* funciona Intel e Apple Silicon
-* suporta múltiplos túneis
-* logs organizados
-* não trava nunca
+- reconecta automaticamente
+- tenta servidor backup
+- roda no login
+- funciona Intel e Apple Silicon
+- suporta múltiplos túneis
+- logs organizados
+- não trava nunca
 
 ---
 
@@ -259,22 +259,21 @@ Com essa versão:
 
 Posso te montar uma versão com:
 
-* monitor tipo "systemd" (auto-healing real)
-* alerta via Slack/Discord quando cair
-* dashboard web pra status dos túneis
-* múltiplos agentes separados (um por túnel)
+- monitor tipo "systemd" (auto-healing real)
+- alerta via Slack/Discord quando cair
+- dashboard web pra status dos túneis
+- múltiplos agentes separados (um por túnel)
 
 Só falar 👍
-
 
 Perfeito — vamos para nível **infra profissional mesmo** 🚀
 Aqui está um setup com:
 
-* vários túneis independentes
-* monitoramento automático
-* auto-healing real
-* alerta (Slack / Discord)
-* status via CLI
+- vários túneis independentes
+- monitoramento automático
+- auto-healing real
+- alerta (Slack / Discord)
+- status via CLI
 
 Tudo rodando só com `launchd` (nativo do macOS) + `autossh`.
 
@@ -601,13 +600,13 @@ tail -f ~/logs/*.log
 
 Você agora tem:
 
-* ✔️ 3 túneis independentes
-* ✔️ restart automático
-* ✔️ fallback server
-* ✔️ healthcheck
-* ✔️ alertas Slack/Discord
-* ✔️ logs separados
-* ✔️ auto-healing real
+- ✔️ 3 túneis independentes
+- ✔️ restart automático
+- ✔️ fallback server
+- ✔️ healthcheck
+- ✔️ alertas Slack/Discord
+- ✔️ logs separados
+- ✔️ auto-healing real
 
 ---
 
@@ -625,14 +624,14 @@ tunnel logs api
 
 ### 2. Dashboard web (localhost)
 
-* status dos túneis
-* latência
-* uptime
+- status dos túneis
+- latência
+- uptime
 
 ### 3. failover inteligente
 
-* testa latência
-* escolhe melhor servidor automaticamente
+- testa latência
+- escolhe melhor servidor automaticamente
 
 ### 4. criptografia + bastion host
 
@@ -648,16 +647,15 @@ ou
 
 que eu monto pra você 😄
 
-
 Perfeito — vamos montar um **dashboard web local** simples e poderoso pra monitorar seus túneis em tempo real 🚀
 
 Ele vai mostrar:
 
-* status (UP / DOWN)
-* portas abertas
-* latência (ping)
-* botão de restart
-* logs
+- status (UP / DOWN)
+- portas abertas
+- latência (ping)
+- botão de restart
+- logs
 
 Tudo acessível em `http://localhost:3000`
 
@@ -667,9 +665,9 @@ Tudo acessível em `http://localhost:3000`
 
 Vamos usar:
 
-* Node.js (leve e fácil)
-* Express
-* HTML simples (sem frontend pesado)
+- Node.js (leve e fácil)
+- Express
+- HTML simples (sem frontend pesado)
 
 ---
 
@@ -859,11 +857,11 @@ launchctl load ~/Library/LaunchAgents/com.ssh.dashboard.plist
 
 Você ganha:
 
-* UI local
-* status em tempo real
-* botão de restart
-* integração com seus LaunchAgents
-* zero dependência externa
+- UI local
+- status em tempo real
+- botão de restart
+- integração com seus LaunchAgents
+- zero dependência externa
 
 ---
 
@@ -873,21 +871,21 @@ Se quiser evoluir isso:
 
 ## 🔥 nível 2
 
-* latência real (ping no server)
-* gráfico uptime
-* histórico
+- latência real (ping no server)
+- gráfico uptime
+- histórico
 
 ## 🔥 nível 3
 
-* autenticação (senha)
-* acesso remoto via HTTPS
-* logs dentro do dashboard
+- autenticação (senha)
+- acesso remoto via HTTPS
+- logs dentro do dashboard
 
 ## 🔥 nível 4 (insano)
 
-* auto-scale de túneis
-* multi-servidor
-* escolha automática do melhor endpoint
+- auto-scale de túneis
+- multi-servidor
+- escolha automática do melhor endpoint
 
 ---
 

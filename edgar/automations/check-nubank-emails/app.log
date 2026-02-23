@@ -1,0 +1,1240 @@
+[23/02/2026 16:40:29] [INFO] === check-nubank-emails started ===
+[23/02/2026 16:40:29] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 16:40:29] [DEBUG] Database opened and table ensured.
+[23/02/2026 16:40:29] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 16:40:29] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 16:40:29] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 16:40:32] [DEBUG] IMAP connected successfully.
+[23/02/2026 16:40:35] [DEBUG] Total messages in INBOX (no filter): 122334
+[23/02/2026 16:40:35] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 16:40:36] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 16:40:36] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3092
+[23/02/2026 16:40:36] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 16:40:37] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 16:40:37] [DEBUG] --- EMAIL MATCH uid=259298 ---
+[23/02/2026 16:40:37] [DEBUG] Subject : Você recebeu uma transferência pelo Pix
+[23/02/2026 16:40:37] [DEBUG] From    : Nubank <undefined@undefined>
+[23/02/2026 16:40:37] [DEBUG] Date    : Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:40:37] [DEBUG] Body    :
+Delivered-To: edgar.segundo@gmail.com
+Received: by 2002:a05:6a11:d892:b0:695:36a4:c729 with SMTP id od18csp238375pxc;
+        Fri, 26 Dec 2025 12:02:53 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHGf1I7WX3QgiByyej7MtVh+debcNaaMj1a5XgsOsXA+COBCzVIMK6zV8wxp7D3b81LVWpL
+X-Received: by 2002:ac8:5914:0:b0:4f1:b9ec:f6a4 with SMTP id d75a77b69052e-4f4abceebf3mr416619881cf.33.1766779372756;
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1766779372; cv=none;
+        d=google.com; s=arc-20240605;
+        b=c6vSfEkNnHmMcqSNwiNEhxFzA50tnKVs9i3qWUmYyDYFOXApKrSjK6T+7B0zFpd2Dk
+         eAWSyJuoYJpqgMkxN8SBSJiabHS4rsg7r4J3ZGoV6BF2Qqdkwga4ihRVeUZ4J1/5+6EJ
+         5e+zbFftWzUkog6ACETelgZAJY2zcX243akz96rUe1M7Pes9vt8JOVUjz/siSN/geZ++
+         yZS9t6pAhLoTditilC8ko4iXEn6M52PJLfcA6AUnEwMEWOqUWPMspR108gb0MViUOvJ1
+         dewRpMqY067Br8JaObzEeWFxxXluMpZZ+nqFZD46QzaMBoyz9mPRXyyz4gX/nT0XyeR/
+         K+Kg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=content-transfer-encoding:message-id:to:from:subject:mime-version
+         :date:sender:dkim-signature:dkim-signature;
+        bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+        fh=FrZfciYWu7Z8nyRXDIa7cKdb+2y2iLqNikEr/CNA5T8=;
+        b=BJakOmQMfFLt9+5bRT2P20FsctCBL0v7uy9VEHM9dpeKYZCsXOGzsp3iJzblTBTtaz
+         Hau/846Zl6xGCzHQp9L9s0M3cI22v4NGbjjvxOwd4owvCNrOEaY4KAgljno+8S/T8/4a
+         a1LheHkWj/sd2gsslWxn5/SDLj8b++CkAXs5MbJEjSme6loPTbgPfKbjfgg65lz45K9u
+         KU7DqIKcuviBPKQrOrlemtyWT1waOD0DEy7/APquZ/RQTli1ICOHMI+MN1NIVRfQ3m03
+         MVXZKsycYQoPI8pbbjFfxDqbSxyDGBpfp4kluvAkDNCuzbh4H1NxqPMmD+7MPvxdqOC6
+         DooA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.
+[23/02/2026 16:40:37] [DEBUG] --- END EMAIL uid=259298 ---
+[23/02/2026 16:40:37] [DEBUG] IMAP disconnected.
+[23/02/2026 16:40:37] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:40:37] [DEBUG] Saved uid=259298 — João da Silva R$250
+[23/02/2026 16:40:37] [INFO] === Done. Found: 1 | Saved: 1 | Skipped (duplicate): 0 ===
+[23/02/2026 16:56:14] [INFO] === check-nubank-emails started ===
+[23/02/2026 16:56:14] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 16:56:14] [DEBUG] Database opened and table ensured.
+[23/02/2026 16:56:14] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 16:56:14] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 16:56:14] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 16:56:17] [DEBUG] IMAP connected successfully.
+[23/02/2026 16:56:20] [DEBUG] Total messages in INBOX (no filter): 122335
+[23/02/2026 16:56:20] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 16:56:20] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 16:56:21] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3093
+[23/02/2026 16:56:21] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 16:56:21] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 16:56:22] [DEBUG] --- EMAIL MATCH uid=259298 ---
+[23/02/2026 16:56:22] [DEBUG] Subject : Você recebeu uma transferência pelo Pix
+[23/02/2026 16:56:22] [DEBUG] From    : Nubank <undefined@undefined>
+[23/02/2026 16:56:22] [DEBUG] Date    : Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:56:22] [DEBUG] Body    :
+Delivered-To: edgar.segundo@gmail.com
+Received: by 2002:a05:6a11:d892:b0:695:36a4:c729 with SMTP id od18csp238375pxc;
+        Fri, 26 Dec 2025 12:02:53 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHGf1I7WX3QgiByyej7MtVh+debcNaaMj1a5XgsOsXA+COBCzVIMK6zV8wxp7D3b81LVWpL
+X-Received: by 2002:ac8:5914:0:b0:4f1:b9ec:f6a4 with SMTP id d75a77b69052e-4f4abceebf3mr416619881cf.33.1766779372756;
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1766779372; cv=none;
+        d=google.com; s=arc-20240605;
+        b=c6vSfEkNnHmMcqSNwiNEhxFzA50tnKVs9i3qWUmYyDYFOXApKrSjK6T+7B0zFpd2Dk
+         eAWSyJuoYJpqgMkxN8SBSJiabHS4rsg7r4J3ZGoV6BF2Qqdkwga4ihRVeUZ4J1/5+6EJ
+         5e+zbFftWzUkog6ACETelgZAJY2zcX243akz96rUe1M7Pes9vt8JOVUjz/siSN/geZ++
+         yZS9t6pAhLoTditilC8ko4iXEn6M52PJLfcA6AUnEwMEWOqUWPMspR108gb0MViUOvJ1
+         dewRpMqY067Br8JaObzEeWFxxXluMpZZ+nqFZD46QzaMBoyz9mPRXyyz4gX/nT0XyeR/
+         K+Kg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=content-transfer-encoding:message-id:to:from:subject:mime-version
+         :date:sender:dkim-signature:dkim-signature;
+        bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+        fh=FrZfciYWu7Z8nyRXDIa7cKdb+2y2iLqNikEr/CNA5T8=;
+        b=BJakOmQMfFLt9+5bRT2P20FsctCBL0v7uy9VEHM9dpeKYZCsXOGzsp3iJzblTBTtaz
+         Hau/846Zl6xGCzHQp9L9s0M3cI22v4NGbjjvxOwd4owvCNrOEaY4KAgljno+8S/T8/4a
+         a1LheHkWj/sd2gsslWxn5/SDLj8b++CkAXs5MbJEjSme6loPTbgPfKbjfgg65lz45K9u
+         KU7DqIKcuviBPKQrOrlemtyWT1waOD0DEy7/APquZ/RQTli1ICOHMI+MN1NIVRfQ3m03
+         MVXZKsycYQoPI8pbbjFfxDqbSxyDGBpfp4kluvAkDNCuzbh4H1NxqPMmD+7MPvxdqOC6
+         DooA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+Return-Path: <bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br>
+Received: from m225-25.mailgun.net (m225-25.mailgun.net. [159.135.225.25])
+        by mx.google.com with UTF8SMTPS id d75a77b69052e-4f4ac687766si242974731cf.305.2025.12.26.12.02.52
+        for <edgar.segundo@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) client-ip=159.135.225.25;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=nubank.com.br; q=dns/txt; s=mailgun; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=cdFAcVI4TyF/y+2Y3FA6W1IKegaPsIVvQJar5UkBcKH7Slnr+nppKRIUJs9vZLbDVjMJq0fY+KYJe4wwCGViAX6h+Je25WoZ/chzHFeLdxI3+GcNo/oky8cCruf8bfDJXiS018DiwdpbMTtAzmZDQdB8szGECE76wBXWG0gFimmcJJ0Mm9TM3+xU7wpwLwb/qTdM1tTuwx49nF13wmeEluCbBluu8KYHXp75ZAbcbKOn1tlj3pf3++pjY81Ai+q6VSbSOoGEwRVL0Y66AvQAPYvTm9PQdaRJjO3CXPzDi2lzQPMCEthTYNM5cgZstBhPJ/YURyaXBLkWB+ik6yGUMQ==
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mailgun.org; q=dns/txt; s=mg; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=n1xK8hqKwaJgtYk0irTNjpgZEvhUzqhXhCJGNtxcoDeN6t1Cm7pZz6Gpy77dWH7OASWspB/GZq6fcZieQ7T40EM/fq6W6X744FgIeQkvEf2LXa8fkIY4NdD2GGiqZf+T5uhW409e/kZMbEo0WGZ9ItPdNx4dnLLVu5vnrj0qLN0=
+X-Mailgun-Sid: WyIxZjRiZSIsImVkZ2FyLnNlZ3VuZG9AZ21haWwuY29tIiwiY2RlZWMiXQ==
+X-Feedback-Id: todomundo@nubank.com.br::5dfa98fcdf6c96bcee570dc9:mailgun
+Received: by e0b4ba98ae79f12cfa5e1840761537d40e939ef96138b3462121daf634563d91 with HTTP
+ id 694ee9ec527c7e0065ebc7d4; Fri, 26 Dec 2025 20:02:52 GMT
+X-Mailgun-Sending-Ip: 159.135.225.25
+Sender: todomundo@nubank.com.br
+Date: Fri, 26 Dec 2025 20:02:52 +0000
+Mime-Version: 1.0
+Subject: =?UTF-8?q?Voc=C3=AA_recebeu_uma_transfer=C3=AAncia_pelo_Pix?=
+From: Nubank <todomundo@nubank.com.br>
+To: 62.462.272 <edgar.segundo@gmail.com>
+X-Mailgun-Variables: {"nu-contact-id": "68b1a12d-0520-436a-b0d5-96caeab7ab06", "nu-external-id":
+ "2abfa068-aabd-3e50-832c-c3aeb13f52a5", "nu-prototype": "s7",
+ "nu-template-name": "pj-brazil-axp-transfer-in-received-others-pix"}
+Message-Id: <20251226200252.9e550b6c7b62f7ae@nubank.com.br>
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html xmlns=3D"http://www.w3.org/1999/xhtml" xmlns:v=3D"urn:=
+schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-microsoft-com:office:offi=
+ce"><head><title></title><!--[if !mso]><!-- --><meta http-equiv=3D"X-UA-Com=
+patible" content=3D"IE=3Dedge"><!--<![endif]--><meta http-equiv=3D"Content-=
+Type" content=3D"text/html; charset=3DUTF-8"><meta name=3D"viewport" conten=
+t=3D"width=3Ddevice-width,initial-scale=3D1"><style type=3D"text/css">#outl=
+ook a { padding:0; }
+          body { margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-=
+size-adjust:100%; }
+          table, td { border-collapse:collapse;mso-table-lspace:0pt;mso-tab=
+le-rspace:0pt; }
+          img { border:0;height:auto;line-height:100%; outline:none;text-de=
+coration:none;-ms-interpolation-mode:bicubic; }
+          p { display:block;margin:13px 0; }</style><!--[if mso]>
+        <xml>
+        <o:OfficeDocumentSettings>
+          <o:AllowPNG/>
+          <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+        </xml>
+        <![endif]--><!--[if lte mso 11]>
+        <style type=3D"text/css">
+          .mj-outlook-group-fix { width:100% !important; }
+        </style>
+        <![endif]--><!--[if !mso]><!--><link href=3D"https://fonts.googleap=
+is.com/css?family=3DUbuntu:300,400,500,700" rel=3D"stylesheet" type=3D"text=
+/css"><style type=3D"text/css">@import url(https://fonts.googleapis.com/css=
+?family=3DUbuntu:300,400,500,700);</style><!--<![endif]--><style type=3D"te=
+xt/css">@media only screen and (min-width:480px) {
+        .mj-column-per-100 { width:100% !important; max-width: 100%; }
+      }</style><style type=3D"text/css">@media only screen and (max-width:4=
+80px) {
+      table.mj-full-width-mobile { width: 100% !important; }
+      td.mj-full-width-mobile { width: auto !important; }
+    }</style><style type=3D"text/css">@media screen and (max-width: 480px) =
+{
+        .pd0 {
+          padding-left: 0px !important;
+          padding-right: 0px !important;
+        }
+
+        .pd15 {
+          padding-left: 15px !important;
+          padding-right: 15px !important;
+        }
+
+        .pd30 {
+          padding-left: 30px !important;
+          padding-right: 30px !important;
+        }
+
+        .top0 {
+          padding-top: 0px !important;
+        }
+
+        .mobile-hidden {
+          display: none !important;
+        }
+
+        .f17 {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f17 div {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f20 div {
+          font-size: 20px !important;
+        }
+       =20
+        .f22 div, .f22 p {
+          font-size: 22px !important;
+        }
+
+        .f24 div, .f24 p {
+          font-size: 24px !important;
+        }
+      }</style><!-- =F0=9F=9B=91PREVIEW TEXT --></head><body style=3D"backg=
+round-color:#e6e6e6;"><div style=3D"display:none;font-size:1px;color:#fffff=
+f;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">=
+O valor j=C3=A1 est=C3=A1 dispon=C3=ADvel na sua conta Nu Empresas &nbsp;&z=
+wnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&
+[23/02/2026 16:56:22] [DEBUG] --- END EMAIL uid=259298 ---
+[23/02/2026 16:56:22] [DEBUG] IMAP disconnected.
+[23/02/2026 16:56:22] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:56:22] [DEBUG] Saved uid=259298 — João da Silva R$250
+[23/02/2026 16:56:22] [INFO] === Done. Found: 1 | Saved: 1 | Skipped (duplicate): 0 ===
+[23/02/2026 16:59:38] [INFO] === check-nubank-emails started ===
+[23/02/2026 16:59:38] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 16:59:38] [DEBUG] Database opened and table ensured.
+[23/02/2026 16:59:38] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 16:59:38] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 16:59:38] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 16:59:41] [DEBUG] IMAP connected successfully.
+[23/02/2026 16:59:43] [DEBUG] Total messages in INBOX (no filter): 122336
+[23/02/2026 16:59:44] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 16:59:44] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 16:59:45] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3094
+[23/02/2026 16:59:45] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 16:59:45] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 16:59:45] [DEBUG] --- EMAIL MATCH uid=259298 ---
+[23/02/2026 16:59:45] [DEBUG] Subject : Você recebeu uma transferência pelo Pix
+[23/02/2026 16:59:45] [DEBUG] From    : Nubank <undefined@undefined>
+[23/02/2026 16:59:45] [DEBUG] Date    : Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:59:45] [DEBUG] Body saved to /tmp/email-259298.html
+[23/02/2026 16:59:45] [DEBUG] Body    :
+Delivered-To: edgar.segundo@gmail.com
+Received: by 2002:a05:6a11:d892:b0:695:36a4:c729 with SMTP id od18csp238375pxc;
+        Fri, 26 Dec 2025 12:02:53 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHGf1I7WX3QgiByyej7MtVh+debcNaaMj1a5XgsOsXA+COBCzVIMK6zV8wxp7D3b81LVWpL
+X-Received: by 2002:ac8:5914:0:b0:4f1:b9ec:f6a4 with SMTP id d75a77b69052e-4f4abceebf3mr416619881cf.33.1766779372756;
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1766779372; cv=none;
+        d=google.com; s=arc-20240605;
+        b=c6vSfEkNnHmMcqSNwiNEhxFzA50tnKVs9i3qWUmYyDYFOXApKrSjK6T+7B0zFpd2Dk
+         eAWSyJuoYJpqgMkxN8SBSJiabHS4rsg7r4J3ZGoV6BF2Qqdkwga4ihRVeUZ4J1/5+6EJ
+         5e+zbFftWzUkog6ACETelgZAJY2zcX243akz96rUe1M7Pes9vt8JOVUjz/siSN/geZ++
+         yZS9t6pAhLoTditilC8ko4iXEn6M52PJLfcA6AUnEwMEWOqUWPMspR108gb0MViUOvJ1
+         dewRpMqY067Br8JaObzEeWFxxXluMpZZ+nqFZD46QzaMBoyz9mPRXyyz4gX/nT0XyeR/
+         K+Kg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=content-transfer-encoding:message-id:to:from:subject:mime-version
+         :date:sender:dkim-signature:dkim-signature;
+        bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+        fh=FrZfciYWu7Z8nyRXDIa7cKdb+2y2iLqNikEr/CNA5T8=;
+        b=BJakOmQMfFLt9+5bRT2P20FsctCBL0v7uy9VEHM9dpeKYZCsXOGzsp3iJzblTBTtaz
+         Hau/846Zl6xGCzHQp9L9s0M3cI22v4NGbjjvxOwd4owvCNrOEaY4KAgljno+8S/T8/4a
+         a1LheHkWj/sd2gsslWxn5/SDLj8b++CkAXs5MbJEjSme6loPTbgPfKbjfgg65lz45K9u
+         KU7DqIKcuviBPKQrOrlemtyWT1waOD0DEy7/APquZ/RQTli1ICOHMI+MN1NIVRfQ3m03
+         MVXZKsycYQoPI8pbbjFfxDqbSxyDGBpfp4kluvAkDNCuzbh4H1NxqPMmD+7MPvxdqOC6
+         DooA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+Return-Path: <bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br>
+Received: from m225-25.mailgun.net (m225-25.mailgun.net. [159.135.225.25])
+        by mx.google.com with UTF8SMTPS id d75a77b69052e-4f4ac687766si242974731cf.305.2025.12.26.12.02.52
+        for <edgar.segundo@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) client-ip=159.135.225.25;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=nubank.com.br; q=dns/txt; s=mailgun; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=cdFAcVI4TyF/y+2Y3FA6W1IKegaPsIVvQJar5UkBcKH7Slnr+nppKRIUJs9vZLbDVjMJq0fY+KYJe4wwCGViAX6h+Je25WoZ/chzHFeLdxI3+GcNo/oky8cCruf8bfDJXiS018DiwdpbMTtAzmZDQdB8szGECE76wBXWG0gFimmcJJ0Mm9TM3+xU7wpwLwb/qTdM1tTuwx49nF13wmeEluCbBluu8KYHXp75ZAbcbKOn1tlj3pf3++pjY81Ai+q6VSbSOoGEwRVL0Y66AvQAPYvTm9PQdaRJjO3CXPzDi2lzQPMCEthTYNM5cgZstBhPJ/YURyaXBLkWB+ik6yGUMQ==
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mailgun.org; q=dns/txt; s=mg; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=n1xK8hqKwaJgtYk0irTNjpgZEvhUzqhXhCJGNtxcoDeN6t1Cm7pZz6Gpy77dWH7OASWspB/GZq6fcZieQ7T40EM/fq6W6X744FgIeQkvEf2LXa8fkIY4NdD2GGiqZf+T5uhW409e/kZMbEo0WGZ9ItPdNx4dnLLVu5vnrj0qLN0=
+X-Mailgun-Sid: WyIxZjRiZSIsImVkZ2FyLnNlZ3VuZG9AZ21haWwuY29tIiwiY2RlZWMiXQ==
+X-Feedback-Id: todomundo@nubank.com.br::5dfa98fcdf6c96bcee570dc9:mailgun
+Received: by e0b4ba98ae79f12cfa5e1840761537d40e939ef96138b3462121daf634563d91 with HTTP
+ id 694ee9ec527c7e0065ebc7d4; Fri, 26 Dec 2025 20:02:52 GMT
+X-Mailgun-Sending-Ip: 159.135.225.25
+Sender: todomundo@nubank.com.br
+Date: Fri, 26 Dec 2025 20:02:52 +0000
+Mime-Version: 1.0
+Subject: =?UTF-8?q?Voc=C3=AA_recebeu_uma_transfer=C3=AAncia_pelo_Pix?=
+From: Nubank <todomundo@nubank.com.br>
+To: 62.462.272 <edgar.segundo@gmail.com>
+X-Mailgun-Variables: {"nu-contact-id": "68b1a12d-0520-436a-b0d5-96caeab7ab06", "nu-external-id":
+ "2abfa068-aabd-3e50-832c-c3aeb13f52a5", "nu-prototype": "s7",
+ "nu-template-name": "pj-brazil-axp-transfer-in-received-others-pix"}
+Message-Id: <20251226200252.9e550b6c7b62f7ae@nubank.com.br>
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html xmlns=3D"http://www.w3.org/1999/xhtml" xmlns:v=3D"urn:=
+schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-microsoft-com:office:offi=
+ce"><head><title></title><!--[if !mso]><!-- --><meta http-equiv=3D"X-UA-Com=
+patible" content=3D"IE=3Dedge"><!--<![endif]--><meta http-equiv=3D"Content-=
+Type" content=3D"text/html; charset=3DUTF-8"><meta name=3D"viewport" conten=
+t=3D"width=3Ddevice-width,initial-scale=3D1"><style type=3D"text/css">#outl=
+ook a { padding:0; }
+          body { margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-=
+size-adjust:100%; }
+          table, td { border-collapse:collapse;mso-table-lspace:0pt;mso-tab=
+le-rspace:0pt; }
+          img { border:0;height:auto;line-height:100%; outline:none;text-de=
+coration:none;-ms-interpolation-mode:bicubic; }
+          p { display:block;margin:13px 0; }</style><!--[if mso]>
+        <xml>
+        <o:OfficeDocumentSettings>
+          <o:AllowPNG/>
+          <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+        </xml>
+        <![endif]--><!--[if lte mso 11]>
+        <style type=3D"text/css">
+          .mj-outlook-group-fix { width:100% !important; }
+        </style>
+        <![endif]--><!--[if !mso]><!--><link href=3D"https://fonts.googleap=
+is.com/css?family=3DUbuntu:300,400,500,700" rel=3D"stylesheet" type=3D"text=
+/css"><style type=3D"text/css">@import url(https://fonts.googleapis.com/css=
+?family=3DUbuntu:300,400,500,700);</style><!--<![endif]--><style type=3D"te=
+xt/css">@media only screen and (min-width:480px) {
+        .mj-column-per-100 { width:100% !important; max-width: 100%; }
+      }</style><style type=3D"text/css">@media only screen and (max-width:4=
+80px) {
+      table.mj-full-width-mobile { width: 100% !important; }
+      td.mj-full-width-mobile { width: auto !important; }
+    }</style><style type=3D"text/css">@media screen and (max-width: 480px) =
+{
+        .pd0 {
+          padding-left: 0px !important;
+          padding-right: 0px !important;
+        }
+
+        .pd15 {
+          padding-left: 15px !important;
+          padding-right: 15px !important;
+        }
+
+        .pd30 {
+          padding-left: 30px !important;
+          padding-right: 30px !important;
+        }
+
+        .top0 {
+          padding-top: 0px !important;
+        }
+
+        .mobile-hidden {
+          display: none !important;
+        }
+
+        .f17 {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f17 div {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f20 div {
+          font-size: 20px !important;
+        }
+       =20
+        .f22 div, .f22 p {
+          font-size: 22px !important;
+        }
+
+        .f24 div, .f24 p {
+          font-size: 24px !important;
+        }
+      }</style><!-- =F0=9F=9B=91PREVIEW TEXT --></head><body style=3D"backg=
+round-color:#e6e6e6;"><div style=3D"display:none;font-size:1px;color:#fffff=
+f;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">=
+O valor j=C3=A1 est=C3=A1 dispon=C3=ADvel na sua conta Nu Empresas &nbsp;&z=
+wnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&
+[23/02/2026 16:59:45] [DEBUG] --- END EMAIL uid=259298 ---
+[23/02/2026 16:59:46] [DEBUG] IMAP disconnected.
+[23/02/2026 16:59:46] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 16:59:46] [DEBUG] Saved uid=259298 — João da Silva R$250
+[23/02/2026 16:59:46] [INFO] === Done. Found: 1 | Saved: 1 | Skipped (duplicate): 0 ===
+[23/02/2026 17:01:18] [INFO] === check-nubank-emails started ===
+[23/02/2026 17:01:18] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 17:01:18] [DEBUG] Database opened and table ensured.
+[23/02/2026 17:01:18] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 17:01:18] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 17:01:18] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 17:01:21] [DEBUG] IMAP connected successfully.
+[23/02/2026 17:01:24] [DEBUG] Total messages in INBOX (no filter): 122336
+[23/02/2026 17:01:24] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 17:01:25] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 17:01:25] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3094
+[23/02/2026 17:01:25] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 17:01:26] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 17:01:27] [DEBUG] --- EMAIL MATCH uid=259298 ---
+[23/02/2026 17:01:27] [DEBUG] Subject : Você recebeu uma transferência pelo Pix
+[23/02/2026 17:01:27] [DEBUG] From    : Nubank <undefined@undefined>
+[23/02/2026 17:01:27] [DEBUG] Date    : Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:01:27] [DEBUG] Body    :
+Delivered-To: edgar.segundo@gmail.com
+Received: by 2002:a05:6a11:d892:b0:695:36a4:c729 with SMTP id od18csp238375pxc;
+        Fri, 26 Dec 2025 12:02:53 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHGf1I7WX3QgiByyej7MtVh+debcNaaMj1a5XgsOsXA+COBCzVIMK6zV8wxp7D3b81LVWpL
+X-Received: by 2002:ac8:5914:0:b0:4f1:b9ec:f6a4 with SMTP id d75a77b69052e-4f4abceebf3mr416619881cf.33.1766779372756;
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1766779372; cv=none;
+        d=google.com; s=arc-20240605;
+        b=c6vSfEkNnHmMcqSNwiNEhxFzA50tnKVs9i3qWUmYyDYFOXApKrSjK6T+7B0zFpd2Dk
+         eAWSyJuoYJpqgMkxN8SBSJiabHS4rsg7r4J3ZGoV6BF2Qqdkwga4ihRVeUZ4J1/5+6EJ
+         5e+zbFftWzUkog6ACETelgZAJY2zcX243akz96rUe1M7Pes9vt8JOVUjz/siSN/geZ++
+         yZS9t6pAhLoTditilC8ko4iXEn6M52PJLfcA6AUnEwMEWOqUWPMspR108gb0MViUOvJ1
+         dewRpMqY067Br8JaObzEeWFxxXluMpZZ+nqFZD46QzaMBoyz9mPRXyyz4gX/nT0XyeR/
+         K+Kg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=content-transfer-encoding:message-id:to:from:subject:mime-version
+         :date:sender:dkim-signature:dkim-signature;
+        bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+        fh=FrZfciYWu7Z8nyRXDIa7cKdb+2y2iLqNikEr/CNA5T8=;
+        b=BJakOmQMfFLt9+5bRT2P20FsctCBL0v7uy9VEHM9dpeKYZCsXOGzsp3iJzblTBTtaz
+         Hau/846Zl6xGCzHQp9L9s0M3cI22v4NGbjjvxOwd4owvCNrOEaY4KAgljno+8S/T8/4a
+         a1LheHkWj/sd2gsslWxn5/SDLj8b++CkAXs5MbJEjSme6loPTbgPfKbjfgg65lz45K9u
+         KU7DqIKcuviBPKQrOrlemtyWT1waOD0DEy7/APquZ/RQTli1ICOHMI+MN1NIVRfQ3m03
+         MVXZKsycYQoPI8pbbjFfxDqbSxyDGBpfp4kluvAkDNCuzbh4H1NxqPMmD+7MPvxdqOC6
+         DooA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+Return-Path: <bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br>
+Received: from m225-25.mailgun.net (m225-25.mailgun.net. [159.135.225.25])
+        by mx.google.com with UTF8SMTPS id d75a77b69052e-4f4ac687766si242974731cf.305.2025.12.26.12.02.52
+        for <edgar.segundo@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) client-ip=159.135.225.25;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=nubank.com.br; q=dns/txt; s=mailgun; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=cdFAcVI4TyF/y+2Y3FA6W1IKegaPsIVvQJar5UkBcKH7Slnr+nppKRIUJs9vZLbDVjMJq0fY+KYJe4wwCGViAX6h+Je25WoZ/chzHFeLdxI3+GcNo/oky8cCruf8bfDJXiS018DiwdpbMTtAzmZDQdB8szGECE76wBXWG0gFimmcJJ0Mm9TM3+xU7wpwLwb/qTdM1tTuwx49nF13wmeEluCbBluu8KYHXp75ZAbcbKOn1tlj3pf3++pjY81Ai+q6VSbSOoGEwRVL0Y66AvQAPYvTm9PQdaRJjO3CXPzDi2lzQPMCEthTYNM5cgZstBhPJ/YURyaXBLkWB+ik6yGUMQ==
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mailgun.org; q=dns/txt; s=mg; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=n1xK8hqKwaJgtYk0irTNjpgZEvhUzqhXhCJGNtxcoDeN6t1Cm7pZz6Gpy77dWH7OASWspB/GZq6fcZieQ7T40EM/fq6W6X744FgIeQkvEf2LXa8fkIY4NdD2GGiqZf+T5uhW409e/kZMbEo0WGZ9ItPdNx4dnLLVu5vnrj0qLN0=
+X-Mailgun-Sid: WyIxZjRiZSIsImVkZ2FyLnNlZ3VuZG9AZ21haWwuY29tIiwiY2RlZWMiXQ==
+X-Feedback-Id: todomundo@nubank.com.br::5dfa98fcdf6c96bcee570dc9:mailgun
+Received: by e0b4ba98ae79f12cfa5e1840761537d40e939ef96138b3462121daf634563d91 with HTTP
+ id 694ee9ec527c7e0065ebc7d4; Fri, 26 Dec 2025 20:02:52 GMT
+X-Mailgun-Sending-Ip: 159.135.225.25
+Sender: todomundo@nubank.com.br
+Date: Fri, 26 Dec 2025 20:02:52 +0000
+Mime-Version: 1.0
+Subject: =?UTF-8?q?Voc=C3=AA_recebeu_uma_transfer=C3=AAncia_pelo_Pix?=
+From: Nubank <todomundo@nubank.com.br>
+To: 62.462.272 <edgar.segundo@gmail.com>
+X-Mailgun-Variables: {"nu-contact-id": "68b1a12d-0520-436a-b0d5-96caeab7ab06", "nu-external-id":
+ "2abfa068-aabd-3e50-832c-c3aeb13f52a5", "nu-prototype": "s7",
+ "nu-template-name": "pj-brazil-axp-transfer-in-received-others-pix"}
+Message-Id: <20251226200252.9e550b6c7b62f7ae@nubank.com.br>
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html xmlns=3D"http://www.w3.org/1999/xhtml" xmlns:v=3D"urn:=
+schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-microsoft-com:office:offi=
+ce"><head><title></title><!--[if !mso]><!-- --><meta http-equiv=3D"X-UA-Com=
+patible" content=3D"IE=3Dedge"><!--<![endif]--><meta http-equiv=3D"Content-=
+Type" content=3D"text/html; charset=3DUTF-8"><meta name=3D"viewport" conten=
+t=3D"width=3Ddevice-width,initial-scale=3D1"><style type=3D"text/css">#outl=
+ook a { padding:0; }
+          body { margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-=
+size-adjust:100%; }
+          table, td { border-collapse:collapse;mso-table-lspace:0pt;mso-tab=
+le-rspace:0pt; }
+          img { border:0;height:auto;line-height:100%; outline:none;text-de=
+coration:none;-ms-interpolation-mode:bicubic; }
+          p { display:block;margin:13px 0; }</style><!--[if mso]>
+        <xml>
+        <o:OfficeDocumentSettings>
+          <o:AllowPNG/>
+          <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+        </xml>
+        <![endif]--><!--[if lte mso 11]>
+        <style type=3D"text/css">
+          .mj-outlook-group-fix { width:100% !important; }
+        </style>
+        <![endif]--><!--[if !mso]><!--><link href=3D"https://fonts.googleap=
+is.com/css?family=3DUbuntu:300,400,500,700" rel=3D"stylesheet" type=3D"text=
+/css"><style type=3D"text/css">@import url(https://fonts.googleapis.com/css=
+?family=3DUbuntu:300,400,500,700);</style><!--<![endif]--><style type=3D"te=
+xt/css">@media only screen and (min-width:480px) {
+        .mj-column-per-100 { width:100% !important; max-width: 100%; }
+      }</style><style type=3D"text/css">@media only screen and (max-width:4=
+80px) {
+      table.mj-full-width-mobile { width: 100% !important; }
+      td.mj-full-width-mobile { width: auto !important; }
+    }</style><style type=3D"text/css">@media screen and (max-width: 480px) =
+{
+        .pd0 {
+          padding-left: 0px !important;
+          padding-right: 0px !important;
+        }
+
+        .pd15 {
+          padding-left: 15px !important;
+          padding-right: 15px !important;
+        }
+
+        .pd30 {
+          padding-left: 30px !important;
+          padding-right: 30px !important;
+        }
+
+        .top0 {
+          padding-top: 0px !important;
+        }
+
+        .mobile-hidden {
+          display: none !important;
+        }
+
+        .f17 {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f17 div {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f20 div {
+          font-size: 20px !important;
+        }
+       =20
+        .f22 div, .f22 p {
+          font-size: 22px !important;
+        }
+
+        .f24 div, .f24 p {
+          font-size: 24px !important;
+        }
+      }</style><!-- =F0=9F=9B=91PREVIEW TEXT --></head><body style=3D"backg=
+round-color:#e6e6e6;"><div style=3D"display:none;font-size:1px;color:#fffff=
+f;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">=
+O valor j=C3=A1 est=C3=A1 dispon=C3=ADvel na sua conta Nu Empresas &nbsp;&z=
+wnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div><div sty=
+le=3D"background-color:#e6e6e6;"><!-- =F0=9F=9B=91 LOGO --><!--[if mso | IE=
+]><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" =
+class=3D"" style=3D"width:600px;" width=3D"600" ><tr><td style=3D"line-heig=
+ht:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]--><div style=
+=3D"background:#ffffff;background-color:#ffffff;margin:0px auto;max-width:6=
+00px;"><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=
+=3D"0" role=3D"presentation" style=3D"background:#ffffff;background-color:#=
+ffffff;width:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:0px;pad=
+ding:0px;text-align:center;"><!--[if mso | IE]><table role=3D"presentation"=
+ border=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=
+=3D"vertical-align:top;width:600px;" ><![endif]--><div class=3D"mj-column-p=
+er-100 mj-outlook-group-fix" style=3D"font-size:0px;text-align:left;directi=
+on:ltr;display:inline-block;vertical-align:top;width:100%;"><table border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"1=
+00%"><tbody><tr><td style=3D"vertical-align:top;padding:0px;"><table border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"1=
+00%"><tr><td align=3D"center" style=3D"font-size:0px;padding:0px;word-break=
+:break-word;"><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=
+=3D"presentation" style=3D"border-collapse:collapse;border-spacing:0px;"><t=
+body><tr><td style=3D"width:600px;"><img height=3D"auto" src=3D"https://cdn=
+=2Enubank.com.br/masterbrand/photos/pj=
+/templates/header-logo-1.jpg" style=3D"=
+border:0;display:block;outline:none;text-decoration:none;height:auto;width:=
+100%;font-size:13px;" width=3D"600"></td></tr></tbody></table></td></tr></t=
+able></td></tr></tbody></table></div><!--[if mso | IE]></td></tr></table><!=
+[endif]--></td></tr></tbody></table></div><!--[if mso | IE]></td></tr></tab=
+le><![endif]--><!-- =F0=9F=9B=91 HEADER --><!--[if mso | IE]><table align=
+=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=3D"" sty=
+le=3D"width:600px;" width=3D"600" ><tr><td style=3D"line-height:0px;font-si=
+ze:0px;mso-line-height-rule:exactly;"><![endif]--><div style=3D"background:=
+#ffffff;background-color:#ffffff;margin:0px auto;max-width:600px;"><table a=
+lign=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"pr=
+esentation" style=3D"background:#ffffff;background-color:#ffffff;width:100%=
+;"><tbody><tr><td style=3D"direction:ltr;font-size:0px;padding:0px;text-ali=
+gn:center;"><!--[if mso | IE]><table role=3D"presentation" border=3D"0" cel=
+lpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=3D"vertical-align=
+:top;width:600px;" ><![endif]--><div class=3D"mj-column-per-100 mj-outlook-=
+group-fix" style=3D"font-size:0px;text-align:left;direction:ltr;display:inl=
+ine-block;vertical-align:top;width:100%;"><table border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"100%"><tbody><tr><t=
+d style=3D"vertical-align:top;padding:0px;"><table border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"100%"></table></td>=
+</tr></tbody></table></div><!--[if mso | IE]></td></tr></table><![endif]-->=
+</td></tr></tbody></table></div><!--[if mso | IE]></td></tr></table><table =
+align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=3D"=
+" style=3D"width:600px;" width=3D"600" ><tr><td style=3D"line-height:0px;fo=
+nt-size:0px;mso-line-height-rule:exactly;"><![endif]--><div style=3D"backgr=
+ound:linear-gradient(#714F8F, #714F8F);background-color:linear-gradient(#71=
+4F8F, #714F8F);margin:0px auto;max-width:600px;"><table align=3D"center" bo=
+rder=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=
+=3D"background:linear-gradient(#714F8F, #714F8F);background-color:linear-gr=
+adient(#714F8F, #714F8F);width:100%;"><tbody><tr><td style=3D"direction:ltr=
+;font-size:0px;padding:26px 30px 0;text-align:center;"><!--[if mso | IE]><t=
+able role=3D"presentation" border=3D"0" cellpadding=3D"0" cellspacing=3D"0"=
+><![endif]--><!-- =F0=9F=9B=91 TEXTO --><!--[if mso | IE]><tr><td class=3D"=
+" width=3D"600px" ><table align=3D"center" border=3D"0" cellpadding=3D"0" c=
+ellspacing=3D"0" class=3D"" style=3D"width:540px;" width=3D"540" ><tr><td s=
+tyle=3D"line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![end=
+if]--><div style=3D"margin:0px auto;max-width:540px;"><table align=3D"cente=
+r" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" s=
+tyle=3D"width:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:0px;pa=
+dding:0px;text-align:center;"><!--[if mso | IE]><table role=3D"presentation=
+" border=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=
+=3D"vertical-align:top;width:540px;" ><![endif]--><div class=3D"mj-column-p=
+er-100 mj-outlook-group-fix" style=3D"font-size:0px;text-align:left;directi=
+on:ltr;display:inline-block;vertical-align:top;width:100%;"><table border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"1=
+00%"><tbody><tr><td style=3D"background-color:#F4F4F4;border-radius:30px 30=
+px 0px 0px;vertical-align:top;padding:0px;"><table border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"100%"><tr><td align=
+=3D"left" class=3D"pd30 f24" style=3D"font-size:0px;padding:30px;word-break=
+:break-word;"><div style=3D"font-family:Helvetica, Arial, sans-serif;font-s=
+ize:28px;font-weight:900;line-height:110%;text-align:left;color:#000000;">T=
+ransfer=C3=AAncia recebida</div></td></tr></table></td></tr></tbody></table=
+></div><!--[if mso | IE]></td></tr></table><![endif]--></td></tr></tbody></=
+table></div><!--[if mso | IE]></td></tr></table></td></tr></table><![endif]=
+--></td></tr></tbody></table></div><!--[if mso | IE]></td></tr></table><![e=
+ndif]--><!-- =F0=9F=9B=91 TEXTO --><!--[if mso | IE]><table align=3D"center=
+" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=3D"" style=3D"widt=
+h:600px;" width=3D"600" ><tr><td style=3D"line-height:0px;font-size:0px;mso=
+-line-height-rule:exactly;"><![endif]--><div style=3D"background:#FFFFFF;ba=
+ckground-color:#FFFFFF;margin:0px auto;max-width:600px;"><table align=3D"ce=
+nter" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation=
+" style=3D"background:#FFFFFF;background-color:#FFFFFF;width:100%;"><tbody>=
+<tr><td style=3D"direction:ltr;font-size:0px;padding:0px;text-align:center;=
+"><!--[if mso | IE]><table role=3D"presentation" border=3D"0" cellpadding=
+=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=3D"vertical-align:top;wid=
+th:600px;" ><![endif]--><div class=3D"mj-column-per-100 mj-outlook-group-fi=
+x" style=3D"font-size:0px;text-align:left;direction:ltr;display:inline-bloc=
+k;vertical-align:top;width:100%;"><table border=3D"0" cellpadding=3D"0" cel=
+lspacing=3D"0" role=3D"presentation" style=3D"vertical-align:top;" width=3D=
+"100%"><tr><td align=3D"left" class=3D"pd30" style=3D"font-size:0px;padding=
+:60px 60px 15px 60px;word-break:break-word;"><div style=3D"font-family:Helv=
+etica, Arial, sans-serif;font-size:17px;line-height:24px;text-align:left;co=
+lor:#000000;">Ol=C3=A1, 62.462.272<br><br>Voc=C3=AA recebeu uma transfer=C3=
+=AAncia pelo Pix de <b>GOBBI PAVAN EDUCACAO LTDA </b>e o valor j=C3=A1 est=
+=C3=A1 dispon=C3=ADvel na sua conta Nu Empresas.</div></td></tr></table></d=
+iv><!--[if mso | IE]></td></tr></table><![endif]--></td></tr></tbody></tabl=
+e></div><!--[if mso | IE]></td></tr></table><table align=3D"center" border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=3D"" style=3D"width:600px;=
+" width=3D"600" ><tr><td style=3D"line-height:0px;font-size:0px;mso-line-he=
+ight-rule:exactly;"><![endif]--><div style=3D"background:#FFFFFF;background=
+-color:#FFFFFF;margin:0px auto;max-width:600px;"><table align=3D"center" bo=
+rder=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=
+=3D"background:#FFFFFF;background-color:#FFFFFF;width:100%;"><tbody><tr><td=
+ style=3D"direction:ltr;font-size:0px;padding:20px 0;padding-bottom:20px;pa=
+dding-left:25%;padding-right:25%;padding-top:20px;text-align:center;"><!--[=
+if mso | IE]><table role=3D"presentation" border=3D"0" cellpadding=3D"0" ce=
+llspacing=3D"0"><tr><td class=3D"" style=3D"width:550px;" ><![endif]--><div=
+ class=3D"mj-column-per-100 mj-outlook-group-fix" style=3D"font-size:0;line=
+-height:0;text-align:left;display:inline-block;width:100%;direction:ltr;"><=
+!--[if mso | IE]><table role=3D"presentation" border=3D"0" cellpadding=3D"0=
+" cellspacing=3D"0"><tr><td style=3D"vertical-align:top;width:550px;" ><![e=
+ndif]--><div class=3D"mj-column-per-100 mj-outlook-group-fix" style=3D"font=
+-size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align=
+:top;width:100%;"><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" r=
+ole=3D"presentation" style=3D"background-color:#E5E5E5;vertical-align:top;"=
+ width=3D"100%"><tr><td align=3D"center" style=3D"font-size:0px;padding:10p=
+x 25px;padding-top:10px;word-break:break-word;"><div style=3D"font-family:U=
+buntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:300%;text-al=
+ign:center;color:#000000;">Valor recebido</div></td></tr><tr><td align=3D"c=
+enter" style=3D"font-size:0px;padding:10px 25px;word-break:break-word;"><di=
+v style=3D"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;=
+line-height:300%;text-align:center;color:#000000;"><strong>R$ 852,00</stron=
+g></div></td></tr><tr><td align=3D"center" style=3D"font-size:0px;padding:1=
+0px 25px;padding-bottom:10px;word-break:break-word;"><div style=3D"font-fam=
+ily:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:300%;te=
+xt-align:center;color:#000000;">26 DEZ =C3=A0s 17:02</div></td></tr></table=
+></div><!--[if mso | IE]></td></tr></table><![endif]--></div><!--[if mso | =
+IE]></td></tr></table><![endif]--></td></tr></tbody></table></div><!--[if m=
+so | IE]></td></tr></table><![endif]--><!-- =F0=9F=9B=91 TEXTO --><!--[if m=
+so | IE]><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=
+=3D"0" class=3D"" style=3D"width:600px;" width=3D"600" ><tr><td style=3D"li=
+ne-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]--><div=
+ style=3D"background:#ffffff;background-color:#ffffff;margin:0px auto;max-w=
+idth:600px;"><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspa=
+cing=3D"0" role=3D"presentation" style=3D"background:#ffffff;background-col=
+or:#ffffff;width:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:0px=
+;padding:0px;text-align:center;"><!--[if mso | IE]><table role=3D"presentat=
+ion" border=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" st=
+yle=3D"vertical-align:top;width:600px;" ><![endif]--><div class=3D"mj-colum=
+n-per-100 mj-outlook-group-fix" style=3D"font-size:0px;text-align:left;dire=
+ction:ltr;display:inline-block;vertical-align:top;width:100%;"><table borde=
+r=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"=
+100%"><tbody><tr><td style=3D"vertical-align:top;padding:0px;"><table borde=
+r=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" width=3D"=
+100%"><tr><td align=3D"left" class=3D"pd30" style=3D"font-size:0px;padding:=
+30px 0px 0px 0px;word-break:break-word;"><div style=3D"font-family:Helvetic=
+a, Arial, sans-serif;font-size:17px;line-height:24px;text-align:left;color:=
+#000000;">&nbsp;</div></td></tr></table></td></tr></tbody></table></div><!-=
+-[if mso | IE]></td></tr></table><![endif]--></td></tr></tbody></table></di=
+v><!--[if mso | IE]></td></tr></table><![endif]--><!-- =F0=9F=9B=91 Ops BR =
+Channels Email - No-reply Code --><!--[if mso | IE]><table align=3D"center"=
+ border=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=3D"" style=3D"width=
+:600px;" width=3D"600" ><tr><td style=3D"line-height:0px;font-size:0px;mso-=
+line-height-rule:exactly;"><![endif]--><div style=3D"margin:0px auto;max-wi=
+dth:600px;"><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspac=
+ing=3D"0" role=3D"presentation" style=3D"width:100%;"><tbody><tr><td style=
+=3D"direction:ltr;font-size:0px;padding:0;text-align:center;"><!--[if mso |=
+ IE]><table role=3D"presentation" border=3D"0" cellpadding=3D"0" cellspacin=
+g=3D"0"><tr><td class=3D"" style=3D"vertical-align:top;width:600px;" ><![en=
+dif]--><div class=3D"mj-column-per-100 mj-outlook-group-fix" style=3D"font-=
+size:0px;text-align:left;direction:ltr;display:inline-block;vertical-align:=
+top;width:100%;"><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" ro=
+le=3D"presentation" style=3D"vertical-align:top;" width=3D"100%">awyt8iyj8i=
+t4e3egni7ji3ttfgasby</table></div><!--[if mso | IE]></td></tr></table><![en=
+dif]--></td></tr></tbody></table></div><!--[if mso | IE]></td></tr></table>=
+<![endif]--> <!-- Fim do No-reply Code --><!-- =F0=9F=9B=91FOOTER --><!--[i=
+f mso | IE]><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspac=
+ing=3D"0" class=3D"" style=3D"width:600px;" width=3D"600" ><tr><td style=3D=
+"line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]--><=
+div style=3D"background:#191919;background-color:#191919;margin:0px auto;ma=
+x-width:600px;"><table align=3D"center" border=3D"0" cellpadding=3D"0" cell=
+spacing=3D"0" role=3D"presentation" style=3D"background:#191919;background-=
+color:#191919;width:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:=
+0px;padding:15px 0px;text-align:center;"><!--[if mso | IE]><table role=3D"p=
+resentation" border=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=
+=3D"" width=3D"600px" ><table align=3D"center" border=3D"0" cellpadding=3D"=
+0" cellspacing=3D"0" class=3D"" style=3D"width:600px;" width=3D"600" ><tr><=
+td style=3D"line-height:0px;font-size:0px;mso-line-height-rule:exactly;"><!=
+[endif]--><div style=3D"margin:0px auto;max-width:600px;"><table align=3D"c=
+enter" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentatio=
+n" style=3D"width:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:0p=
+x;padding:0px;text-align:center;"><!--[if mso | IE]><table role=3D"presenta=
+tion" border=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" s=
+tyle=3D"vertical-align:top;width:600px;" ><![endif]--><div class=3D"mj-colu=
+mn-per-100 mj-outlook-group-fix" style=3D"font-size:0px;text-align:left;dir=
+ection:ltr;display:inline-block;vertical-align:top;width:100%;"><table bord=
+er=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D=
+"vertical-align:top;" width=3D"100%"><tr><td align=3D"left" style=3D"font-s=
+ize:0px;padding:10px 25px;word-break:break-word;"><div style=3D"font-family=
+:Ubuntu, Helvetica, Arial, sans-serif;font-size:20px;font-weight:bold;line-=
+height:26px;text-align:left;color:#FFFFFF;"><b>Abra=C3=A7os,<br>Equipe Nuba=
+nk</b></div></td></tr><tr><td align=3D"left" class=3D"body-footer" style=3D=
+"font-size:0px;padding:10px 25px;word-break:break-word;"><div style=3D"font=
+-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:1;t=
+ext-align:left;color:#FFFFFF;">Fa=C3=A7a parte da <a href=3D"http://email.n=
+ubank.com.br/c/eJxUz7GSrCAQheGn0awtbAQ0ILjJvEc3tDPcVaQQp2b36bcMNzxV5wv-6EMU=
+Cb340Vnr3KId9i8fjOa40sKzmTEuNso6jWi0YW2VmrlPHhWaEdGiUmhwWMQYxTY4trg6km5S-WL=
+KX0M49oFrv_lXa-Xs9L8OHx0-wrFfOUWKMvw5dvjo8wXhyI1CgxS9nXmkESMogwombQlYRQOLDS=
+TEjljZm8inSc203QaJV1J2BiKOoMUomDUGCJqER70aJHObUo92tO8i_nT3brKXjZpApl18-Q9c6=
+SdtQJ8CrVI-V6mQMlQJkt4S4WgvqSeU9Omrl_ikOpzyvHI8ukk9d0rb3dW_Pf4GAAD__zZdcz0"=
+ style=3D"color: #b19cd9; text-decoration: none">NuCommunity</a>, um lugar =
+para voc=C3=AA se conectar com outros clientes, compartilhar ideias e suges=
+t=C3=B5es, e ficar por dentro das novidades do universo Nu.<br><br>Por favo=
+r, pedimos que voc=C3=AA n=C3=A3o responda esse e-mail, pois se trata de um=
+a mensagem autom=C3=A1tica e n=C3=A3o =C3=A9 poss=C3=ADvel dar continuidade=
+ ao seu atendimento por aqui.</div></td></tr></table></div><!--[if mso | IE=
+]></td></tr></table><![endif]--></td></tr></tbody></table></div><!--[if mso=
+ | IE]></td></tr></table></td></tr><tr><td class=3D"" width=3D"600px" ><tab=
+le align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" class=
+=3D"" style=3D"width:600px;" width=3D"600" ><tr><td style=3D"line-height:0p=
+x;font-size:0px;mso-line-height-rule:exactly;"><![endif]--><div style=3D"ma=
+rgin:0px auto;max-width:600px;"><table align=3D"center" border=3D"0" cellpa=
+dding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D"width:100%;"><=
+tbody><tr><td style=3D"direction:ltr;font-size:0px;padding:0px;text-align:c=
+enter;"><!--[if mso | IE]><table role=3D"presentation" border=3D"0" cellpad=
+ding=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=3D"width:600px;" ><![=
+endif]--><div class=3D"mj-column-per-100 mj-outlook-group-fix" style=3D"fon=
+t-size:0;line-height:0;text-align:left;display:inline-block;width:100%;dire=
+ction:ltr;"><!--[if mso | IE]><table role=3D"presentation" border=3D"0" cel=
+lpadding=3D"0" cellspacing=3D"0"><tr><td style=3D"vertical-align:top;width:=
+600px;" ><![endif]--><div class=3D"mj-column-per-100 mj-outlook-group-fix" =
+style=3D"font-size:0px;text-align:left;direction:ltr;display:inline-block;v=
+ertical-align:top;width:100%;"><table border=3D"0" cellpadding=3D"0" cellsp=
+acing=3D"0" role=3D"presentation" width=3D"100%"><tbody><tr><td style=3D"ve=
+rtical-align:top;padding:0px;"><table border=3D"0" cellpadding=3D"0" cellsp=
+acing=3D"0" role=3D"presentation" width=3D"100%"><tr><td align=3D"left" ver=
+tical-align=3D"middle" style=3D"font-size:0px;padding:10px;word-break:break=
+-word;"><!--[if mso | IE]><table align=3D"left" border=3D"0" cellpadding=3D=
+"0" cellspacing=3D"0" role=3D"presentation" ><tr><td><![endif]--><table ali=
+gn=3D"left" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presen=
+tation" style=3D"float:none;display:inline-table;"><tr><td style=3D"padding=
+:20px;"><table border=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"pre=
+sentation" style=3D"background:#191919;border-radius:3px;width:30px;"><tr><=
+td style=3D"font-size:0;height:30px;vertical-align:middle;width:30px;"><img=
+ height=3D"30" src=3D"https://cdn.nubank.com.br/core-marketing/icons%20-%20=
+Social%20media/Off-white/PNG_1x/logo_Facebook_1x.png" style=3D"border-radiu=
+s:3px;display:block;" width=3D"30"></td></tr></table></td></tr></table><!--=
+[if mso | IE]></td><td><![endif]--><table align=3D"left" border=3D"0" cellp=
+adding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D"float:none;di=
+splay:inline-table;"><tr><td style=3D"padding:10px;"><table border=3D"0" ce=
+llpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D"background=
+:#191919;border-radius:3px;width:30px;"><tr><td style=3D"font-size:0;height=
+:30px;vertical-align:middle;width:30px;"><a href=3D"http://email.nubank.com=
+=2Ebr/c/eJw0zz2ynDAQBODTQDbUaFhJEChw8u4=
+xIw278gNBCe2PfXoXrnphd_UXdAoxqcZeg_HOe=
+T-PnvpHsHYSK2k2djI4O05o5oVcXCzyPInpcyAka4gcIZKlYVZrUVz04mjxrN0Ny1O4fA9x3wap=
+_RoerR1nN_7q6Kujr_f7PbT83fb_i6v7EX15QtxL49ggp-AmMWwoAVpCuI2OQTBZmF1kZfEs6C6=
+in6a18HoZYlkY3QTMkmBUizCNFCGOrGLGxRLbyxx1b3v7c2g4_ZWbbsfKTaHwpuH4DVL5b16BPw=
+e0yuVctEIuUDVqfmmCvT20nnDkT1-DpjvX4dT7s6S9u-F947xe7_pXoH8BAAD__wKQckc" targ=
+et=3D"_blank"><img height=3D"30" src=3D"https://cdn.nubank.com.br/core-mark=
+eting/icons%20-%20Social%20media/Footer%20Icons%20-%20Actual%20-%202025/Off=
+-white/PNG%202X/logo_Tiktok.png" style=3D"border-radius:3px;display:block;"=
+ width=3D"30"></a></td></tr></table></td></tr></table><!--[if mso | IE]></t=
+d><td><![endif]--><table align=3D"left" border=3D"0" cellpadding=3D"0" cell=
+spacing=3D"0" role=3D"presentation" style=3D"float:none;display:inline-tabl=
+e;"><tr><td style=3D"padding:20px;"><table border=3D"0" cellpadding=3D"0" c=
+ellspacing=3D"0" role=3D"presentation" style=3D"background:#191919;border-r=
+adius:3px;width:30px;"><tr><td style=3D"font-size:0;height:30px;vertical-al=
+ign:middle;width:30px;"><a href=3D"http://email.nubank.com.br/c/eJwkz73SnDA=
+MheGrgU6MkLG9FC7S7H1Itth1AoYx3p_k6jPMV56Z8xRvCjGpxl7D6J3zfjae-mdI1qhHmoxZZl=
+6imawsM9tRJlQWpD4HQrIjkSNEsjTMai2Ki14cLZ61m7C8hMufIe7bILVfw7O1ozO_Orp3dP98P=
+kMuZ-NH5e36dHT_AX15QdxL49ggp-BuMvJICdASwmQcg2CyMLvIyuJZ0F1Ev01r4fUyxLIwuhsw=
+SwKjFuFmKEI0rDKaxRLbyxx1b3v7e2g4_bWbbsfKTaHwpuH4DVL5X16Bvwe0yuVctEIuUDVqfmu=
+CvT21nnDkb1-DpgfX4dTHq6S9m_CxcV6vtP4d6H8AAAD__6EVcvY" target=3D"_blank"><im=
+g height=3D"30" src=3D"https://cdn.nubank.com.br/core-marketing/icons%20-%2=
+0Social%20media/Footer%20Icons%20-%20Actual%20-%202025/Off-white/PNG%202X/l=
+ogo_Instagram.png" style=3D"border-radius:3px;display:block;" width=3D"30">=
+</a></td></tr></table></td></tr></table><!--[if mso | IE]></td><td><![endif=
+]--><table align=3D"left" border=3D"0" cellpadding=3D"0" cellspacing=3D"0" =
+role=3D"presentation" style=3D"float:none;display:inline-table;"><tr><td st=
+yle=3D"padding:10px;"><table border=3D"0" cellpadding=3D"0" cellspacing=3D"=
+0" role=3D"presentation" style=3D"background:#191919;border-radius:3px;widt=
+h:30px;"><tr><td style=3D"font-size:0;height:30px;vertical-align:middle;wid=
+th:30px;"><a href=3D"http://email.nubank.com.br/c/eJwUz7GOnTAQheGngW6QGbCNC=
+xdRViSKFClFIqUd2wN4wzXImL3cPP2K8kjnK_5gfWD2NdtWK6W16TTWix3YiN4LYZQx0vdaG6UH=
+541RRIMyvo4WBcoWUaEQKLExLKVwymuncNLEVS_S6Sj9a_z2aFyuV7uUsh9V96XCscLx-Xw2r-0=
+sp-P7UuHoF0qJ1wrHP1_n4-1vt_x-xl-hfPv-4_3nOL1dc51O8Fsq5AvEYNXgWmoxgJAooO8UgR=
+NBglGemJwmJ9RN-CqcE623QXITCTUAkQvQsRQwdOjBd8Su7SaJJG-z561s5bWzPfS9Cz_2lQpDo=
+gfb_R1cpv9xBbp2KJnSMXGGmCCz5_jBAbaycD5gj1edLYeZcnPwfKawVb2YHxTXO7v-sPgZAAD_=
+_095e1k" target=3D"_blank"><img height=3D"30" src=3D"https://cdn.nubank.com=
+=2Ebr/core-marketing/icons%20-%20Social=
+%20media/Footer%20Icons%20-%20Actual%2=
+0-%202025/Off-white/PNG%202X/logo_Youtube.png" style=3D"border-radius:3px;d=
+isplay:block;" width=3D"30"></a></td></tr></table></td></tr></table><!--[if=
+ mso | IE]></td></tr></table><![endif]--></td></tr></table></td></tr></tbod=
+y></table></div><!--[if mso | IE]></td></tr></table><![endif]--></div><!--[=
+if mso | IE]></td></tr></table><![endif]--></td></tr></tbody></table></div>=
+<!--[if mso | IE]></td></tr></table></td></tr><tr><td class=3D"" width=3D"6=
+00px" ><table align=3D"center" border=3D"0" cellpadding=3D"0" cellspacing=
+=3D"0" class=3D"" style=3D"width:600px;" width=3D"600" ><tr><td style=3D"li=
+ne-height:0px;font-size:0px;mso-line-height-rule:exactly;"><![endif]--><div=
+ style=3D"margin:0px auto;max-width:600px;"><table align=3D"center" border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D"w=
+idth:100%;"><tbody><tr><td style=3D"direction:ltr;font-size:0px;padding:0px=
+;text-align:center;"><!--[if mso | IE]><table role=3D"presentation" border=
+=3D"0" cellpadding=3D"0" cellspacing=3D"0"><tr><td class=3D"" style=3D"vert=
+ical-align:top;width:600px;" ><![endif]--><div class=3D"mj-column-per-100 m=
+j-outlook-group-fix" style=3D"font-size:0px;text-align:left;direction:ltr;d=
+isplay:inline-block;vertical-align:top;width:100%;"><table border=3D"0" cel=
+lpadding=3D"0" cellspacing=3D"0" role=3D"presentation" style=3D"vertical-al=
+ign:top;" width=3D"100%"><tr><td align=3D"left" class=3D"body-footer" style=
+=3D"font-size:0px;padding:10px 25px;word-break:break-word;"><div style=3D"f=
+ont-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:13px;line-height:=
+1;text-align:left;color:#FFFFFF;">Tem alguma d=C3=BAvida? Mande uma mensage=
+m para nosso time de atendimento pelo chat do app ou ligue <a style=3D"curs=
+or: text; text-decoration: none; color: inherit; pointer-events: none; font=
+-weight: normal;">4020 0185</a> (capitais e regi=C3=B5es metropolitanas) ou=
+ <a style=3D"cursor: text; text-decoration: none; color: inherit; pointer-e=
+vents: none; font-weight: normal;">0800 591 2117</a> (demais localidades). =
+Atendimento 24h.<br><br>Caso a solu=C3=A7=C3=A3o fornecida nos canais de at=
+endimento n=C3=A3o tenha sido satisfat=C3=B3ria, fale com a Ouvidoria em 08=
+00 887 0463 ou pelos meios dispon=C3=ADveis em nossa p=C3=A1gina de <a href=
+=3D"http://email.nubank.com.br/c/eJxUz7ES2yAQBNCvkbrTHIcAuaBI4_844GSTSKBByO=
+Pk6zNKl3J35xWbfEwicRSvnLXOPbSj8e0VB6O0WTQ559Cus8awzFYSKzQBZcyekIwisoRIhqaHG=
+IPBRhcsrY5lmLFcgcuvKdZ9Cm3c_Lv3Y9A_BnoO9PxvHOgZa-nc6zmQrtcnp9oyj-WCf33skJO3=
+S1CsKAEaQpi1ZQiYDDxsZOHgOKC9iXy7tMLbbYjDymgXYA4JtBiERVOEqFmC0qshNrc5Wu21_z7=
+En-7OXfZj4y5QeBd__ITQ-E_egL8H9MblXKVBLtAkSv5Igtrf0k448ndsXtKL23TK6yqpDjO-ds=
+7b_XX8ePobAAD__z3Odac" style=3D"color: #b19cd9; text-decoration: none">Cont=
+atos.</a> Atendimento das 8h =C3=A0s 18h em dias =C3=BAteis.<br></div></td>=
+</tr><tr><td align=3D"left" class=3D"body-footer" style=3D"font-size:0px;pa=
+dding:10px 25px;word-break:break-word;"><div style=3D"font-family:Ubuntu, H=
+elvetica, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;co=
+lor:#FFFFFF;"><b>Nu Pagamentos S.A. 18.236.120/0001-58</b></div></td></tr><=
+tr><td align=3D"left" class=3D"body-footer" style=3D"font-size:0px;padding:=
+10px 25px;word-break:break-word;"><div style=3D"font-family:Ubuntu, Helveti=
+ca, Arial, sans-serif;font-size:13px;line-height:1;text-align:left;color:#F=
+FFFFF;"><b>Rua Capote Valente, 39 - 05409-000 - S=C3=A3o Paulo, SP.</b><br>=
+<br></div></td></tr><tr><td align=3D"left" class=3D"unsubscription-link-cla=
+ss" style=3D"font-size:0px;padding:10px 25px;word-break:break-word;"><div s=
+tyle=3D"font-family:Ubuntu, Helvetica, Arial, sans-serif;font-size:12px;lin=
+e-height:1;text-align:left;color:#FFFFFF;">N=C3=A3o deseja receber mais nos=
+sos emails? <b><a href=3D"https://webapp-proxy-webhooks.nubank.com.br/api/w=
+ebhooks/email-unsubscribe/MDEuTUNvd0JRWURLMlZ1QXlFQTdBeUhHdWpic2hLZTRXQkVFd=
+G9LRUtoT0NYS3dQcmVDNXFpT0lQM1NjRUkuOVMtX1MwRWZoWnpqQVI0SnNQVk9TZUhfQ3E3blRH=
+dTk4a3prV3RYMUNFM2F6bnduVjVqWEticF9IOGpMVFhObksyMnhFQlFoa3pxa01icDZxUlJwUVZ=
+MbFZGVE1rczlTR1o2ODdkdEVaQTc5NzcyeVh0Z24ySkV3TTRjRWZTa3F2SE5OT0cxVE9TUV93Zl=
+hpUGJCZ25SQ3pjWVdZYnhFTVZxY1hxTUNBTDhKalBXR21YbkdxMkRGYWV5R1Rocno3MXdxSko3S=
+Wt0NFJGOWVva3FfcjN3cUtraEtRN0J2bjdwVDVJREVsWG1OczdZekZOLTFqMzlLdVZ5NmdkQ1c3=
+clpUVE8zektZbl94T1VDNUdWZnRmYWVhMFd3aXFXanNzdHRkRnRLOE5MNUppN2Y2X3R5ZkRVbG9=
+fQ0RwdjMwSXJ0dHh0dVRob0pSd3p6U2ZGTlljckhpRHktWm9RaTBiNUlzQXhNbE5YclJCVFZET2=
+9vRXF1ZlZPT0dvZG94M1Q4UVlXZzA2bjROX2FRZzJUa2xRZHFaUFBsSHpGLUtLUUR1T2xTQ2l2e=
+E40Sm9mdFFpbC12VHpXYi1ZMFdhV3ViR001YnEwanBabk5ramdtUlhYZEpiUVprcXA5X2FEd2g3=
+bWhGX2lfcnpqYUZtRFVMMDNWeXhLYVZJV2RmX1dFMlFQSjNmWnJQVGsyOTNVRlB3MVR1dU5CTTQ=
+0VzlkeWVtcjllVHZ3MlJLa2xCRDViekFrUjhnYU5PbjVJT3FFY0pJYzBYZERVdlBLUlZFcE5Bbk=
+pjU2hxZjRjc192UTN3S1FXaTRObk1yc1hKaXkyRWNOb0ExZ0loazhrU0piZ0NwMkYwTGR6TGZpQ=
+jY1dzROMHBjR0xaXzFnRDk5bDlyV0xXVUl0UHh3MFRUQ1JVS0dKYzJsUmNWbXNSbkJVcmtibW10=
+WlJOWmtYR2VxcEZCYmlIVllHbThkT1ltdWFScHpBaVFRSGk1NlVpQ3BCODMxbkRvV2FmalpGWEl=
+yeVFFS0FzUmRpdkdRTTFTT0xDNGJWWlE1ZTgtVXlWYVdQdUZhNGdXQm91c2RBLVVBNjcwS0JHOW=
+1fQkkwT2UxZm15MVIydUZrU2lKd05ZemszMFZJZU5wZ2RaS1N4bkhUWE9rdktnT0RtMTNBNWlEa=
+XNscklWd1l6Y3JHQ0FwTG1PRVlDUGhEektpaVp3aEwyenMzYm1tLXdxVXdMcmZyeGZSci1ZcDhM=
+SkZOQXI1X185bm9aeDRFRWZKZEdORGFIcVIzdXNrOW10UnozV0xBVjI3aU1rZkhNN1lMZUJQa2Z=
+GdHFFWTJLbm5mMDNYeGVQTnFsQ2Q2RG1NWnZEZlRpRTBobXRtbS5heWFqSFlfc0QtWm9vWERQM3=
+pnZGJnLklNTGR2bWpHZW5rR082RjJjY2YwaVVqRzdHaDVDVWhkMEpaQ2gtaU14dlFHWUVWZU9PT=
+nluQWk5SjRMMW9jQnV3YVcwN3g3UGE4QlFqUEw0Tlp6eTZrdks0NmN6d2hjMDdRUDZqV2V5dWk4=
+N1BEUFFlWG1mdGEyUmctR2pSSEFyd29FUlRoWVdQajJjUHJjZTBZNll0TEQzQUtaVFpwYWJONlB=
+EOG5ON0x0aUdQbUwzeXhPY3VOOWVacjF1Y0t2cDhlZUhoZnkzVGN1V3JZanhxZmRUODFobmVfbk=
+g5RFpqdVJLRGtUTG1rN2hNZi1pV2NsZ1Q3Z3FQd3RWanU5UTVWQ2pIUXFEQ3VoZGhFRk9xMXZ3b=
+Uhn" style=3D"color:#FFFFFF;text-decoration: none">Clique aqui para se desc=
+adastrar.</a></b><br></div></td></tr></table></div><!--[if mso | IE]></td><=
+/tr></table><![endif]--></td></tr></tbody></table></div><!--[if mso | IE]><=
+/td></tr></table></td></tr></table><![endif]--></td></tr></tbody></table></=
+div><!--[if mso | IE]></td></tr></table><![endif]--></div><img width=3D"1" =
+height=3D"1" alt=3D"" src=3D"http://email.nubank.com.br/o/eJwUz8GyqyAMgOGnq=
+bs4MQjogodJILTcq-gg7fScpz_j8l98iz-FmFTjoGHyznm_Gk_DK2A0c06yrIazZ4s4rXaeo-R5=
+STrxOpRASHYicoRIlsZVrUVx0Yuj7FkfM9a3cP0_xmMfpQ31DfGonWOHkoJbZOKJEqAlhNk4BsF=
+kYXWRlcWzoLuJfru2ytttiCUzugWYJYFRi7AYihANq0wmW2J7m7Md_eg_p4bL3911PzfuCpV3De=
+c_kMa_ZQP-ntAb1ytrg1KhadTy0QRHf2m74CzfoQVNT27jpc93TcdjxufOZbunhk-gvwAAAP__4=
+6JkwQ"></body></html>
+
+[23/02/2026 17:01:27] [DEBUG] --- END EMAIL uid=259298 ---
+[23/02/2026 17:01:27] [DEBUG] IMAP disconnected.
+[23/02/2026 17:01:27] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:01:27] [DEBUG] Saved uid=259298 — João da Silva R$250
+[23/02/2026 17:01:27] [INFO] === Done. Found: 1 | Saved: 1 | Skipped (duplicate): 0 ===
+[23/02/2026 17:04:00] [INFO] === check-nubank-emails started ===
+[23/02/2026 17:04:00] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 17:04:00] [DEBUG] Database opened and table ensured.
+[23/02/2026 17:04:00] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 17:04:00] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 17:04:00] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 17:04:03] [DEBUG] IMAP connected successfully.
+[23/02/2026 17:04:07] [DEBUG] Total messages in INBOX (no filter): 122336
+[23/02/2026 17:04:07] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 17:04:07] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 17:04:08] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3094
+[23/02/2026 17:04:08] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 17:04:08] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 17:04:09] [DEBUG] --- EMAIL MATCH uid=259298 ---
+[23/02/2026 17:04:09] [DEBUG] Subject : Você recebeu uma transferência pelo Pix
+[23/02/2026 17:04:09] [DEBUG] From    : Nubank <undefined@undefined>
+[23/02/2026 17:04:09] [DEBUG] Date    : Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:04:09] [DEBUG] Body    :
+Delivered-To: edgar.segundo@gmail.com
+Received: by 2002:a05:6a11:d892:b0:695:36a4:c729 with SMTP id od18csp238375pxc;
+        Fri, 26 Dec 2025 12:02:53 -0800 (PST)
+X-Google-Smtp-Source: AGHT+IHGf1I7WX3QgiByyej7MtVh+debcNaaMj1a5XgsOsXA+COBCzVIMK6zV8wxp7D3b81LVWpL
+X-Received: by 2002:ac8:5914:0:b0:4f1:b9ec:f6a4 with SMTP id d75a77b69052e-4f4abceebf3mr416619881cf.33.1766779372756;
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+ARC-Seal: i=1; a=rsa-sha256; t=1766779372; cv=none;
+        d=google.com; s=arc-20240605;
+        b=c6vSfEkNnHmMcqSNwiNEhxFzA50tnKVs9i3qWUmYyDYFOXApKrSjK6T+7B0zFpd2Dk
+         eAWSyJuoYJpqgMkxN8SBSJiabHS4rsg7r4J3ZGoV6BF2Qqdkwga4ihRVeUZ4J1/5+6EJ
+         5e+zbFftWzUkog6ACETelgZAJY2zcX243akz96rUe1M7Pes9vt8JOVUjz/siSN/geZ++
+         yZS9t6pAhLoTditilC8ko4iXEn6M52PJLfcA6AUnEwMEWOqUWPMspR108gb0MViUOvJ1
+         dewRpMqY067Br8JaObzEeWFxxXluMpZZ+nqFZD46QzaMBoyz9mPRXyyz4gX/nT0XyeR/
+         K+Kg==
+ARC-Message-Signature: i=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=arc-20240605;
+        h=content-transfer-encoding:message-id:to:from:subject:mime-version
+         :date:sender:dkim-signature:dkim-signature;
+        bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+        fh=FrZfciYWu7Z8nyRXDIa7cKdb+2y2iLqNikEr/CNA5T8=;
+        b=BJakOmQMfFLt9+5bRT2P20FsctCBL0v7uy9VEHM9dpeKYZCsXOGzsp3iJzblTBTtaz
+         Hau/846Zl6xGCzHQp9L9s0M3cI22v4NGbjjvxOwd4owvCNrOEaY4KAgljno+8S/T8/4a
+         a1LheHkWj/sd2gsslWxn5/SDLj8b++CkAXs5MbJEjSme6loPTbgPfKbjfgg65lz45K9u
+         KU7DqIKcuviBPKQrOrlemtyWT1waOD0DEy7/APquZ/RQTli1ICOHMI+MN1NIVRfQ3m03
+         MVXZKsycYQoPI8pbbjFfxDqbSxyDGBpfp4kluvAkDNCuzbh4H1NxqPMmD+7MPvxdqOC6
+         DooA==;
+        dara=google.com
+ARC-Authentication-Results: i=1; mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+Return-Path: <bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br>
+Received: from m225-25.mailgun.net (m225-25.mailgun.net. [159.135.225.25])
+        by mx.google.com with UTF8SMTPS id d75a77b69052e-4f4ac687766si242974731cf.305.2025.12.26.12.02.52
+        for <edgar.segundo@gmail.com>
+        (version=TLS1_2 cipher=ECDHE-ECDSA-AES128-GCM-SHA256 bits=128/128);
+        Fri, 26 Dec 2025 12:02:52 -0800 (PST)
+Received-SPF: pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) client-ip=159.135.225.25;
+Authentication-Results: mx.google.com;
+       dkim=pass header.i=@nubank.com.br header.s=mailgun header.b=cdFAcVI4;
+       dkim=pass header.i=@mailgun.org header.s=mg header.b=n1xK8hqK;
+       spf=pass (google.com: domain of bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br designates 159.135.225.25 as permitted sender) smtp.mailfrom="bounce+fdc2b4.cdeec-edgar.segundo=gmail.com@nubank.com.br";
+       dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=nubank.com.br
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=nubank.com.br; q=dns/txt; s=mailgun; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=cdFAcVI4TyF/y+2Y3FA6W1IKegaPsIVvQJar5UkBcKH7Slnr+nppKRIUJs9vZLbDVjMJq0fY+KYJe4wwCGViAX6h+Je25WoZ/chzHFeLdxI3+GcNo/oky8cCruf8bfDJXiS018DiwdpbMTtAzmZDQdB8szGECE76wBXWG0gFimmcJJ0Mm9TM3+xU7wpwLwb/qTdM1tTuwx49nF13wmeEluCbBluu8KYHXp75ZAbcbKOn1tlj3pf3++pjY81Ai+q6VSbSOoGEwRVL0Y66AvQAPYvTm9PQdaRJjO3CXPzDi2lzQPMCEthTYNM5cgZstBhPJ/YURyaXBLkWB+ik6yGUMQ==
+DKIM-Signature: a=rsa-sha256; v=1; c=relaxed/relaxed; d=mailgun.org; q=dns/txt; s=mg; t=1766779372; x=1766786572;
+ h=Content-Transfer-Encoding: Content-Type: Message-Id: To: To: From: From: Subject: Subject: Mime-Version: Date: Sender: Sender: X-Feedback-Id;
+ bh=FN6uZzTKTTIqydAYeXO2B4Aud1FASyEEGsAvzyx1ecA=;
+ b=n1xK8hqKwaJgtYk0irTNjpgZEvhUzqhXhCJGNtxcoDeN6t1Cm7pZz6Gpy77dWH7OASWspB/GZq6fcZieQ7T40EM/fq6W6X744FgIeQkvEf2LXa8fkIY4NdD2GGiqZf+T5uhW409e/kZMbEo0WGZ9ItPdNx4dnLLVu5vnrj0qLN0=
+X-Mailgun-Sid: WyIxZjRiZSIsImVkZ2FyLnNlZ3VuZG9AZ21haWwuY29tIiwiY2RlZWMiXQ==
+X-Feedback-Id: todomundo@nubank.com.br::5dfa98fcdf6c96bcee570dc9:mailgun
+Received: by e0b4ba98ae79f12cfa5e1840761537d40e939ef96138b3462121daf634563d91 with HTTP
+ id 694ee9ec527c7e0065ebc7d4; Fri, 26 Dec 2025 20:02:52 GMT
+X-Mailgun-Sending-Ip: 159.135.225.25
+Sender: todomundo@nubank.com.br
+Date: Fri, 26 Dec 2025 20:02:52 +0000
+Mime-Version: 1.0
+Subject: =?UTF-8?q?Voc=C3=AA_recebeu_uma_transfer=C3=AAncia_pelo_Pix?=
+From: Nubank <todomundo@nubank.com.br>
+To: 62.462.272 <edgar.segundo@gmail.com>
+X-Mailgun-Variables: {"nu-contact-id": "68b1a12d-0520-436a-b0d5-96caeab7ab06", "nu-external-id":
+ "2abfa068-aabd-3e50-832c-c3aeb13f52a5", "nu-prototype": "s7",
+ "nu-template-name": "pj-brazil-axp-transfer-in-received-others-pix"}
+Message-Id: <20251226200252.9e550b6c7b62f7ae@nubank.com.br>
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+
+<!doctype html><html xmlns=3D"http://www.w3.org/1999/xhtml" xmlns:v=3D"urn:=
+schemas-microsoft-com:vml" xmlns:o=3D"urn:schemas-microsoft-com:office:offi=
+ce"><head><title></title><!--[if !mso]><!-- --><meta http-equiv=3D"X-UA-Com=
+patible" content=3D"IE=3Dedge"><!--<![endif]--><meta http-equiv=3D"Content-=
+Type" content=3D"text/html; charset=3DUTF-8"><meta name=3D"viewport" conten=
+t=3D"width=3Ddevice-width,initial-scale=3D1"><style type=3D"text/css">#outl=
+ook a { padding:0; }
+          body { margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-=
+size-adjust:100%; }
+          table, td { border-collapse:collapse;mso-table-lspace:0pt;mso-tab=
+le-rspace:0pt; }
+          img { border:0;height:auto;line-height:100%; outline:none;text-de=
+coration:none;-ms-interpolation-mode:bicubic; }
+          p { display:block;margin:13px 0; }</style><!--[if mso]>
+        <xml>
+        <o:OfficeDocumentSettings>
+          <o:AllowPNG/>
+          <o:PixelsPerInch>96</o:PixelsPerInch>
+        </o:OfficeDocumentSettings>
+        </xml>
+        <![endif]--><!--[if lte mso 11]>
+        <style type=3D"text/css">
+          .mj-outlook-group-fix { width:100% !important; }
+        </style>
+        <![endif]--><!--[if !mso]><!--><link href=3D"https://fonts.googleap=
+is.com/css?family=3DUbuntu:300,400,500,700" rel=3D"stylesheet" type=3D"text=
+/css"><style type=3D"text/css">@import url(https://fonts.googleapis.com/css=
+?family=3DUbuntu:300,400,500,700);</style><!--<![endif]--><style type=3D"te=
+xt/css">@media only screen and (min-width:480px) {
+        .mj-column-per-100 { width:100% !important; max-width: 100%; }
+      }</style><style type=3D"text/css">@media only screen and (max-width:4=
+80px) {
+      table.mj-full-width-mobile { width: 100% !important; }
+      td.mj-full-width-mobile { width: auto !important; }
+    }</style><style type=3D"text/css">@media screen and (max-width: 480px) =
+{
+        .pd0 {
+          padding-left: 0px !important;
+          padding-right: 0px !important;
+        }
+
+        .pd15 {
+          padding-left: 15px !important;
+          padding-right: 15px !important;
+        }
+
+        .pd30 {
+          padding-left: 30px !important;
+          padding-right: 30px !important;
+        }
+
+        .top0 {
+          padding-top: 0px !important;
+        }
+
+        .mobile-hidden {
+          display: none !important;
+        }
+
+        .f17 {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f17 div {
+          font-size: 17px !important;
+          line-height: 24px !important;
+        }
+
+        .f20 div {
+          font-size: 20px !important;
+        }
+       =20
+        .f22 div, .f22 p {
+          font-size: 22px !important;
+        }
+
+        .f24 div, .f24 p {
+          font-size: 24px !important;
+        }
+      }</style><!-- =F0=9F=9B=91PREVIEW TEXT --></head><body style=3D"backg=
+round-color:#e6e6e6;"><div style=3D"display:none;font-size:1px;color:#fffff=
+f;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">=
+O valor j=C3=A1 est=C3=A1 dispon=C3=ADvel na sua conta Nu Empresas &nbsp;&z=
+wnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&nbsp;&zwnj=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&n=
+bsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp=
+;&zwnj;&nbsp;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&
+[23/02/2026 17:04:09] [DEBUG] --- END EMAIL uid=259298 ---
+[23/02/2026 17:04:09] [DEBUG] IMAP disconnected.
+[23/02/2026 17:04:09] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:04:09] [INFO] Parsed uid=259298 — person=GOBBI PAVAN EDUCACAO LTDA amount=852 cnpj=62.462.272 date=2025-12-26T20:02:52.000Z
+[23/02/2026 17:04:09] [DEBUG] Saved uid=259298 — GOBBI PAVAN EDUCACAO LTDA R$852
+[23/02/2026 17:04:09] [INFO] === Done. Found: 1 | Saved: 1 | Skipped (duplicate): 0 ===
+[23/02/2026 17:21:02] [INFO] === check-nubank-emails started ===
+[23/02/2026 17:21:02] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/check-nubank-emails/db.fastvistos
+[23/02/2026 17:21:02] [DEBUG] Database opened and table ensured.
+[23/02/2026 17:21:02] [DEBUG] DB query result for latest transaction_date: {"latest":null}
+[23/02/2026 17:21:02] [INFO] [DEBUG] No transactions in DB. Using DEBUG_SINCE_DATE: 2025-12-26T03:00:00.000Z
+[23/02/2026 17:21:02] [INFO] IMAP connection attempt 1/3...
+[23/02/2026 17:21:04] [DEBUG] IMAP connected successfully.
+[23/02/2026 17:21:07] [DEBUG] Total messages in INBOX (no filter): 122336
+[23/02/2026 17:21:08] [DEBUG] Messages matching from="todomundo@nubank.com.br": 432
+[23/02/2026 17:21:08] [DEBUG] Messages matching subject="Você recebeu uma transferência pelo Pix": 72
+[23/02/2026 17:21:08] [DEBUG] Messages matching since=2025-12-26T03:00:00.000Z: 3094
+[23/02/2026 17:21:08] [DEBUG] Applying combined filter: {"from":"todomundo@nubank.com.br","subject":"Você recebeu uma transferência pelo Pix","since":"2025-12-26T03:00:00.000Z"}
+[23/02/2026 17:21:09] [INFO] Found 1 matching message(s) with combined filter.
+[23/02/2026 17:21:09] [DEBUG] Fetched uid=259298 subject="Você recebeu uma transferência pelo Pix" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:21:10] [DEBUG] IMAP disconnected.
+[23/02/2026 17:21:10] [DEBUG] Processing uid=259298 from="Nubank <undefined@undefined>" date=Fri Dec 26 2025 17:02:52 GMT-0300 (Brasilia Standard Time)
+[23/02/2026 17:21:10] [DEBUG] uid=259298 extraction: cnpj=regex person=regex amount=regex date=failed
+[23/02/2026 17:21:10] [WARN] uid=259298 — regex failed for fields: [transaction_date]. Delegating to LLM...
+[23/02/2026 17:21:10] [WARN] [LLM STUB] Would extract field="transaction_date" from email uid=259298
+[23/02/2026 17:21:10] [DEBUG] [LLM STUB] Plain text snippet:
+O valor jÃ¡ estÃ¡ disponÃ­vel na sua conta Nu Empresas  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌  ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ ‌ 
+
+TransferÃªncia recebida
+
+OlÃ¡, 62.462.272
+
+VocÃª recebeu uma transferÃªncia pelo Pix de GOBBI PAVAN EDUCACAO LTDA e o v
+[23/02/2026 17:21:10] [ERROR] uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
+[23/02/2026 17:21:10] [WARN] [DISCORD MOCKUP] ❌ check-nubank-emails: uid=259298 — extraction failed after LLM for fields: [transaction_date]. Discarding.
+[23/02/2026 17:21:10] [INFO] === Done. Found: 1 | Saved: 0 | Skipped: 0 | Discarded: 1 ===

@@ -44,6 +44,7 @@ pm2 startup
 ```
 
 > Se está tentando instalar de novo, precisa limpar tudo:
+
 ```bash
 pm2 kill
 rm -rf ~/.pm2
