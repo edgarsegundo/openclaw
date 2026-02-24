@@ -1,6 +1,6 @@
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import axios from 'axios';
 
 const tab = ref('conciliar');
@@ -8,7 +8,24 @@ const loading = ref(false);
 const transactions = ref([]);
 const total = ref(0);
 const page = ref(1);
-const pageSize = ref(5);
+const pageSize = ref(3);
+
+// Garante que o valor atual de pageSize sempre aparece no seletor
+const itemsPerPageOptions = computed(() => {
+  const opts = [3, 5, 10, 25, 50, 100];
+  return opts.includes(pageSize.value) ? opts : [pageSize.value, ...opts].sort((a, b) => a - b);
+});
+
+function onPageChange(newPage: number) {
+  page.value = newPage;
+  fetchTransactions();
+}
+
+function onPageSizeChange(newSize: number) {
+  pageSize.value = newSize;
+  page.value = 1; // volta para a primeira página ao mudar o tamanho
+  fetchTransactions();
+}
 
 const headers = [
   { title: 'Data', value: 'transaction_date' },
@@ -24,11 +41,13 @@ const headers = [
 async function fetchTransactions() {
   loading.value = true;
   try {
+    console.log('[fetchTransactions] page:', page.value, 'pageSize:', pageSize.value);
     const res = await axios.get('http://localhost:3001/api/fastvistos/transactions', {
       params: { page: page.value, pageSize: pageSize.value },
     });
     transactions.value = res.data.rows;
     total.value = res.data.total;
+    console.log('[fetchTransactions] total:', res.data.total, 'rows:', res.data.rows.length, 'rows:', res.data.rows);
   } finally {
     loading.value = false;
   }
@@ -107,12 +126,13 @@ function formatCurrency(value: number|string) {
                       :headers="headers"
                       :items="transactions"
                       :loading="loading"
-                      :page.sync="page"
-                      :items-per-page.sync="pageSize"
+                      :page="page"
+                      :items-per-page="pageSize"
+                      :items-per-page-options="itemsPerPageOptions"
                       :server-items-length="total"
                       class="elevation-1"
-                      @update:page="fetchTransactions"
-                      @update:items-per-page="fetchTransactions"
+                      @update:page="onPageChange"
+                      @update:items-per-page="onPageSizeChange"
                     >
                       <template #item.transaction_date="{ item }">
                         {{ formatDate(item.transaction_date) }}
@@ -127,12 +147,13 @@ function formatCurrency(value: number|string) {
                       :headers="headers"
                       :items="transactions"
                       :loading="loading"
-                      :page.sync="page"
-                      :items-per-page.sync="pageSize"
+                      :page="page"
+                      :items-per-page="pageSize"
+                      :items-per-page-options="itemsPerPageOptions"
                       :server-items-length="total"
                       class="elevation-1"
-                      @update:page="fetchTransactions"
-                      @update:items-per-page="fetchTransactions"
+                      @update:page="onPageChange"
+                      @update:items-per-page="onPageSizeChange"
                     >
                       <template #item.transaction_date="{ item }">
                         {{ formatDate(item.transaction_date) }}
