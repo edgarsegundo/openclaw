@@ -1,3 +1,4 @@
+
 <script setup lang="ts">
 import { ref } from 'vue';
 import axios from 'axios';
@@ -7,19 +8,17 @@ const loading = ref(false);
 const transactions = ref([]);
 const total = ref(0);
 const page = ref(1);
-const pageSize = ref(10);
+const pageSize = ref(5);
 
 const headers = [
-  { title: 'ID', value: 'id' },
-  { title: 'IMAP UID', value: 'imap_uid' },
+  { title: 'Data', value: 'transaction_date' },
   { title: 'CNPJ', value: 'cnpj' },
-  { title: 'Operação', value: 'operation' },
-  { title: 'Nome', value: 'name' },
-  { title: 'Tipo', value: 'type' },
   { title: 'Pessoa', value: 'person_name' },
   { title: 'Valor', value: 'amount' },
-  { title: 'Data', value: 'transaction_date' },
-  { title: 'Criado em', value: 'created_at' },
+  { title: 'Operação', value: 'operation' },
+  { title: 'Tipo', value: 'type' },
+  { title: 'IMAP UID', value: 'imap_uid' },
+  { title: 'Nome', value: 'name' },
 ];
 
 async function fetchTransactions() {
@@ -36,6 +35,26 @@ async function fetchTransactions() {
 }
 
 fetchTransactions();
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  // Convert to São Paulo timezone (America/Sao_Paulo)
+  return date.toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(/ de /g, '-').replace(',', '');
+}
+
+function formatCurrency(value: number|string) {
+  if (value === null || value === undefined) return '';
+  return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
+}
 </script>
 
 <template>
@@ -43,26 +62,32 @@ fetchTransactions();
     <v-main>
       <v-container fluid class="pa-4">
         <!-- Row com 3 cards de gráficos mock -->
-        <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-          <v-card class="pa-4" style="flex: 1;">
-            <v-card-title>Gráfico 1</v-card-title>
-            <v-card-text>
-              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-            </v-card-text>
-          </v-card>
-          <v-card class="pa-4" style="flex: 1;">
-            <v-card-title>Gráfico 2</v-card-title>
-            <v-card-text>
-              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-            </v-card-text>
-          </v-card>
-          <v-card class="pa-4" style="flex: 1;">
-            <v-card-title>Gráfico 3</v-card-title>
-            <v-card-text>
-              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-            </v-card-text>
-          </v-card>
-        </div>
+        <v-row class="mb-6" no-gutters align="stretch">
+          <v-col cols="12" md="4" style="padding: 0 12px 0 0;">
+            <v-card class="pa-4 h-100">
+              <v-card-title>Gráfico 1</v-card-title>
+              <v-card-text>
+                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+          <v-col cols="12" md="4" style="padding: 0 12px 0 12px;">
+            <v-card class="pa-4 h-100">
+              <v-card-title>Gráfico 2</v-card-title>
+              <v-card-text>
+                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+          <v-col cols="12" md="4" style="padding: 0 0 0 12px;">
+            <v-card class="pa-4 h-100">
+              <v-card-title>Gráfico 3</v-card-title>
+              <v-card-text>
+                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+              </v-card-text>
+            </v-card>
+          </v-col>
+        </v-row>
 
         <!-- Row com card único, tabs e tabela -->
         <v-row>
@@ -88,7 +113,14 @@ fetchTransactions();
                       class="elevation-1"
                       @update:page="fetchTransactions"
                       @update:items-per-page="fetchTransactions"
-                    />
+                    >
+                      <template #item.transaction_date="{ item }">
+                        {{ formatDate(item.transaction_date) }}
+                      </template>
+                      <template #item.amount="{ item }">
+                        {{ formatCurrency(item.amount) }}
+                      </template>
+                    </v-data-table>
                   </v-window-item>
                   <v-window-item value="todos">
                     <v-data-table
@@ -101,7 +133,14 @@ fetchTransactions();
                       class="elevation-1"
                       @update:page="fetchTransactions"
                       @update:items-per-page="fetchTransactions"
-                    />
+                    >
+                      <template #item.transaction_date="{ item }">
+                        {{ formatDate(item.transaction_date) }}
+                      </template>
+                      <template #item.amount="{ item }">
+                        {{ formatCurrency(item.amount) }}
+                      </template>
+                    </v-data-table>
                   </v-window-item>
                 </v-window>
               </v-card-text>
