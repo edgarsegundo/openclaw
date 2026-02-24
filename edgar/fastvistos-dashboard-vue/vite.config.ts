@@ -13,5 +13,11 @@ export default defineConfig({
   },
   server: {
     port: 5174,
+    fs: {
+      allow: [
+        "../..", // permite servir node_modules da raiz do monorepo
+        ".",
+      ],
+    },
   },
 });
