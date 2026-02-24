@@ -5,6 +5,10 @@
   "keywords": [],
   "license": "ISC",
   "author": "",
+  "workspaces": [
+    "vue-base",
+    "fastvistos-dashboard-vue"
+  ],
   "type": "module",
   "main": "index.js",
   "scripts": {
