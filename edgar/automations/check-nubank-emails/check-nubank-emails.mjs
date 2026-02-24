@@ -517,13 +517,13 @@ async function fetchEmailsFromImap(cutoffDate) {
             continue;
           }
 
-          // Detect unexpected subject variation
-          if (!subjectLower.includes(SEARCH_CONFIG.subjectExpected)) {
-            logger.warn(`uid=${msg.uid} — unexpected subject variation: "${subject}"`);
-            await notifyDiscord(
-              `⚠️ check-nubank-emails: New subject variation: "${subject}" — review needed`,
-            );
-          }
+          // // Detect unexpected subject variation
+          // if (!subjectLower.includes(SEARCH_CONFIG.subjectExpected)) {
+          //   logger.warn(`uid=${msg.uid} — unexpected subject variation: "${subject}"`);
+          //   await notifyDiscord(
+          //     `⚠️ check-nubank-emails: New subject variation: "${subject}" — review needed`,
+          //   );
+          // }
 
           subjectsSeen.add(subject);
           const body = msg.source?.toString("utf8") ?? "";
