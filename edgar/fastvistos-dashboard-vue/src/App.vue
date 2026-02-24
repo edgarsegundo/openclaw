@@ -41,39 +41,33 @@ fetchTransactions();
 <template>
   <v-app>
     <v-main>
-      <v-container fluid>
+      <v-container fluid class="pa-4">
         <!-- Row com 3 cards de gráficos mock -->
-        <v-row class="mb-6">
-          <v-col cols="12" md="4">
-            <v-card>
-              <v-card-title>Gráfico 1</v-card-title>
-              <v-card-text>
-                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" md="4">
-            <v-card>
-              <v-card-title>Gráfico 2</v-card-title>
-              <v-card-text>
-                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-          <v-col cols="12" md="4">
-            <v-card>
-              <v-card-title>Gráfico 3</v-card-title>
-              <v-card-text>
-                <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
+        <div style="display: flex; gap: 24px; margin-bottom: 32px;">
+          <v-card class="pa-4" style="flex: 1;">
+            <v-card-title>Gráfico 1</v-card-title>
+            <v-card-text>
+              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+            </v-card-text>
+          </v-card>
+          <v-card class="pa-4" style="flex: 1;">
+            <v-card-title>Gráfico 2</v-card-title>
+            <v-card-text>
+              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+            </v-card-text>
+          </v-card>
+          <v-card class="pa-4" style="flex: 1;">
+            <v-card-title>Gráfico 3</v-card-title>
+            <v-card-text>
+              <div style="height:120px;display:flex;align-items:center;justify-content:center;">[Gráfico mock]</div>
+            </v-card-text>
+          </v-card>
+        </div>
 
         <!-- Row com card único, tabs e tabela -->
         <v-row>
           <v-col cols="12">
-            <v-card>
+            <v-card class="mb-6 pa-4 mt-8">
               <v-card-title>
                 Transações
               </v-card-title>
