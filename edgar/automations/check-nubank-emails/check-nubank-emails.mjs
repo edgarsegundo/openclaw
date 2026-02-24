@@ -636,6 +636,16 @@ async function main() {
       logger.info(
         `Saved uid=${email.uid} — ${parsed.person_name} R$${parsed.amount} sources=${parsed.parse_sources}`,
       );
+      await notifyDiscord(
+        `✅ **Nova transação salva**\n` +
+          `👤 **Pessoa:** ${parsed.person_name}\n` +
+          `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
+          `🏦 **CNPJ:** ${parsed.cnpj}\n` +
+          `📋 **Tipo:** ${parsed.type.toUpperCase()} (${parsed.operation === "in" ? "entrada" : "saída"})\n` +
+          `📅 **Data:** ${new Date(parsed.transaction_date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}\n` +
+          `🔍 **Fontes:** ${parsed.parse_sources}\n` +
+          `🆔 **UID IMAP:** ${email.uid}`,
+      );
       saved++;
     } catch (err) {
       logger.error(`Failed to insert uid=${email.uid}: ${err.message}`);
