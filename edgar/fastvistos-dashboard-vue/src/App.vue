@@ -75,7 +75,7 @@ function formatCurrency(value: number | string) {
 </script>
 
 <template>
-  <div style="min-height: 100vh; background: #0f0f0f; color: #fff; padding: 32px 24px; font-family: sans-serif;">
+  <div style="min-height: 100vh; width: 100%; background: #12141A; color: #fff; padding: 32px 24px; font-family: sans-serif; box-sizing: border-box;">
 
     <!-- Cards de gráficos -->
     <div style="display: flex; gap: 20px; margin-bottom: 32px;">
@@ -220,4 +220,9 @@ function formatCurrency(value: number | string) {
 
 <style scoped>
 * { box-sizing: border-box; }
+:deep(body), :deep(html) {
+  margin: 0;
+  padding: 0;
+  background: #12141A;
+}
 </style>
