@@ -1,5 +1,5 @@
 import { html } from "lit";
-import type { AppViewState } from "../app-view-state.ts";
+import type { AppViewState } from "../../ui/src/ui/app-view-state.ts";
 
 // Renders the fastvistos dashboard as an iframe microfrontend
 export function renderFastvistosTab(state: AppViewState) {
