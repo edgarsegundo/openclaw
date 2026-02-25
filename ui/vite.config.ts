@@ -41,6 +41,7 @@ export default defineConfig(() => {
     plugins: [
       monkeypatch("src/ui/navigation.ts", "../edgar/monkeypatches/navigation.ts"),
       monkeypatch("src/i18n/locales/en.ts", "../edgar/monkeypatches/en.ts"),
+      monkeypatch("src/ui/app-render.ts", "../edgar/monkeypatches/app-render.ts"),
     ],
     publicDir: path.resolve(here, "public"),
     optimizeDeps: {
