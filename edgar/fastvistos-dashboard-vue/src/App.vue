@@ -1,37 +1,89 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import axios from 'axios';
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  TransitionRoot,
-  TransitionChild
-} from '@headlessui/vue';
 
 const tab = ref('conciliar');
 const loading = ref(false);
-const transactions = ref<any[]>([]);
+const transactions = ref([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = ref(3);
 
 /* ── Modal ── */
-const selectedTransaction = ref<any>(null);
 const isModalOpen = ref(false);
+const selectedTransaction = ref(null);
+const orderSearch = ref("");
+const orderResults = ref([]);
+const orderCount = ref(0);
+const orderPage = ref(1);
+const orderLoading = ref(false);
+const orderNext = ref(null);
+const orderPrev = ref(null);
 
-function openModal(item: any) {
-  selectedTransaction.value = item;
+let orderSearchTimeout: any = null;
+
+function openModal(transaction) {
+  selectedTransaction.value = transaction;
   isModalOpen.value = true;
+  orderPage.value = 1;
+  orderSearch.value = "";
+  fetchOrders();
 }
 
-function closeModal() {
-  isModalOpen.value = false;
+function fetchOrders() {
+  orderLoading.value = true;
+  const q = orderSearch.value.trim();
+  const params: any = { q };
+  console.log("[fetchOrders] params:", params);
+  if (orderPage.value > 1) params.page = orderPage.value;
+  axios
+    .get("/api/fastvistos/microservicesadm/proxy/customer-orders/search", { params })
+    .then((res) => {
+      console.log("[fetchOrders] response:", res.data);
+      orderResults.value = res.data.results || [];
+      orderCount.value = res.data.count || 0;
+      orderNext.value = res.data.next;
+      orderPrev.value = res.data.previous;
+    })
+    .finally(() => {
+      orderLoading.value = false;
+    });
+}
+
+function onOrderSearchInput() {
+  orderPage.value = 1;
+  if (orderSearchTimeout) clearTimeout(orderSearchTimeout);
+  orderSearchTimeout = setTimeout(fetchOrders, 400);
+}
+
+function onOrderPageChange(nextPage) {
+  orderPage.value = nextPage;
+  fetchOrders();
+}
+
+watch(isModalOpen, (open) => {
+  if (!open) {
+    orderResults.value = [];
+    orderCount.value = 0;
+    orderSearch.value = "";
+    orderPage.value = 1;
+  }
+});
+
+function formatOrderDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: 'short',
+    year: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).replace(/ de /g, '-').replace(',', '');
 }
 
 /* ── Orders Mock ── */
-const orderSearch = ref('');
-
 const customerOrders = ref([
   { id: 101, name: 'João Silva', value: 250.5 },
   { id: 102, name: 'Maria Souza', value: 120.0 },
@@ -229,86 +281,71 @@ function formatCurrency(value: number | string) {
     </div>
 
     <!-- MODAL -->
-    <TransitionRoot appear :show="isModalOpen" as="template">
-      <Dialog as="div" class="modal-root" @close="closeModal">
-
-        <TransitionChild
-          as="template"
-          enter="ease-out duration-200"
-          enter-from="opacity-0"
-          enter-to="opacity-100"
-          leave="ease-in duration-150"
-          leave-from="opacity-100"
-          leave-to="opacity-0"
-        >
-          <div class="modal-overlay" />
-        </TransitionChild>
-
-        <div class="modal-container">
-
-          <TransitionChild
-            as="template"
-            enter="ease-out duration-200"
-            enter-from="opacity-0 scale-95"
-            enter-to="opacity-100 scale-100"
-            leave="ease-in duration-150"
-            leave-from="opacity-100 scale-100"
-            leave-to="opacity-0 scale-95"
-          >
-
-            <DialogPanel class="modal-panel">
-
-              <DialogTitle class="modal-title">
-                Detalhes da Transação
-              </DialogTitle>
-
-              <div v-if="selectedTransaction" class="modal-grid">
-                <div><strong>Data:</strong> {{ formatDate(selectedTransaction.transaction_date) }}</div>
-                <div><strong>Pessoa:</strong> {{ selectedTransaction.person_name }}</div>
-                <div><strong>Valor:</strong> {{ formatCurrency(selectedTransaction.amount) }}</div>
-                <div><strong>Operação:</strong> {{ selectedTransaction.operation }}</div>
-                <div><strong>Tipo:</strong> {{ selectedTransaction.type }}</div>
-              </div>
-
-              <!-- Orders -->
-              <div class="orders-card">
-                <input
-                  v-model="orderSearch"
-                  class="input"
-                  placeholder="Buscar cliente..."
-                />
-
-                <table class="orders-table">
-                  <thead>
-                    <tr>
-                      <th>ID Pedido</th>
-                      <th>Nome Cliente</th>
-                      <th>Valor</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    <tr v-for="order in filteredOrders" :key="order.id">
-                      <td>{{ order.id }}</td>
-                      <td>{{ order.name }}</td>
-                      <td>{{ formatCurrency(order.value) }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <div class="modal-actions">
-                <button class="btn btn--ghost" @click="closeModal">
-                  Fechar
-                </button>
-              </div>
-
-            </DialogPanel>
-
-          </TransitionChild>
+    <div v-if="isModalOpen" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Detalhes da Transação</div>
+          <button class="modal-close" @click="isModalOpen = false">×</button>
         </div>
-      </Dialog>
-    </TransitionRoot>
+        <div class="modal-body">
+          <!-- Detalhes da Transação -->
+          <div class="modal-section">
+            <div class="modal-section-title">Pedidos do Cliente</div>
+            <input
+              v-model="orderSearch"
+              @input="onOrderSearchInput"
+              placeholder="Buscar cliente..."
+              class="input-search"
+              autocomplete="off"
+            />
+            <div v-if="orderLoading" class="state-empty">Carregando pedidos...</div>
+            <table v-else class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Data/Hora</th>
+                  <th>Nome</th>
+                  <th>Email</th>
+                  <th>WhatsApp</th>
+                  <th>CPF/CNPJ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="order in orderResults" :key="order.id">
+                  <td>{{ order.id }}</td>
+                  <td>{{ formatOrderDate(order.timestamp) }}</td>
+                  <td>{{ order.customer_name }}</td>
+                  <td>{{ order.customer_email }}</td>
+                  <td>{{ order.customer_whatsapp }}</td>
+                  <td>{{ order.customer_cpf_cnpj }}</td>
+                </tr>
+                <tr v-if="orderResults.length === 0">
+                  <td colspan="6" class="state-empty">Nenhum pedido encontrado.</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination" v-if="orderCount > 0">
+              <button
+                class="btn btn--ghost"
+                :disabled="!orderPrev"
+                @click="onOrderPageChange(orderPage - 1)"
+              >← Anterior</button>
+              <span class="pagination__info">
+                Página <strong>{{ orderPage }}</strong>
+              </span>
+              <button
+                class="btn btn--ghost"
+                :disabled="!orderNext"
+                @click="onOrderPageChange(orderPage + 1)"
+              >Próximo →</button>
+              <span class="pagination__total">
+                Total: <strong>{{ orderCount }}</strong> pedidos
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
@@ -607,81 +644,113 @@ function formatCurrency(value: number | string) {
 
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-}
-
-.modal-container {
-  position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
 }
 
-.modal-panel {
-  width: 100%;
-  max-width: 720px;
-  background: var(--card);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  border: 1px solid var(--border);
+.modal {
+  background: var(--card, #18181b);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 32px;
+  min-width: 480px;
+  max-width: 90vw;
 }
 
-.modal-title {
-  font-size: 18px;
-  font-weight: 700;
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
 }
 
-.modal-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
 }
 
-.orders-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 16px;
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #888;
+  cursor: pointer;
 }
 
-.input {
-  width: 100%;
+.modal-section {
+  margin-top: 24px;
+}
+
+.modal-section-title {
+  font-size: 16px;
+  font-weight: 600;
   margin-bottom: 12px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
 }
 
-.orders-table {
+.input-search {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #333;
+  background: #222;
+  color: #fff;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.data-table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 14px;
+  margin-bottom: 12px;
 }
 
-.orders-table th,
-.orders-table td {
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
+.data-table th, .data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #252525;
+  text-align: left;
 }
 
-.modal-actions {
-  margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
-}
-
-.card-transactions {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+.state-empty {
+  text-align: center;
+  color: #888;
   padding: 24px;
-  margin: 0 12px 32px 12px;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn--ghost {
+  background: #222;
+  color: #fff;
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn--ghost:disabled {
+  background: #18181b;
+  color: #444;
+  cursor: not-allowed;
+}
+
+.pagination__info {
+  font-size: 13px;
+  color: #888;
+}
+
+.pagination__total {
+  font-size: 13px;
+  color: #888;
+}
 </style>
