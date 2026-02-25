@@ -34,12 +34,10 @@ function fetchOrders() {
   orderLoading.value = true;
   const q = orderSearch.value.trim();
   const params: any = { q };
-  console.log("[fetchOrders] params:", params);
   if (orderPage.value > 1) params.page = orderPage.value;
   axios
     .get("/api/fastvistos/microservicesadm/proxy/customer-orders/search", { params })
     .then((res) => {
-      console.log("[fetchOrders] response:", res.data);
       orderResults.value = res.data.results || [];
       orderCount.value = res.data.count || 0;
       orderNext.value = res.data.next;
