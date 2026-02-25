@@ -1,6 +1,2 @@
 @import "tailwindcss";
-@import './base.css';
-
-#app {
-  width: 100%;
-}
+@import './openclaw-bridge.css';
