@@ -62,6 +62,28 @@ router.patch("/transactions/:id/description", express.json(), (req, res) => {
   }
 });
 
+router.patch("/transactions/:id/status", express.json(), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { status } = req.body;
+
+  if (!id || typeof status !== "string" || !status.trim()) {
+    return res.status(400).json({ error: "Invalid id or status" });
+  }
+
+  try {
+    const stmt = db.prepare("UPDATE transactions SET status = ? WHERE id = ?");
+    const result = stmt.run(status, id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
 // Proxy endpoint: GET /api/fastvistos/microservicesadm/proxy/customer-orders/search
 // Proxy endpoint: GET /api/fastvistos/microservicesadm/proxy/customer-orders/search
 // Only allow requests from a specific origin (CORS)

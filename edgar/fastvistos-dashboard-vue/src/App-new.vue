@@ -31,7 +31,7 @@ const statusSaving = ref(false);
 
 async function onSwitchChange(val: boolean) {
   if (!selectedTransaction.value || statusSaving.value) return;
-  const newStatus = val ? 'RECONCILED' : 'UNRECONCILED';
+  const newStatus = val ? 'conciliado' : 'pendente';
   statusSaving.value = true;
   try {
     await axios.patch(
@@ -108,7 +108,7 @@ let orderSearchTimeout: any = null;
 function openModal(transaction) {
   selectedTransaction.value = transaction;
   descriptionValue.value = transaction.description || "";
-  isConciliado.value = transaction.status === 'RECONCILED';
+  isConciliado.value = transaction.status === 'conciliado';
   dragPos.value = { x: 0, y: 0 };
   isModalOpen.value = true;
   orderPage.value = 1;
@@ -227,7 +227,6 @@ const headers = [
   { title: 'Tipo',      value: 'type' },
   { title: 'IMAP UID',  value: 'imap_uid' },
   { title: 'Nome',      value: 'name' },
-  { title: 'Status',    value: 'status' }, 
 ];
 
 /* ── API ── */
@@ -325,11 +324,6 @@ function formatCurrency(value: number | string) {
                     {{ item.operation === 'in' ? 'Entrada' : 'Saída' }}
                   </span>
                 </template>
-                <template v-else-if="col.value === 'status'">
-                  <span :class="['badge', item.status === 'RECONCILED' ? 'badge--in' : 'badge--out']">
-                    {{ item.status === 'RECONCILED' ? 'Conciliado' : 'Pendente' }}
-                  </span>
-                </template>
                 <template v-else>{{ item[col.value] }}</template>
               </td>
             </tr>
@@ -372,10 +366,6 @@ function formatCurrency(value: number | string) {
           <div class="modal-title">Detalhes da Transação</div>
           <button class="modal-close" @click="isModalOpen = false">×</button>
         </div>
-
-        <div v-if="isConciliado" class="reconciliado-stamp">
-          Reconciliado
-        </div>        
 
         <div v-if="selectedTransaction" class="modal-body">
 
@@ -425,10 +415,7 @@ function formatCurrency(value: number | string) {
             ref="dragCard"
             class="status-card"
             :class="{ 'status-card--dragging': dragging }"
-            :style="{
-              left: `calc(50% + ${dragPos.x}px)`,
-              top: `calc(170px + ${dragPos.y}px)`
-            }"
+            :style="{ transform: `translate(${dragPos.x}px, ${dragPos.y}px)` }"
             @mousedown.prevent="onDragStart"
           >
             <div class="status-card__grip">⠿</div>
@@ -440,7 +427,7 @@ function formatCurrency(value: number | string) {
                   type="checkbox"
                   :checked="isConciliado"
                   :disabled="statusSaving"
-                  @click.prevent="onSwitchChange(!isConciliado)"
+                  @change="onSwitchChange(($event.target as HTMLInputElement).checked)"
                 />
                 <span :class="['checkbox-text', isConciliado ? 'checkbox-text--on' : '']">Conciliado</span>
               </label>
@@ -512,7 +499,7 @@ function formatCurrency(value: number | string) {
     <!-- ERROR DIALOG (Vue nativo, sem Headless UI) -->
     <Teleport to="body">
       <div v-if="errorDialogOpen" class="error-dialog-root">
-        <div @click="errorDialogOpen = false" />
+        <div class="error-dialog-overlay" @click="errorDialogOpen = false" />
         <div class="error-dialog-wrapper">
           <div class="error-dialog-panel">
             <div class="error-dialog-icon">⚠️</div>
@@ -844,7 +831,6 @@ function formatCurrency(value: number | string) {
   flex: 1;
   padding-right: 4px;
   padding-left: 4px;
-  position: relative;
 }
 
 .modal-section {
@@ -1028,7 +1014,7 @@ function formatCurrency(value: number | string) {
   align-items: center;
   gap: 10px;
   padding: 7px 14px;
-  background: rgba(33, 33, 33, 0.2);
+  background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1036,9 +1022,10 @@ function formatCurrency(value: number | string) {
   cursor: grab;
   user-select: none;
   width: fit-content;
+  margin: 10px auto;
   box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   transition: box-shadow 0.15s ease, background 0.15s ease;
-  position: absolute;
+  position: relative;
   z-index: 10;
 }
 .status-card:hover { background: rgba(255,255,255,0.07); box-shadow: 0 6px 32px rgba(0,0,0,0.4); }
@@ -1086,21 +1073,4 @@ function formatCurrency(value: number | string) {
 .error-dialog-icon { font-size: 40px; margin-bottom: 16px; }
 .error-dialog-title { font-size: 18px; font-weight: 700; color: #f87171; margin-bottom: 12px; }
 .error-dialog-message { font-size: 13px; color: #888; margin-bottom: 24px; line-height: 1.5; }
-
-.reconciliado-stamp {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(-30deg);
-  font-size: 64px;
-  font-weight: 900;
-  color: var(--ok, #4ade80);
-  opacity: 0.12;
-  pointer-events: none;
-  white-space: nowrap;
-  z-index: 5;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  user-select: none;
-}
 </style>
