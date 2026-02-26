@@ -8,7 +8,7 @@ const axios = require("axios");
 const router = express.Router();
 
 const DB_PATH = path.resolve(__dirname, "../automations/check-nubank-emails/db.fastvistos");
-const db = new Database(DB_PATH, { readonly: true });
+const db = new Database(DB_PATH, { readonly: false });
 
 // GET /api/fastvistos/transactions
 router.get("/transactions", (req, res) => {
@@ -27,6 +27,8 @@ router.get("/transactions", (req, res) => {
     "amount",
     "transaction_date",
     "created_at",
+    "description",
+    "status",
   ];
   const total = db.prepare(`SELECT COUNT(*) as count FROM transactions`).get().count;
   const rows = db
@@ -37,17 +39,46 @@ router.get("/transactions", (req, res) => {
   res.json({ total, page, pageSize, rows });
 });
 
+// PATCH /api/fastvistos/transactions/:id/description
+router.patch("/transactions/:id/description", express.json(), (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { description } = req.body;
+
+  if (!id || typeof description !== "string") {
+    return res.status(400).json({ error: "Invalid id or description" });
+  }
+
+  try {
+    const stmt = db.prepare("UPDATE transactions SET description = ? WHERE id = ?");
+    const result = stmt.run(description, id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
 // Proxy endpoint: GET /api/fastvistos/microservicesadm/proxy/customer-orders/search
 // Proxy endpoint: GET /api/fastvistos/microservicesadm/proxy/customer-orders/search
 // Only allow requests from a specific origin (CORS)
-const allowedOrigin = "http://127.0.0.1:18789";
+
+const allowedOrigins = new Set([
+  "http://127.0.0.1:18789",
+  "http://localhost:18789",
+  "http://localhost:5173",
+]);
 
 router.get(
   "/microservicesadm/proxy/customer-orders/search",
   cors({
     origin: function (origin, callback) {
+      console.log("***** CORS check for origin:", origin);
       // Permite SOMENTE chamadas do domínio autorizado (não permite curl/server-to-server)
-      if (origin === allowedOrigin) {
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));

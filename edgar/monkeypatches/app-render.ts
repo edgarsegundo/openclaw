@@ -1140,7 +1140,7 @@ export function renderApp(state: AppViewState) {
             ? html`
                 <iframe
                   src="http://localhost:5174"
-                  style="width: 100%; height: calc(100vh - 120px); border: none; border-radius: 8px"
+                  style="width: 100%; height: calc(100vh - 200px); border: none; border-radius: 8px"
                 ></iframe>
               `
             : nothing

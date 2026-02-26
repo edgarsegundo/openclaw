@@ -10,7 +10,7 @@ export function renderFastvistosTab(state: AppViewState) {
     <div class="fastvistos-iframe-container" style="height:100%;width:100%;display:flex;align-items:stretch;">
       <iframe
         src="${dashboardUrl}"
-        style="border:0;width:100%;height:80vh;min-height:600px;flex:1;"
+        style="border:0;width:100%;height:100%;flex:1;"
         title="Fastvistos Dashboard"
         allowfullscreen
       ></iframe>
