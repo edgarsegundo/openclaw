@@ -47,6 +47,10 @@ const RETRY_CONFIG = {
   delays: [30_000, 60_000, 120_000],
 };
 
+const businessId = process.env.FASTVISTOS_BUSINESS_ID;
+const apiBaseUrl = process.env.FASTVISTOS_API_URL || "https://sys.fastvistos.com.br/api";
+const apiKey = process.env.FASTVISTOS_API_KEY;
+
 // ─── Logger ──────────────────────────────────────────────────────────────────
 
 const logger = winston.createLogger({
@@ -131,6 +135,7 @@ function openDatabase() {
       transaction_date DATETIME NOT NULL,
       parse_sources    TEXT NOT NULL,
       body             TEXT NOT NULL,
+      is_sync          INTEGER NOT NULL DEFAULT 0,
       created_at       DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -145,6 +150,14 @@ function openDatabase() {
       discarded   INTEGER
     );
   `);
+
+  // Migration: add is_sync column if it doesn't exist (for existing databases)
+  const columns = db.prepare("PRAGMA table_info(transactions)").all();
+  const hasIsSync = columns.some((col) => col.name === "is_sync");
+  if (!hasIsSync) {
+    logger.info("Migrating DB: adding is_sync column to transactions table.");
+    db.exec(`ALTER TABLE transactions ADD COLUMN is_sync INTEGER NOT NULL DEFAULT 0`);
+  }
 
   logger.debug("Database opened and table ensured.");
   return db;
@@ -173,7 +186,7 @@ function getLatestTransactionDate(db) {
 
   if (row?.latest) {
     const date = new Date(row.latest);
-    date.setDate(date.getDate() - CUTOFF_LOOKBACK_DAYS); // subtrai 2 dias para evitar gaps
+    date.setDate(date.getDate() - CUTOFF_LOOKBACK_DAYS);
     logger.info(`Cutoff date from DB (minus ${CUTOFF_LOOKBACK_DAYS} days): ${date.toISOString()}`);
     return date;
   }
@@ -198,9 +211,101 @@ function isUidAlreadySaved(db, uid) {
 
 function insertTransaction(db, tx) {
   db.prepare(`
-    INSERT INTO transactions (imap_uid, cnpj, operation, name, type, person_name, amount, transaction_date, parse_sources, body)
-    VALUES (@imap_uid, @cnpj, @operation, @name, @type, @person_name, @amount, @transaction_date, @parse_sources, @body)
+    INSERT INTO transactions (imap_uid, cnpj, operation, name, type, person_name, amount, transaction_date, parse_sources, body, is_sync)
+    VALUES (@imap_uid, @cnpj, @operation, @name, @type, @person_name, @amount, @transaction_date, @parse_sources, @body, @is_sync)
   `).run(tx);
+}
+
+function updateIsSync(db, imapUid, isSync) {
+  db.prepare(`UPDATE transactions SET is_sync = ? WHERE imap_uid = ?`).run(isSync ? 1 : 0, imapUid);
+}
+
+function getPendingSyncTransactions(db) {
+  return db.prepare(`SELECT * FROM transactions WHERE is_sync = 0`).all();
+}
+
+// ─── External API ─────────────────────────────────────────────────────────────
+
+async function syncTransactionToApi(tx) {
+  if (!apiKey) {
+    logger.warn("FASTVISTOS_API_KEY not set, skipping external sync");
+    return false;
+  }
+
+  if (!businessId) {
+    logger.warn("FASTVISTOS_BUSINESS_ID not set, skipping external sync");
+    return false;
+  }
+
+  const url = `${apiBaseUrl}/transactions/create/`;
+
+  const payload = {
+    business_id: businessId,
+    imap_uid: tx.imap_uid,
+    cnpj: tx.cnpj,
+    operation: tx.operation,
+    name: tx.name,
+    type: tx.type,
+    person_name: tx.person_name,
+    amount: tx.amount,
+    transaction_date: tx.transaction_date,
+    parse_sources: tx.parse_sources,
+    body: tx.body,
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.status === 201) {
+      logger.info(`[API] Transaction synced successfully — imap_uid=${tx.imap_uid}`);
+      return true;
+    }
+
+    const body = await res.text();
+    logger.error(
+      `[API] Sync failed for imap_uid=${tx.imap_uid} — status=${res.status} body=${body}`,
+    );
+    return false;
+  } catch (err) {
+    logger.error(`[API] Sync error for imap_uid=${tx.imap_uid} — ${err.message}`);
+    return false;
+  }
+}
+
+// ─── Resync pending transactions ──────────────────────────────────────────────
+
+async function resyncPendingTransactions(db) {
+  const pending = getPendingSyncTransactions(db);
+
+  if (pending.length === 0) {
+    logger.info("[Resync] No pending transactions to sync.");
+    return;
+  }
+
+  logger.info(
+    `[Resync] Found ${pending.length} transaction(s) with is_sync=false. Attempting resync...`,
+  );
+
+  let resynced = 0;
+  for (const tx of pending) {
+    const success = await syncTransactionToApi(tx);
+    if (success) {
+      updateIsSync(db, tx.imap_uid, true);
+      resynced++;
+      logger.info(`[Resync] imap_uid=${tx.imap_uid} synced and marked is_sync=true`);
+    } else {
+      logger.warn(`[Resync] imap_uid=${tx.imap_uid} still failed, keeping is_sync=false`);
+    }
+  }
+
+  logger.info(`[Resync] Done. Resynced: ${resynced}/${pending.length}`);
 }
 
 // ─── Email Parser ─────────────────────────────────────────────────────────────
@@ -367,17 +472,10 @@ async function parseEmail(email) {
   const plainText = stripHtmlToText(decoded);
   const bodyForStorage = htmlBody.slice(0, BODY_MAX_LENGTH);
 
-  // ── Regex extraction
   let cnpjResult = extractCnpj(decoded);
   let personNameResult = extractPersonName(decoded);
   let amountResult = extractAmount(decoded);
   let transactionDateResult = extractTransactionDate(htmlBody, email.date);
-
-  // // 🧪 FORCE LLM TEST — remove after testing
-  // cnpjResult            = { value: null, source: 'failed' };
-  // personNameResult      = { value: null, source: 'failed' };
-  // amountResult          = { value: null, source: 'failed' };
-  // transactionDateResult = { value: null, source: 'failed' };
 
   const operation = "in";
   const type = "pix";
@@ -387,7 +485,6 @@ async function parseEmail(email) {
     `uid=${email.uid} regex: cnpj=${cnpjResult.source} person=${personNameResult.source} amount=${amountResult.source} date=${transactionDateResult.source}`,
   );
 
-  // ── Identify failed fields
   const failedFields = [];
   if (cnpjResult.source === "failed") {
     failedFields.push("cnpj");
@@ -402,7 +499,6 @@ async function parseEmail(email) {
     failedFields.push("transaction_date");
   }
 
-  // ── Delegate ALL failed fields to LLM in a single call
   if (failedFields.length > 0) {
     logger.warn(
       `uid=${email.uid} — regex failed for: [${failedFields.join(", ")}]. Delegating to LLM...`,
@@ -426,7 +522,6 @@ async function parseEmail(email) {
     }
   }
 
-  // ── Check if any field is still null after LLM
   const stillFailed = [];
   if (cnpjResult.value === null) {
     stillFailed.push("cnpj");
@@ -495,7 +590,6 @@ async function fetchEmailsFromImap(cutoffDate) {
         const byDate = await client.search({ since: cutoffDate });
         logger.debug(`Messages matching since=${cutoffDate.toISOString()}: ${byDate.length}`);
 
-        // IMAP filter: from + since only (subject filtered locally for reliability)
         const filter = { from: SEARCH_CONFIG.email, since: cutoffDate };
         logger.debug(
           `Applying IMAP filter: from="${SEARCH_CONFIG.email}" since=${cutoffDate.toISOString()}`,
@@ -511,19 +605,10 @@ async function fetchEmailsFromImap(cutoffDate) {
           const subject = msg.envelope.subject ?? "";
           const subjectLower = subject.toLowerCase();
 
-          // Local subject filter
           if (!subjectLower.includes(SEARCH_CONFIG.subjectContains)) {
             logger.debug(`uid=${msg.uid} skipped — subject does not match: "${subject}"`);
             continue;
           }
-
-          // // Detect unexpected subject variation
-          // if (!subjectLower.includes(SEARCH_CONFIG.subjectExpected)) {
-          //   logger.warn(`uid=${msg.uid} — unexpected subject variation: "${subject}"`);
-          //   await notifyDiscord(
-          //     `⚠️ check-nubank-emails: New subject variation: "${subject}" — review needed`,
-          //   );
-          // }
 
           subjectsSeen.add(subject);
           const body = msg.source?.toString("utf8") ?? "";
@@ -573,7 +658,6 @@ function sleep(ms) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // throw new Error('teste de notificação Discord'); // 🧪 remove after testing
   logger.info("=== check-nubank-emails started ===");
 
   let db;
@@ -582,7 +666,7 @@ async function main() {
   } catch (err) {
     logger.error(`Failed to open database: ${err.message}`);
     await notifyDiscord(`❌ check-nubank-emails: Failed to open database — ${err.message}`);
-    process.exit(1); // sem banco não tem nada a fazer
+    process.exit(1);
   }
 
   const startedAt = new Date();
@@ -598,7 +682,7 @@ async function main() {
     await notifyDiscord(`❌ check-nubank-emails: IMAP failed after all retries — ${err.message}`);
     finishRun(db, runId, "failed", { found: 0, saved: 0, skipped: 0, discarded: 0 });
     db.close();
-    return; // não aborta o processo, termina graciosamente
+    return;
   }
 
   let saved = 0;
@@ -632,10 +716,22 @@ async function main() {
     }
 
     try {
-      insertTransaction(db, { imap_uid: email.uid, ...parsed });
+      // Insert locally with is_sync = false initially
+      insertTransaction(db, { imap_uid: email.uid, ...parsed, is_sync: 0 });
       logger.info(
         `Saved uid=${email.uid} — ${parsed.person_name} R$${parsed.amount} sources=${parsed.parse_sources}`,
       );
+      saved++;
+
+      // Attempt external sync
+      const synced = await syncTransactionToApi({ imap_uid: email.uid, ...parsed });
+      if (synced) {
+        updateIsSync(db, email.uid, true);
+        logger.info(`uid=${email.uid} — is_sync set to true`);
+      } else {
+        logger.warn(`uid=${email.uid} — external sync failed, is_sync remains false`);
+      }
+
       await notifyDiscord(
         `✅ **Nova transação salva**\n` +
           `👤 **Pessoa:** ${parsed.person_name}\n` +
@@ -644,9 +740,9 @@ async function main() {
           `📋 **Tipo:** ${parsed.type.toUpperCase()} (${parsed.operation === "in" ? "entrada" : "saída"})\n` +
           `📅 **Data:** ${new Date(parsed.transaction_date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}\n` +
           `🔍 **Fontes:** ${parsed.parse_sources}\n` +
+          `🔗 **Sync:** ${synced ? "✅" : "⏳ pendente"}\n` +
           `🆔 **UID IMAP:** ${email.uid}`,
       );
-      saved++;
     } catch (err) {
       logger.error(`Failed to insert uid=${email.uid}: ${err.message}`);
       await notifyDiscord(
@@ -658,6 +754,10 @@ async function main() {
 
   const status = discarded > 0 ? "partial" : "success";
   finishRun(db, runId, status, { found: emails.length, saved, skipped, discarded });
+
+  // Always attempt to resync any pending transactions (current run + previous failures)
+  await resyncPendingTransactions(db);
+
   db.close();
 
   logger.info(
@@ -668,5 +768,4 @@ async function main() {
 main().catch(async (err) => {
   logger.error(`Unexpected error: ${err.message}`);
   await notifyDiscord(`❌ check-nubank-emails: Unexpected error — ${err.message}`);
-  // não chama process.exit — termina graciosamente
 });

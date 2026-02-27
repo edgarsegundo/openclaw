@@ -7,6 +7,9 @@ const path = require("path");
 const axios = require("axios");
 const router = express.Router();
 
+const businessId = process.env.FASTVISTOS_BUSINESS_ID;
+const apiBaseUrl = process.env.FASTVISTOS_API_URL || "http://localhost:8000/api";
+
 const DB_PATH = path.resolve(__dirname, "../automations/check-nubank-emails/db.fastvistos");
 const db = new Database(DB_PATH, { readonly: false });
 
@@ -105,6 +108,7 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:18789",
   "http://localhost:18789",
   "http://localhost:5173",
+  "http://localhost:5174",
 ]);
 
 router.get(
@@ -124,16 +128,13 @@ router.get(
     try {
       const params = req.query;
       const apiKey = process.env.API_KEY_MICROSEVICESADM;
-      const response = await axios.get(
-        "https://sys.fastvistos.com.br/api/customer-orders/search/",
-        {
-          params,
-          headers: {
-            "X-API-Key": apiKey,
-          },
-          maxBodyLength: Infinity,
+      const response = await axios.get(`${apiBaseUrl}/customer-orders/search/`, {
+        params,
+        headers: {
+          "X-API-Key": apiKey,
         },
-      );
+        maxBodyLength: Infinity,
+      });
       res.status(response.status).json(response.data);
     } catch (error) {
       if (error.response) {
@@ -162,16 +163,16 @@ router.post(
   express.json(),
   async (req, res) => {
     try {
-      const { customer_order_uuid, external_transaction_id } = req.body;
-      if (!customer_order_uuid || !external_transaction_id) {
+      const { customer_order_transaction_uuid, transaction_id } = req.body;
+      if (!customer_order_transaction_uuid || !transaction_id) {
         return res.status(400).json({
-          detail: "customer_order_uuid and external_transaction_id are required.",
+          detail: "customer_order_transaction_uuid e transaction_id são obrigatórios.",
         });
       }
       const apiKey = process.env.API_KEY_MICROSEVICESADM;
       const response = await axios.post(
-        "https://sys.fastvistos.com.br/api/customer-order-transaction/delete/",
-        { customer_order_uuid, external_transaction_id },
+        `${apiBaseUrl}/customer-order-transaction/delete/`,
+        { customer_order_transaction_uuid },
         {
           headers: {
             "X-API-Key": apiKey,
@@ -179,6 +180,23 @@ router.post(
           maxBodyLength: Infinity,
         },
       );
+
+      // Se a exclusão falhou, retorna erro sem atualizar o banco
+      if (response.status != 200) {
+        return res
+          .status(500)
+          .json({ error: "Failed to delete customer order transaction in FastVistos." });
+      }
+
+      // Atualiza campo customer_order_transaction_uuid para NULL
+      try {
+        db.prepare(
+          "UPDATE transactions SET customer_order_transaction_uuid = NULL WHERE id = ?",
+        ).run(transaction_id);
+      } catch (dbErr) {
+        // Log, mas não bloqueia resposta
+        console.error("Erro ao atualizar customer_order_transaction_uuid para NULL:", dbErr);
+      }
       res.status(response.status).json(response.data);
     } catch (error) {
       if (error.response) {
@@ -207,16 +225,16 @@ router.post(
   express.json(),
   async (req, res) => {
     try {
-      const { customer_order_uuid, external_transaction_id } = req.body;
-      if (!customer_order_uuid || !external_transaction_id) {
+      const { customer_order_uuid, transaction_id } = req.body;
+      if (!customer_order_uuid || !transaction_id) {
         return res.status(400).json({
-          detail: "customer_order_uuid and external_transaction_id are required.",
+          detail: "customer_order_uuid e transaction_id são obrigatórios.",
         });
       }
       const apiKey = process.env.API_KEY_MICROSEVICESADM;
       const response = await axios.post(
-        "https://sys.fastvistos.com.br/api/customer-order-transaction/create/",
-        { customer_order_uuid, external_transaction_id },
+        `${apiBaseUrl}/customer-order-transaction/create/`,
+        { customer_order_uuid },
         {
           headers: {
             "X-API-Key": apiKey,
@@ -224,6 +242,74 @@ router.post(
           maxBodyLength: Infinity,
         },
       );
+      const customer_order_transaction_uuid = response.data?.id || null;
+
+      if (!customer_order_transaction_uuid) {
+        return res
+          .status(500)
+          .json({ error: "Failed to create customer order transaction, missing id in response." });
+      }
+
+      try {
+        db.prepare("UPDATE transactions SET customer_order_transaction_uuid = ? WHERE id = ?").run(
+          customer_order_transaction_uuid,
+          transaction_id,
+        );
+      } catch (dbErr) {
+        // Log, mas não bloqueia resposta
+        console.error("Erro ao atualizar customer_order_transaction_uuid:", dbErr);
+      }
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      if (error.response) {
+        res.status(error.response.status).json(error.response.data);
+      } else {
+        res.status(500).json({ error: "Proxy error", details: error.message });
+      }
+    }
+  },
+);
+
+// Proxy endpoint: POST /api/fastvistos/microservicesadm/proxy/customer-order-full/create
+router.post(
+  "/microservicesadm/proxy/customer-order-full/create",
+  cors({
+    origin: function (origin, callback) {
+      console.log(">>>> CORS check for origin:", origin);
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+  express.json(),
+  async (req, res) => {
+    try {
+      const { customer_id, customer_name, external_transaction_id } = req.body;
+      if (!customer_id && !customer_name) {
+        return res.status(400).json({ detail: "customer_id ou customer_name é obrigatório." });
+      }
+      if (!external_transaction_id) {
+        return res.status(400).json({ detail: "external_transaction_id é obrigatório." });
+      }
+      if (!businessId) {
+        return res.status(400).json({ detail: "business_id é obrigatório." });
+      }
+      const apiKey = process.env.API_KEY_MICROSEVICESADM;
+      const payload = {
+        customer_id,
+        customer_name,
+        external_transaction_id,
+        business_id: businessId,
+      };
+      const response = await axios.post(`${apiBaseUrl}/customer-order-full/create/`, payload, {
+        headers: {
+          "X-API-Key": apiKey,
+        },
+        maxBodyLength: Infinity,
+      });
       res.status(response.status).json(response.data);
     } catch (error) {
       if (error.response) {

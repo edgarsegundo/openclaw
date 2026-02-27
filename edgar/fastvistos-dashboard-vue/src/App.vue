@@ -25,6 +25,10 @@ const orderLoading = ref(false);
 const orderNext = ref(null);
 const orderPrev = ref(null);
 
+/* ── Vincular ── */
+const linkedOrderUuid = ref<string | null>(null);
+const vincularLoading = ref(false);
+
 /* ── Description ── */
 const descriptionValue = ref("");
 const descriptionSaving = ref(false);
@@ -114,6 +118,7 @@ function openModal(transaction) {
   selectedTransaction.value = transaction;
   descriptionValue.value = transaction.description || "";
   isConciliado.value = transaction.status === 'RECONCILED';
+  linkedOrderUuid.value = transaction.customer_order_transaction_uuid || null;
   dragPos.value = { x: 0, y: 0 };
   isModalOpen.value = true;
   orderPage.value = 1;
@@ -179,12 +184,63 @@ function onOrderPageChange(nextPage) {
   fetchOrders();
 }
 
+async function onVincularChange(customer) {
+  if (vincularLoading.value) return;
+
+  const isLinked = linkedOrderUuid.value === customer.latest_order_uuid;
+
+  // Bloqueia se já há vínculo com outra order
+  if (!isLinked && linkedOrderUuid.value) return;
+
+  vincularLoading.value = true;
+  try {
+    if (isLinked) {
+      await axios.post(
+        '/api/fastvistos/microservicesadm/proxy/customer-order-transaction/delete',
+        {
+          customer_order_uuid: customer.latest_order_uuid,
+          external_transaction_id: selectedTransaction.value.id,
+        }
+      );
+      linkedOrderUuid.value = null;
+      selectedTransaction.value.customer_order_transaction_uuid = null;
+    } else {
+      await axios.post(
+        '/api/fastvistos/microservicesadm/proxy/customer-order-transaction/create',
+        {
+          customer_order_uuid: customer.latest_order_uuid,
+          external_transaction_id: selectedTransaction.value.id,
+        }
+      );
+      linkedOrderUuid.value = customer.latest_order_uuid;
+      selectedTransaction.value.customer_order_transaction_uuid = customer.latest_order_uuid;
+    }
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.detail ||
+      'Erro ao vincular. Tente novamente.';
+    showError(msg);
+  } finally {
+    vincularLoading.value = false;
+  }
+}
+
+const sortedOrderResults = computed(() => {
+  if (!linkedOrderUuid.value) return orderResults.value;
+  const pinned = orderResults.value.filter(o => o.latest_order_uuid === linkedOrderUuid.value);
+  const rest = orderResults.value.filter(o => o.latest_order_uuid !== linkedOrderUuid.value);
+  return [...pinned, ...rest];
+});
+
 watch(isModalOpen, (open) => {
   if (!open) {
     orderResults.value = [];
     orderCount.value = 0;
     orderSearch.value = "";
     orderPage.value = 1;
+    linkedOrderUuid.value = null;
+    vincularLoading.value = false;
     if (descriptionTimeout) clearTimeout(descriptionTimeout);
     descriptionValue.value = "";
   }
@@ -279,6 +335,31 @@ function formatCurrency(value: number | string) {
   if (value === null || value === undefined) return '';
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 });
 }
+
+async function onCriarOrdem(customer) {
+  if (vincularLoading.value) return;
+  vincularLoading.value = true;
+  try {
+    await axios.post(
+      '/api/fastvistos/microservicesadm/proxy/customer-order-full/create',
+      {
+        customer_id: customer.id,
+        customer_name: customer.customer_name,
+        external_transaction_id: selectedTransaction.value.id,
+      }
+    );
+    await fetchOrders();
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.error ||
+      err?.response?.data?.detail ||
+      'Erro ao criar ordem. Tente novamente.';
+    showError(msg);
+  } finally {
+    vincularLoading.value = false;
+  }
+}
+
 </script>
 
 <template>
@@ -462,9 +543,9 @@ function formatCurrency(value: number | string) {
             </div>
           </div>
 
-          <!-- Pedidos do Cliente -->
+          <!-- Clientes -->
           <div class="modal-section">
-            <div class="modal-section-title">Pedidos do Cliente</div>
+            <div class="modal-section-title">Clientes</div>
             <input
               v-model="orderSearch"
               @input="onOrderSearchInput"
@@ -485,19 +566,40 @@ function formatCurrency(value: number | string) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="order in orderResults" :key="order.uuid ?? order.id" :data-order-uuid="order.latest_order_uuid ?? ''">
+                  <tr
+                    v-for="customer in sortedOrderResults"
+                    :key="customer.id"
+                    :data-order-uuid="customer.latest_order_uuid ?? ''"
+                    :class="{ 'row--pinned': linkedOrderUuid && linkedOrderUuid === customer.latest_order_uuid }"
+                  >
                     <td>
-                      <template v-if="order.latest_order_uuid">
-                        {{ formatOrderDate(order.latest_order_timestamp) }}
+                      <template v-if="customer.latest_order_uuid">
+                        <div class="ultima-ordem-cell">
+                          <span>{{ formatOrderDate(customer.latest_order_timestamp) }}</span>
+                          <label
+                            class="vincular-label"
+                            :class="{ 'vincular-label--blocked': linkedOrderUuid && linkedOrderUuid !== customer.latest_order_uuid }"
+                            @click.stop
+                          >
+                            <input
+                              type="checkbox"
+                              class="vincular-check"
+                              :checked="linkedOrderUuid === customer.latest_order_uuid"
+                              :disabled="vincularLoading || (!!linkedOrderUuid && linkedOrderUuid !== customer.latest_order_uuid)"
+                              @change="onVincularChange(customer)"
+                            />
+                            <span class="vincular-text">vincular</span>
+                          </label>
+                        </div>
                       </template>
                       <template v-else>
-                        <button class="btn btn--ghost" @click.stop="">Criar Ordem</button>
+                        <button class="btn btn--create-order" :disabled="vincularLoading" @click.stop="onCriarOrdem(customer)">Criar Ordem</button>
                       </template>
                     </td>
-                    <td>{{ order.customer_name }}</td>
-                    <td>{{ order.customer_email }}</td>
-                    <td>{{ order.customer_whatsapp }}</td>
-                    <td>{{ order.customer_cpf_cnpj }}</td>
+                    <td>{{ customer.customer_name }}</td>
+                    <td>{{ customer.customer_email }}</td>
+                    <td>{{ customer.customer_whatsapp }}</td>
+                    <td>{{ customer.customer_cpf_cnpj }}</td>
                   </tr>
                   <tr v-if="orderResults.length === 0">
                     <td colspan="5" class="state-empty-inline">
@@ -794,6 +896,24 @@ function formatCurrency(value: number | string) {
 }
 
 .btn--primary:hover { opacity: 0.85; }
+
+.btn--create-order {
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn--create-order:hover {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.7);
+}
 
 /* ── Select ── */
 .select {
@@ -1122,5 +1242,76 @@ function formatCurrency(value: number | string) {
   letter-spacing: 4px;
   text-transform: uppercase;
   user-select: none;
+}
+
+/* ── Ultima ordem cell ── */
+.ultima-ordem-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vincular-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+.vincular-label:hover:not(.vincular-label--blocked) {
+  opacity: 1;
+}
+
+.vincular-label--blocked {
+  opacity: 0.15;
+  cursor: not-allowed;
+}
+
+.vincular-check {
+  width: 11px;
+  height: 11px;
+  cursor: pointer;
+  accent-color: var(--accent, #6366f1);
+}
+
+.vincular-check:disabled {
+  cursor: not-allowed;
+}
+
+.vincular-text {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+/* ── Row pinada ── */
+.row--pinned {
+  background: rgba(99, 102, 241, 0.07) !important;
+  border-left: 2px solid var(--accent, #6366f1);
+}
+
+.row--pinned .vincular-label {
+  opacity: 1;
+}
+
+.row--pinned .vincular-text {
+  color: var(--accent, #6366f1);
+}
+
+.row--pinned td:first-child {
+  position: relative;
+}
+
+.row--pinned td:first-child::after {
+  content: '⬡';
+  font-size: 7px;
+  color: var(--accent, #6366f1);
+  opacity: 0.7;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 </style>
