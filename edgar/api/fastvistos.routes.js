@@ -15,6 +15,10 @@ router.get("/transactions", (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const pageSize = parseInt(req.query.pageSize) || 10;
   const offset = (page - 1) * pageSize;
+  const status = req.query.status?.toUpperCase();
+
+  const VALID_STATUSES = ["RECONCILED", "UNRECONCILED"];
+  const statusFilter = status && VALID_STATUSES.includes(status) ? status : null;
 
   const columns = [
     "id",
@@ -30,12 +34,21 @@ router.get("/transactions", (req, res) => {
     "description",
     "status",
   ];
-  const total = db.prepare(`SELECT COUNT(*) as count FROM transactions`).get().count;
+
+  const where = statusFilter ? `WHERE status = ?` : "";
+  const params = statusFilter ? [status] : [];
+
+  const total = db
+    .prepare(`SELECT COUNT(*) as count FROM transactions ${where}`)
+    .get(...params).count;
+
   const rows = db
     .prepare(
-      `SELECT ${columns.join(", ")} FROM transactions ORDER BY transaction_date DESC LIMIT ? OFFSET ?`,
+      `SELECT ${columns.join(", ")} FROM transactions ${where}
+       ORDER BY transaction_date DESC LIMIT ? OFFSET ?`,
     )
-    .all(pageSize, offset);
+    .all(...params, pageSize, offset);
+
   res.json({ total, page, pageSize, rows });
 });
 

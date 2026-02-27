@@ -9,6 +9,11 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = ref(5);
 
+const TAB_STATUS: Record<string, string | undefined> = {
+  conciliar: 'UNRECONCILED',
+  todos: undefined,
+};
+
 /* ── Modal ── */
 const isModalOpen = ref(false);
 const selectedTransaction = ref(null);
@@ -234,8 +239,13 @@ const headers = [
 async function fetchTransactions() {
   loading.value = true;
   try {
+    const status = TAB_STATUS[tab.value];
     const res = await axios.get('http://localhost:3001/api/fastvistos/transactions', {
-      params: { page: page.value, pageSize: pageSize.value },
+      params: {
+        page: page.value,
+        pageSize: pageSize.value,
+        ...(status ? { status } : {}),
+      },
     });
     transactions.value = res.data.rows;
     total.value = res.data.total;
@@ -243,6 +253,11 @@ async function fetchTransactions() {
     loading.value = false;
   }
 }
+
+watch(tab, () => {
+  page.value = 1;
+  fetchTransactions();
+});
 
 fetchTransactions();
 
@@ -462,8 +477,7 @@ function formatCurrency(value: number | string) {
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Data/Hora</th>
+                    <th>Última Ordem</th>
                     <th>Nome</th>
                     <th>Email</th>
                     <th>WhatsApp</th>
@@ -471,16 +485,22 @@ function formatCurrency(value: number | string) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="order in orderResults" :key="order.id">
-                    <td>{{ order.id }}</td>
-                    <td>{{ formatOrderDate(order.timestamp) }}</td>
+                  <tr v-for="order in orderResults" :key="order.uuid ?? order.id" :data-order-uuid="order.latest_order_uuid ?? ''">
+                    <td>
+                      <template v-if="order.latest_order_uuid">
+                        {{ formatOrderDate(order.latest_order_timestamp) }}
+                      </template>
+                      <template v-else>
+                        <button class="btn btn--ghost" @click.stop="">Criar Ordem</button>
+                      </template>
+                    </td>
                     <td>{{ order.customer_name }}</td>
                     <td>{{ order.customer_email }}</td>
                     <td>{{ order.customer_whatsapp }}</td>
                     <td>{{ order.customer_cpf_cnpj }}</td>
                   </tr>
                   <tr v-if="orderResults.length === 0">
-                    <td colspan="6" class="state-empty-inline">
+                    <td colspan="5" class="state-empty-inline">
                       {{ orderLoading ? 'Carregando...' : 'Nenhum pedido encontrado.' }}
                     </td>
                   </tr>
