@@ -112,7 +112,6 @@ router.get(
   cors({
     origin: function (origin, callback) {
       console.log("***** CORS check for origin:", origin);
-      // Permite SOMENTE chamadas do domínio autorizado (não permite curl/server-to-server)
       if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
@@ -125,7 +124,6 @@ router.get(
     try {
       const params = req.query;
       const apiKey = process.env.API_KEY_MICROSEVICESADM;
-
       const response = await axios.get(
         "https://sys.fastvistos.com.br/api/customer-orders/search/",
         {
@@ -136,7 +134,96 @@ router.get(
           maxBodyLength: Infinity,
         },
       );
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      if (error.response) {
+        res.status(error.response.status).json(error.response.data);
+      } else {
+        res.status(500).json({ error: "Proxy error", details: error.message });
+      }
+    }
+  },
+);
 
+// Proxy endpoint: POST /api/fastvistos/microservicesadm/proxy/customer-order-transaction/delete
+router.post(
+  "/microservicesadm/proxy/customer-order-transaction/delete",
+  cors({
+    origin: function (origin, callback) {
+      console.log("***** CORS check for origin:", origin);
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+  express.json(),
+  async (req, res) => {
+    try {
+      const { customer_order_uuid, external_transaction_id } = req.body;
+      if (!customer_order_uuid || !external_transaction_id) {
+        return res.status(400).json({
+          detail: "customer_order_uuid and external_transaction_id are required.",
+        });
+      }
+      const apiKey = process.env.API_KEY_MICROSEVICESADM;
+      const response = await axios.post(
+        "https://sys.fastvistos.com.br/api/customer-order-transaction/delete/",
+        { customer_order_uuid, external_transaction_id },
+        {
+          headers: {
+            "X-API-Key": apiKey,
+          },
+          maxBodyLength: Infinity,
+        },
+      );
+      res.status(response.status).json(response.data);
+    } catch (error) {
+      if (error.response) {
+        res.status(error.response.status).json(error.response.data);
+      } else {
+        res.status(500).json({ error: "Proxy error", details: error.message });
+      }
+    }
+  },
+);
+
+// Proxy endpoint: POST /api/fastvistos/microservicesadm/proxy/customer-order-transaction/create
+router.post(
+  "/microservicesadm/proxy/customer-order-transaction/create",
+  cors({
+    origin: function (origin, callback) {
+      console.log("***** CORS check for origin:", origin);
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  }),
+  express.json(),
+  async (req, res) => {
+    try {
+      const { customer_order_uuid, external_transaction_id } = req.body;
+      if (!customer_order_uuid || !external_transaction_id) {
+        return res.status(400).json({
+          detail: "customer_order_uuid and external_transaction_id are required.",
+        });
+      }
+      const apiKey = process.env.API_KEY_MICROSEVICESADM;
+      const response = await axios.post(
+        "https://sys.fastvistos.com.br/api/customer-order-transaction/create/",
+        { customer_order_uuid, external_transaction_id },
+        {
+          headers: {
+            "X-API-Key": apiKey,
+          },
+          maxBodyLength: Infinity,
+        },
+      );
       res.status(response.status).json(response.data);
     } catch (error) {
       if (error.response) {
