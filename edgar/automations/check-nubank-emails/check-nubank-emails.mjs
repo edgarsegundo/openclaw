@@ -14,6 +14,39 @@ import { AIClient } from "../ai-client/ai-client.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, ".env") });
 
+// ─── CLI Args ─────────────────────────────────────────────────────────────────
+
+function parseSinceArg() {
+  const idx = process.argv.indexOf("--since");
+  if (idx === -1) {
+    return null;
+  }
+
+  const raw = process.argv[idx + 1];
+  if (!raw) {
+    throw new Error("--since requires a value (e.g. --since 30d or --since 2025-01-01)");
+  }
+
+  // Formato relativo: 30d, 7d, 1d, etc.
+  const relMatch = raw.match(/^(\d+)d$/i);
+  if (relMatch) {
+    const days = parseInt(relMatch[1], 10);
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  // Formato absoluto: 2025-01-01 ou 2025-01-01T00:00:00
+  const date = new Date(raw);
+  if (isNaN(date.getTime())) {
+    throw new Error(`--since value invalid: "${raw}"`);
+  }
+  return date;
+}
+
+const CLI_SINCE = parseSinceArg();
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DB_PATH = path.join(__dirname, "db.fastvistos");
@@ -199,6 +232,12 @@ function finishRun(db, runId, status, { found, saved, skipped, discarded }) {
 }
 
 function getLatestTransactionDate(db) {
+  // Flag --since tem prioridade máxima sobre qualquer outra lógica
+  if (CLI_SINCE) {
+    logger.info(`[CLI] --since override: using ${CLI_SINCE.toISOString()}`);
+    return CLI_SINCE;
+  }
+
   const row = db.prepare(`SELECT MAX(transaction_date) as latest FROM transactions`).get();
   logger.debug(`DB query result for latest transaction_date: ${JSON.stringify(row)}`);
 
