@@ -1,4 +1,3 @@
-// https://claude.ai/chat/70e232ac-111b-4709-bcd0-54375cc5c6ff
 import path from "path";
 import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
@@ -33,26 +32,9 @@ const IMAP_CONFIG = {
 };
 
 const SEARCH_CONFIG = {
-  // Filtra apenas pelo sender no IMAP — amplo e estável independente de templates
   email: "todomundo@nubank.com.br",
-
-  // Subjects conhecidos que devem ser PROCESSADOS (transferências recebidas)
-  knownReceived: [
-    "você recebeu uma transferência pelo pix",
-    "transferência recebida",
-    "voce recebeu uma transferencia pelo pix", // variação sem acento
-  ],
-
-  // Subjects conhecidos que devem ser IGNORADOS silenciosamente
-  knownIgnored: [
-    "transferência realizada com sucesso",
-    "comprovante de pagamento",
-    "sua fatura",
-    "fatura disponível",
-    "seu boleto",
-    "limite aprovado",
-    "bem-vindo",
-  ],
+  subjectContains: "você recebeu", // filtra apenas transferências recebidas
+  subjectExpected: "você recebeu uma transferência pelo pix", // referência para detectar variações
 };
 
 const DEBUG_SINCE_DATE = new Date("2025-12-26T00:00:00.000-03:00"); // TODO: remove before production
@@ -240,35 +222,6 @@ function updateIsSync(db, imapUid, isSync) {
 
 function getPendingSyncTransactions(db) {
   return db.prepare(`SELECT * FROM transactions WHERE is_sync = 0`).all();
-}
-
-// ─── Subject Classification ───────────────────────────────────────────────────
-//
-// Classifica cada e-mail recebido do Nubank em três categorias:
-//
-//   'received'  → transferência recebida, deve ser processada
-//   'ignored'   → e-mail conhecido mas irrelevante (fatura, boleto, etc.)
-//   'unknown'   → subject nunca visto antes → alerta imediato no Discord
-//
-// Isso garante que qualquer mudança de template do banco seja detectada,
-// ao invés de silenciosamente cair fora do filtro.
-
-function classifySubject(subject) {
-  const lower = subject.toLowerCase().trim();
-
-  for (const known of SEARCH_CONFIG.knownReceived) {
-    if (lower.includes(known)) {
-      return "received";
-    }
-  }
-
-  for (const known of SEARCH_CONFIG.knownIgnored) {
-    if (lower.includes(known)) {
-      return "ignored";
-    }
-  }
-
-  return "unknown";
 }
 
 // ─── External API ─────────────────────────────────────────────────────────────
@@ -510,64 +463,6 @@ ${plainText.slice(0, 3000)}
   }
 }
 
-// ── LLM: fallback total ───────────────────────────────────────────────────────
-//
-// Usado em dois cenários:
-//   1. E-mail classificado como 'unknown' — o LLM decide se é uma transferência
-//      recebida e, se for, extrai todos os campos.
-//   2. E-mail 'received' onde todos os regex falharam simultaneamente — o LLM
-//      tenta extrair tudo a partir do texto puro.
-//
-// Retorna null se o LLM confirmar que não é uma transferência recebida.
-
-const llmFullExtractionSchema = z.object({
-  is_received_transfer: z.boolean(),
-  cnpj: z.string().nullable(),
-  person_name: z.string().nullable(),
-  amount: z.number().positive().nullable(),
-  transaction_date: z.string().datetime().nullable(),
-});
-
-async function fullLlmExtraction(plainText, email, reason) {
-  const prompt = `
-You are a data extraction assistant for Brazilian bank (Nubank) email notifications.
-
-Your task:
-1. Determine if this email is a PIX RECEIVED notification (money coming IN to the account).
-2. If yes, extract the required fields.
-
-Return ONLY valid JSON with these keys:
-- "is_received_transfer": true if this is an incoming PIX transfer, false otherwise
-- "cnpj": partial CNPJ of the account owner (e.g. "62.462.272"), or null
-- "person_name": full name of the person or company that SENT the Pix, or null
-- "amount": numeric transfer amount (e.g. 852.00), or null
-- "transaction_date": ISO 8601 datetime in UTC, or null
-
-If "is_received_transfer" is false, set all other fields to null.
-Do NOT add explanations. Return ONLY valid JSON.
-
-Reason this email is being analyzed by LLM: ${reason}
-
-Email text:
-${plainText.slice(0, 4000)}
-`;
-
-  logger.warn(`[LLM-FULL] Full extraction for uid=${email.uid} — reason: ${reason}`);
-
-  try {
-    const result = await aiClient.generateStructured({
-      prompt,
-      schema: llmFullExtractionSchema,
-      temperature: 0.1,
-    });
-    logger.info(`[LLM-FULL] Result for uid=${email.uid}: ${JSON.stringify(result)}`);
-    return result;
-  } catch (err) {
-    logger.error(`[LLM-FULL] Failed for uid=${email.uid}: ${err.message}`);
-    return null;
-  }
-}
-
 // ── Main parse orchestrator ───────────────────────────────────────────────────
 
 async function parseEmail(email) {
@@ -604,26 +499,11 @@ async function parseEmail(email) {
     failedFields.push("transaction_date");
   }
 
-  // Se todos os 4 campos falharam, ir direto pro LLM completo — regex
-  // provavelmente não reconhece mais esse template
-  if (failedFields.length === 4) {
-    logger.warn(`uid=${email.uid} — all regex fields failed, using full LLM extraction`);
-    const llmResult = await fullLlmExtraction(plainText, email, "all regex fields failed");
-
-    if (!llmResult || !llmResult.is_received_transfer) {
-      logger.warn(`uid=${email.uid} — LLM confirmed not a received transfer. Discarding.`);
-      return null;
-    }
-
-    cnpjResult = { value: llmResult.cnpj, source: "llm" };
-    personNameResult = { value: llmResult.person_name, source: "llm" };
-    amountResult = { value: llmResult.amount, source: "llm" };
-    transactionDateResult = { value: llmResult.transaction_date, source: "llm" };
-  } else if (failedFields.length > 0) {
-    // Alguns campos falharam — LLM parcial só para os campos específicos
+  if (failedFields.length > 0) {
     logger.warn(
       `uid=${email.uid} — regex failed for: [${failedFields.join(", ")}]. Delegating to LLM...`,
     );
+
     const llmResult = await extractFailedFieldsWithLLM(failedFields, plainText, email);
 
     if (llmResult) {
@@ -703,23 +583,38 @@ async function fetchEmailsFromImap(cutoffDate) {
       const lock = await client.getMailboxLock("INBOX");
 
       try {
-        // Filtra apenas pelo sender — sem subject — para garantir que nenhum
-        // e-mail do Nubank passe despercebido, independente do template
+        const allMessages = await client.search({ all: true });
+        logger.debug(`Total messages in INBOX (no filter): ${allMessages.length}`);
+        const bySender = await client.search({ from: SEARCH_CONFIG.email });
+        logger.debug(`Messages matching from="${SEARCH_CONFIG.email}": ${bySender.length}`);
+        const byDate = await client.search({ since: cutoffDate });
+        logger.debug(`Messages matching since=${cutoffDate.toISOString()}: ${byDate.length}`);
+
         const filter = {
           from: SEARCH_CONFIG.email,
           since: cutoffDate,
+          subject: SEARCH_CONFIG.subjectContains, // filtra no servidor IMAP, reduz tráfego
         };
         logger.debug(
-          `Applying IMAP filter: from="${SEARCH_CONFIG.email}" since=${cutoffDate.toISOString()}`,
+          `Applying IMAP filter: from="${SEARCH_CONFIG.email}" since=${cutoffDate.toISOString()} subject="${SEARCH_CONFIG.subjectContains}"`,
         );
 
         const messageIds = await client.search(filter);
-        logger.info(`Found ${messageIds.length} candidate(s) from IMAP filter (sender only).`);
+        logger.info(`Found ${messageIds.length} candidate(s) from IMAP filter.`);
 
         const emails = [];
+        const subjectsSeen = new Set();
 
         for await (const msg of client.fetch(messageIds, { envelope: true, source: true })) {
           const subject = msg.envelope.subject ?? "";
+          const subjectLower = subject.toLowerCase();
+
+          if (!subjectLower.includes(SEARCH_CONFIG.subjectContains)) {
+            logger.debug(`uid=${msg.uid} skipped — subject does not match: "${subject}"`);
+            continue;
+          }
+
+          subjectsSeen.add(subject);
           const body = msg.source?.toString("utf8") ?? "";
           logger.debug(
             `Fetched uid=${msg.uid} subject="${subject}" date=${String(msg.envelope.date)}`,
@@ -734,7 +629,9 @@ async function fetchEmailsFromImap(cutoffDate) {
           });
         }
 
-        logger.info(`Fetched ${emails.length} email(s) from sender.`);
+        logger.info(`Matched ${emails.length} email(s) after local subject filter.`);
+        logger.info(`Subjects seen this run: ${[...subjectsSeen].join(" | ") || "none"}`);
+
         return emails;
       } finally {
         lock.release();
@@ -805,122 +702,6 @@ async function main() {
       continue;
     }
 
-    // ── Classificação do subject ─────────────────────────────────────────────
-    const classification = classifySubject(email.subject);
-    logger.debug(
-      `uid=${email.uid} subject="${email.subject}" → classification="${classification}"`,
-    );
-
-    if (classification === "ignored") {
-      // Subject conhecido e irrelevante — descartar silenciosamente
-      logger.debug(`uid=${email.uid} — subject is known-ignored. Skipping.`);
-      skipped++;
-      continue;
-    }
-
-    if (classification === "unknown") {
-      // Subject nunca visto — alertar imediatamente e tentar LLM completo
-      const alertMsg =
-        `⚠️ **check-nubank-emails: Subject desconhecido detectado**\n` +
-        `📧 **Subject:** ${email.subject}\n` +
-        `🆔 **UID IMAP:** ${email.uid}\n` +
-        `📅 **Data:** ${String(email.date)}\n` +
-        `\nO LLM tentará processar este e-mail. Verifique se o subject deve ser adicionado a \`knownReceived\` ou \`knownIgnored\` no SEARCH_CONFIG.`;
-
-      logger.warn(`uid=${email.uid} — UNKNOWN subject: "${email.subject}"`);
-      await notifyDiscord(alertMsg);
-
-      // Tentar processar via LLM completo — pode ser uma transferência recebida
-      // com subject novo/alterado pelo banco
-      const rawBody = email.body ?? "";
-      const htmlBody = extractHtmlBody(rawBody);
-      const decoded = decodeQuotedPrintable(htmlBody);
-      const plainText = stripHtmlToText(decoded);
-
-      const llmResult = await fullLlmExtraction(
-        plainText,
-        email,
-        `unknown subject: "${email.subject}"`,
-      );
-
-      if (!llmResult || !llmResult.is_received_transfer) {
-        logger.warn(
-          `uid=${email.uid} — LLM says not a received transfer. Skipping (alert was sent).`,
-        );
-        skipped++;
-        continue;
-      }
-
-      // LLM confirmou que é uma transferência recebida — processar
-      logger.info(
-        `uid=${email.uid} — LLM confirmed received transfer from unknown subject. Processing.`,
-      );
-
-      const stillFailed = [
-        !llmResult.cnpj && "cnpj",
-        !llmResult.person_name && "person_name",
-        !llmResult.amount && "amount",
-        !llmResult.transaction_date && "transaction_date",
-      ].filter(Boolean);
-
-      if (stillFailed.length > 0) {
-        const msg = `uid=${email.uid} — LLM could not extract [${stillFailed.join(", ")}] from unknown-subject email. Discarding.`;
-        logger.error(msg);
-        await notifyDiscord(`❌ check-nubank-emails: ${msg}`);
-        discarded++;
-        continue;
-      }
-
-      const bodyForStorage = (email.body ?? "").slice(0, BODY_MAX_LENGTH);
-      const parse_sources = JSON.stringify({
-        cnpj: "llm",
-        person_name: "llm",
-        amount: "llm",
-        transaction_date: "llm",
-      });
-
-      const parsed = {
-        cnpj: llmResult.cnpj,
-        operation: "in",
-        name: "Nubank Pagamentos S.A.",
-        type: "pix",
-        person_name: llmResult.person_name,
-        amount: llmResult.amount,
-        transaction_date: llmResult.transaction_date,
-        parse_sources,
-        body: bodyForStorage,
-      };
-
-      try {
-        insertTransaction(db, { imap_uid: email.uid, ...parsed, is_sync: 0 });
-        saved++;
-
-        const synced = await syncTransactionToApi({ imap_uid: email.uid, ...parsed });
-        if (synced) {
-          updateIsSync(db, email.uid, true);
-        }
-
-        await notifyDiscord(
-          `✅ **Nova transação salva (via LLM — subject desconhecido)**\n` +
-            `👤 **Pessoa:** ${parsed.person_name}\n` +
-            `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
-            `🏦 **CNPJ:** ${parsed.cnpj}\n` +
-            `📅 **Data:** ${new Date(parsed.transaction_date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}\n` +
-            `🔗 **Sync:** ${synced ? "✅" : "⏳ pendente"}\n` +
-            `🆔 **UID IMAP:** ${email.uid}`,
-        );
-      } catch (err) {
-        logger.error(`Failed to insert uid=${email.uid}: ${err.message}`);
-        await notifyDiscord(
-          `❌ check-nubank-emails: Failed to insert uid=${email.uid} — ${err.message}`,
-        );
-        discarded++;
-      }
-
-      continue;
-    }
-
-    // ── classification === "received" — fluxo normal ──────────────────────────
     let parsed;
     try {
       parsed = await parseEmail(email);
