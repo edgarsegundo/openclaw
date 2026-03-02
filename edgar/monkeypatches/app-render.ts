@@ -1145,6 +1145,26 @@ export function renderApp(state: AppViewState) {
               `
             : nothing
         }
+        
+        ${
+          // [edgar]
+          state.tab === "discord"
+            ? html`
+                <button
+                  @click=${() => {
+                    window.open(
+                      "https://discord.com/channels/1474802637902971086/1474809505744425060",
+                      "_blank",
+                      "width=1200,height=800,noopener,noreferrer",
+                    );
+                  }}
+                  style="padding: 10px 16px; border-radius: 8px; cursor: pointer;"
+                >
+                  Abrir Discord
+                </button>
+              `
+            : nothing
+        }
 
       </main>
       ${renderExecApprovalPrompt(state)}

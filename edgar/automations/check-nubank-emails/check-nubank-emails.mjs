@@ -145,26 +145,31 @@ const aiClient = new AIClient({
 
 // ─── Discord Notification ─────────────────────────────────────────────────────
 
-async function notifyDiscord(message) {
+async function notifyDiscord(data) {
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  if (!webhookUrl) {
-    logger.warn("DISCORD_WEBHOOK_URL not set, skipping notification");
-    return;
-  }
 
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: message }),
-    });
-
-    if (!res.ok) {
-      logger.error(`Discord notification failed: ${res.status} ${res.statusText}`);
-    }
-  } catch (err) {
-    logger.error(`Discord notification error: ${err.message}`);
-  }
+  await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      embeds: [
+        {
+          title: "Nova transação",
+          color: 0x00ff00,
+          fields: [
+            { name: "Pessoa", value: data.person_name, inline: true },
+            { name: "Valor", value: `R$ ${data.amount.toFixed(2)}`, inline: true },
+            { name: "CNPJ", value: data.cnpj, inline: true },
+            { name: "Tipo", value: "PIX (entrada)", inline: true },
+            { name: "UID", value: String(data.uid), inline: false },
+          ],
+          footer: {
+            text: new Date(data.transaction_date).toLocaleString("pt-BR"),
+          },
+        },
+      ],
+    }),
+  });
 }
 
 // ─── Database ────────────────────────────────────────────────────────────────

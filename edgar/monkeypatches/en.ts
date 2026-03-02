@@ -43,6 +43,7 @@ export const en: TranslationMap = {
     debug: "Debug",
     logs: "Logs",
     fastvistos: "Fastvistos", // [edgar]
+    discord: "Discord", // [edgar]
   },
   subtitles: {
     agents: "Manage agent workspaces, tools, and identities.",

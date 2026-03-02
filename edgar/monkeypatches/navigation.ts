@@ -13,7 +13,7 @@ export const TAB_GROUPS = [
     tabs: ["overview", "channels", "instances", "sessions", "usage", "cron"],
   },
   { label: "agent", tabs: ["agents", "skills", "nodes"] },
-  { label: "edgar", tabs: ["fastvistos"] }, // [edgar]
+  { label: "edgar", tabs: ["fastvistos", "discord"] }, // [edgar]
   { label: "settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
@@ -31,7 +31,8 @@ export type Tab =
   | "config"
   | "debug"
   | "logs"
-  | "fastvistos"; // [edgar]
+  | "fastvistos" // [edgar]
+  | "discord"; // [edgar]
 
 const TAB_PATHS: Record<Tab, string> = {
   agents: "/agents",
@@ -48,6 +49,7 @@ const TAB_PATHS: Record<Tab, string> = {
   debug: "/debug",
   logs: "/logs",
   fastvistos: "/fastvistos", // [edgar]
+  discord: "/discord", // [edgar]
 };
 
 const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
