@@ -5,7 +5,7 @@ import type { AppViewState } from "../../ui/src/ui/app-view-state.ts";
 export function renderFastvistosTab(state: AppViewState) {
   console.debug("Rendering Fastvistos tab", state);
   // You may want to make the URL configurable or dynamic in the future
-  const dashboardUrl = "http://localhost:5173/"; // Adjust if needed
+  const dashboardUrl = "https://sys.fastvistos.com.br/admin/customer_order/customerorder/"; // Adjust if needed
   return html`
     <div class="fastvistos-iframe-container" style="height:100%;width:100%;display:flex;align-items:stretch;">
       <iframe

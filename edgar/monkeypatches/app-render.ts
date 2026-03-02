@@ -1139,7 +1139,7 @@ export function renderApp(state: AppViewState) {
           state.tab === "fastvistos"
             ? html`
                 <iframe
-                  src="http://localhost:5174"
+                  src="https://sys.fastvistos.com.br/admin/customer_order/customerorder/"
                   style="width: 100%; height: calc(100vh - 200px); border: none; border-radius: 8px"
                 ></iframe>
               `
@@ -1161,6 +1161,18 @@ export function renderApp(state: AppViewState) {
                   style="padding: 10px 16px; border-radius: 8px; cursor: pointer;"
                 >
                   Abrir Discord
+                </button>
+                <button
+                  @click=${() => {
+                    window.open(
+                      "https://sys.fastvistos.com.br/admin/customer_order/customerorder/",
+                      "_blank",
+                      "width=1200,height=800,noopener,noreferrer",
+                    );
+                  }}
+                  style="padding: 10px 16px; border-radius: 8px; cursor: pointer; margin-left: 8px;"
+                >
+                  Abrir Fastvistos Orders
                 </button>
               `
             : nothing
