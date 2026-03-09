@@ -206,6 +206,14 @@ function openDatabase() {
     );
   `);
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS seen_uids (
+      imap_uid   INTEGER PRIMARY KEY,
+      reason     TEXT NOT NULL,
+      created_at DATETIME NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+
   // Migration: add is_sync column if it doesn't exist (for existing databases)
   const columns = db.prepare("PRAGMA table_info(transactions)").all();
   const hasIsSync = columns.some((col) => col.name === "is_sync");
@@ -266,8 +274,16 @@ function getLatestTransactionDate(db) {
 }
 
 function isUidAlreadySaved(db, uid) {
-  const row = db.prepare(`SELECT id FROM transactions WHERE imap_uid = ? LIMIT 1`).get(uid);
-  return !!row;
+  const inTx = db.prepare(`SELECT id FROM transactions WHERE imap_uid = ? LIMIT 1`).get(uid);
+  if (inTx) {
+    return true;
+  }
+  const inSeen = db.prepare(`SELECT imap_uid FROM seen_uids WHERE imap_uid = ? LIMIT 1`).get(uid);
+  return !!inSeen;
+}
+
+function markUidAsSeen(db, uid, reason) {
+  db.prepare(`INSERT OR IGNORE INTO seen_uids (imap_uid, reason) VALUES (?, ?)`).run(uid, reason);
 }
 
 function insertTransaction(db, tx) {
@@ -890,6 +906,7 @@ async function main() {
         logger.warn(
           `uid=${email.uid} — LLM says not a received transfer. Skipping (alert was sent).`,
         );
+        markUidAsSeen(db, email.uid, "unknown_not_transfer");
         skipped++;
         continue;
       }
@@ -910,6 +927,7 @@ async function main() {
         const msg = `uid=${email.uid} — LLM could not extract [${stillFailed.join(", ")}] from unknown-subject email. Discarding.`;
         logger.error(msg);
         await notifyDiscord(`❌ check-nubank-emails: ${msg}`);
+        markUidAsSeen(db, email.uid, "unknown_llm_extract_failed");
         discarded++;
         continue;
       }
@@ -957,6 +975,7 @@ async function main() {
         await notifyDiscord(
           `❌ check-nubank-emails: Failed to insert uid=${email.uid} — ${err.message}`,
         );
+        markUidAsSeen(db, email.uid, "unknown_insert_failed");
         discarded++;
       }
 
