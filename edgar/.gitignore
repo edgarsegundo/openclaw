@@ -2,4 +2,4 @@ db.fastvistos
 visa-crawler.db
 app.log
 cron.log
-visa-crawler-*.log
+**/visa-crawler-*.log
