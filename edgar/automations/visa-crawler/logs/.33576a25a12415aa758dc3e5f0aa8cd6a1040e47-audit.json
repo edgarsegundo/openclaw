@@ -1,0 +1,15 @@
+{
+  "keep": {
+    "days": true,
+    "amount": 14
+  },
+  "auditLog": "/Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/logs/.33576a25a12415aa758dc3e5f0aa8cd6a1040e47-audit.json",
+  "files": [
+    {
+      "date": 1773858561155,
+      "name": "/Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/logs/visa-crawler-2026-03-18.log",
+      "hash": "97d48cf6ceb942ef3bed93e1e0efca9f09dbc96d0602801b9f1365ad174d301f"
+    }
+  ],
+  "hashType": "sha256"
+}

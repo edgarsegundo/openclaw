@@ -1,0 +1,73 @@
+[18/03/2026 15:29:21] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 15:29:21] [DEBUG] Database opened and schema ensured.
+[18/03/2026 15:42:16] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 15:42:16] [DEBUG] Database opened and schema ensured.
+[18/03/2026 15:42:16] [INFO] === visa-crawler iniciado — 1 país(es) ativo(s) ===
+[18/03/2026 15:42:16] [WARN] DISCORD_WEBHOOK_URL not set, skipping notification
+[18/03/2026 15:42:16] [INFO] [1/1] Processando: Portugal
+[18/03/2026 15:42:16] [INFO] [Portugal] Iniciando coleta...
+[18/03/2026 15:42:23] [WARN] [Portugal] Avisos de validação:
+[18/03/2026 15:42:23] [WARN]   [aviso] "fonte": domínio não reconhecido como oficial — "https://www.vfsglobal.com/portugal/brazil/schengen-visa.html"
+[18/03/2026 15:42:23] [DEBUG] [Portugal] Verificando URLs dos recursos...
+[18/03/2026 15:42:27] [WARN] [Portugal] [aviso] "recursos": URL inacessível (HTTP 403) — "https://vistos.mne.gov.pt/pt/vistos-nacionais/informacao-geral/tipo-de-visto"
+[18/03/2026 15:42:27] [WARN] [Portugal] [auto-corrigido] "recursos": removido item com URL quebrada — "Tipo de visto - Informação Geral - Vistos Nacionais"
+[18/03/2026 15:42:27] [INFO] [Portugal] Snapshot #1 salvo. Divergências: 0
+[18/03/2026 15:42:27] [INFO] [Portugal] Primeiro snapshot registrado.
+[18/03/2026 15:42:27] [INFO] === Finalizado — Total: 1 | Sucesso: 1 | Divergências: 0 | Erros: 0 ===
+[18/03/2026 15:42:27] [WARN] DISCORD_WEBHOOK_URL not set, skipping notification
+[18/03/2026 16:29:52] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:29:52] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:30:04] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:30:04] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:30:04] [INFO] === visa-crawler iniciado — 1 país(es) ativo(s) ===
+[18/03/2026 16:30:04] [INFO] [1/1] Processando: Estados Unidos
+[18/03/2026 16:30:04] [INFO] [Estados Unidos] Iniciando coleta...
+[18/03/2026 16:30:13] [DEBUG] [Estados Unidos] Verificando URLs dos recursos...
+[18/03/2026 16:30:14] [INFO] [Estados Unidos] Snapshot #2 salvo. Divergências: 0
+[18/03/2026 16:30:14] [INFO] [Estados Unidos] Primeiro snapshot registrado.
+[18/03/2026 16:30:14] [INFO] === Finalizado — Total: 1 | Sucesso: 1 | Divergências: 0 | Erros: 0 ===
+[18/03/2026 16:48:15] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:48:15] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:48:15] [WARN] ISO(s) não encontrado(s) ou inativo(s): FR
+[18/03/2026 16:48:15] [ERROR] Nenhum país válido para processar com os ISOs informados.
+[18/03/2026 16:48:25] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:48:25] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:48:27] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:48:27] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:48:27] [INFO] === visa-crawler iniciado — 1 país(es) ativo(s) ===
+[18/03/2026 16:48:28] [INFO] [1/1] Processando: França
+[18/03/2026 16:48:28] [INFO] [França] Iniciando coleta...
+[18/03/2026 16:48:35] [DEBUG] [França] Verificando URLs dos recursos...
+[18/03/2026 16:48:37] [INFO] [França] Snapshot #3 salvo. Divergências: 0
+[18/03/2026 16:48:37] [INFO] [França] Primeiro snapshot registrado.
+[18/03/2026 16:48:37] [INFO] === Finalizado — Total: 1 | Sucesso: 1 | Divergências: 0 | Erros: 0 ===
+[18/03/2026 16:49:54] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:49:54] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:49:59] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:49:59] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:50:34] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 16:50:34] [DEBUG] Database opened and schema ensured.
+[18/03/2026 16:50:34] [INFO] === visa-crawler iniciado — 1 país(es): IT ===
+[18/03/2026 16:50:45] [ERROR] Discord notification error: fetch failed
+[18/03/2026 16:50:45] [INFO] [1/1] Processando: Itália
+[18/03/2026 16:50:45] [INFO] [Itália] Iniciando coleta...
+[18/03/2026 16:50:55] [ERROR] [Itália] Erro na consulta principal: fetch failed
+[18/03/2026 16:51:01] [ERROR] [Itália] Falha: fetch failed
+[18/03/2026 16:51:01] [INFO] === Finalizado — [IT] | Total: 1 | Sucesso: 0 | Divergências: 0 | Erros: 1 ===
+[18/03/2026 17:07:36] [DEBUG] Opening database at: /Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/visa-crawler.db
+[18/03/2026 17:07:36] [DEBUG] Database opened and schema ensured.
+[18/03/2026 17:07:36] [INFO] === visa-crawler iniciado — 1 país(es): IT ===
+[18/03/2026 17:07:37] [DEBUG] Discord notification sent.
+[18/03/2026 17:07:37] [INFO] [1/1] Processando: Itália
+[18/03/2026 17:07:37] [INFO] [Itália] Iniciando coleta...
+[18/03/2026 17:07:45] [WARN] [Itália] Avisos de validação:
+[18/03/2026 17:07:45] [WARN]   [aviso] "custo": preenchido, mas typeLabel indica isenção de visto
+[18/03/2026 17:07:45] [WARN]   [aviso] "fonte": domínio não reconhecido como oficial — "https://consportoalegre.esteri.it/pt/servizi-consolari-e-visti/servizi-per-il-cittadino-straniero/visti/visto-para-turismo-e-transito-ate-90-dias/"
+[18/03/2026 17:07:45] [WARN]   [auto-corrigido] "recursos": Visto de longa duração – tipo D - Ambasciata d'Italia Brasilia marcado como oficial mas URL não é governamental — rebaixado para artigo
+[18/03/2026 17:07:45] [DEBUG] [Itália] Verificando URLs dos recursos...
+[18/03/2026 17:07:49] [WARN] [Itália] [aviso] "recursos": URL inacessível (HTTP 404) — "https://www.nostrali.com.br/na-midia/italia-flexibiliza-regra-de-visto-para-brasileiros-descendentes-de-italianos-entenda-o-que-muda"
+[18/03/2026 17:07:49] [WARN] [Itália] [auto-corrigido] "recursos": removido item com URL quebrada — "Itália flexibiliza regra de visto para brasileiros descendentes de italianos; entenda o que muda"
+[18/03/2026 17:07:49] [INFO] [Itália] Snapshot #4 salvo. Divergências: 0
+[18/03/2026 17:07:49] [INFO] [Itália] Primeiro snapshot registrado.
+[18/03/2026 17:07:49] [INFO] === Finalizado — [IT] | Total: 1 | Sucesso: 1 | Divergências: 0 | Erros: 0 ===
+[18/03/2026 17:07:49] [DEBUG] Discord notification sent.
