@@ -1,18 +1,42 @@
 import "dotenv/config";
 import readline from "node:readline";
+import { healthcheck } from "./healthcheck.js";
+import { revalidar } from "./revalidate.js";
 import { validar } from "./validate.js";
 
 const apiKey = process.env.PERPLEXITY_API_KEY;
+const HEALTHCHECK_ENABLED = process.env.HEALTHCHECK !== "false";
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-rl.question("País destino (padrão: Portugal): ", async (input) => {
-  const pais = input.trim() || "Portugal";
+async function fetchSonar(body) {
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
 
-  const body = {
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(`API error: ${JSON.stringify(err)}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("Resposta vazia da API.");
+  }
+  return JSON.parse(content);
+}
+
+function buildBodyPrincipal(pais) {
+  return {
     model: "sonar",
     response_format: {
       type: "json_schema",
@@ -33,14 +57,9 @@ rl.question("País destino (padrão: Portugal): ", async (input) => {
             seguroSaude: { type: ["boolean", "null"] },
             comprovanteRetorno: { type: ["boolean", "null"] },
             validadeMinPassaporte: { type: ["string", "null"] },
-            documentos: {
-              type: ["array", "null"],
-              items: { type: "string" },
-            },
-            vacinas: {
-              type: ["array", "null"],
-              items: { type: "string" },
-            },
+            confiabilidade: { type: ["string", "null"] },
+            documentos: { type: ["array", "null"], items: { type: "string" } },
+            vacinas: { type: ["array", "null"], items: { type: "string" } },
             consulados: {
               type: ["array", "null"],
               items: {
@@ -68,6 +87,7 @@ rl.question("País destino (padrão: Portugal): ", async (input) => {
             "seguroSaude",
             "comprovanteRetorno",
             "validadeMinPassaporte",
+            "confiabilidade",
             "documentos",
             "vacinas",
             "consulados",
@@ -106,52 +126,120 @@ entrevista            — true se exige entrevista presencial, false se não exi
 seguroSaude           — true se exige seguro saúde ou seguro viagem, false se não exige, null se não aplicável.
 comprovanteRetorno    — true se exige comprovante de passagem de volta na imigração, false se não exige, null se não aplicável.
 validadeMinPassaporte — Validade mínima exigida do passaporte. Ex: "6 meses além da data de retorno". Null se não há exigência específica.
-documentos            — Array com a lista de documentos necessários para entrada ou solicitação do visto. Ex: ["Passaporte válido", "Comprovante de renda", "Seguro viagem"].
-vacinas               — Array com vacinas obrigatórias para entrada. Ex: ["Febre amarela"]. Array vazio [] se não há exigência.
+confiabilidade        — Nível de confiança nas informações encontradas: "alta" (fontes oficiais encontradas), "média" (fontes mistas ou desatualizadas), "baixa" (sem fontes oficiais acessíveis, país com acesso restrito ou informações escassas).
+documentos            — Array com a lista de documentos necessários. Ex: ["Passaporte válido", "Comprovante de renda"].
+vacinas               — Array com vacinas obrigatórias para entrada. Array vazio [] se não há exigência.
 consulados            — Array com os principais consulados ou embaixadas do país no Brasil, com "cidade" e "site". Null se não aplicável.
 observacoes           — Informações importantes ou alertas que não se encaixam nos campos acima. Null se não houver.
-fonte                 — Array de URLs das fontes oficiais consultadas.
+fonte                 — Array de URLs APENAS de fontes governamentais ou oficiais (embaixadas, consulados, sites .gov). Nunca inclua blogs, portais de viagem ou agregadores.
 atualizadoEm          — Data da busca no formato "YYYY-MM-DD".`,
       },
     ],
   };
+}
+
+function buildBodyRecursos(pais, confiabilidade = null) {
+  const paisDificil = confiabilidade === "baixa";
+  return {
+    model: "sonar",
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "visa_recursos",
+        schema: {
+          type: "object",
+          properties: {
+            recursos: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  titulo: { type: "string" },
+                  url: { type: "string" },
+                  tipo: { type: "string" },
+                },
+                required: ["titulo", "url", "tipo"],
+              },
+            },
+          },
+          required: ["recursos"],
+        },
+      },
+    },
+    messages: [
+      {
+        role: "system",
+        content: `Você é um especialista em pesquisa de conteúdo sobre viagens internacionais para brasileiros.
+Busque conteúdos variados, atualizados e de qualidade sobre o processo de visto solicitado.
+Priorize conteúdo em português brasileiro quando disponível.
+Mesmo que as informações oficiais sejam escassas, busque ativamente relatos de viajantes, grupos de Facebook, fóruns e qualquer conteúdo útil disponível.`,
+      },
+      {
+        role: "user",
+        content: `Busque para brasileiros que querem viajar para ${pais}${paisDificil ? " (país com informações oficiais escassas ou acesso restrito)" : ""}:
+- Artigos atualizados explicando o processo de entrada ou visto
+- Vídeos no YouTube com relatos reais ou tutoriais passo a passo
+- Threads em fóruns como Reddit (r/vzavista, r/brcombr, r/travel, r/solotravel) com relatos de quem já passou pelo processo
+- Conteúdo oficial do consulado ou embaixada, se disponível
+- Tutoriais completos em blogs de viagem brasileiros
+${paisDificil ? "- Relatos em grupos de Facebook, comunidades de viagem ou qualquer fonte alternativa disponível" : ""}
+
+Retorne no mínimo 3 recursos, mesmo que sejam de fontes não oficiais.
+Retorne um array "recursos" onde cada item tem:
+- "titulo": nome descritivo do conteúdo
+- "url": link direto
+- "tipo": um de "artigo", "vídeo", "fórum", "oficial", "tutorial", "relato"
+
+Retorne APENAS o JSON. Nenhum texto antes ou depois.`,
+      },
+    ],
+  };
+}
+
+rl.question("País destino (padrão: Portugal): ", async (input) => {
+  const pais = input.trim() || "Portugal";
 
   try {
     console.log(`\nBuscando informações para: ${pais}...\n`);
 
-    const apiResponse = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    // consulta principal primeiro para obter confiabilidade
+    const visaRaw = await fetchSonar(buildBodyPrincipal(pais));
+    const confiabilidade = visaRaw.confiabilidade ?? null;
 
-    if (!apiResponse.ok) {
-      const err = await apiResponse.json();
-      console.error("Erro da API:", JSON.stringify(err, null, 2));
-      return;
-    }
+    // consulta de recursos em paralelo com revalidação se necessário
+    const recursosRaw = await fetchSonar(buildBodyRecursos(pais, confiabilidade));
 
-    const apiData = await apiResponse.json();
-    const content = apiData.choices?.[0]?.message?.content;
+    // merge antes de validar
+    const merged = { ...visaRaw, recursos: recursosRaw.recursos ?? null };
 
-    if (!content) {
-      console.error("Resposta vazia da API.");
-      return;
-    }
-
-    const parsed = JSON.parse(content);
-    const { valido, erros, data: visaData } = validar(parsed);
+    const { valido, erros, duvidas, data: visaData } = validar(merged, pais);
 
     if (erros.length) {
       console.warn("\nAvisos de validação:");
       erros.forEach((e) => console.warn(" ", e));
     }
 
+    // healthcheck de URLs em paralelo com revalidação
+    if (HEALTHCHECK_ENABLED) {
+      console.log("Verificando URLs dos recursos...");
+    }
+    const [dadosFinais] = await Promise.all([
+      duvidas.length ? revalidar(pais, visaData, duvidas) : Promise.resolve(visaData),
+      HEALTHCHECK_ENABLED ? healthcheck(visaData, erros) : Promise.resolve(),
+    ]);
+
+    if (
+      HEALTHCHECK_ENABLED &&
+      erros.some((e) => e.includes("inacessível") || e.includes("removido"))
+    ) {
+      console.warn("\nAvisos pós-healthcheck:");
+      erros
+        .filter((e) => e.includes("inacessível") || e.includes("removido"))
+        .forEach((e) => console.warn(" ", e));
+    }
+
     console.log(`\nDados ${valido ? "válidos ✓" : "com erros críticos ✗"}:`);
-    console.log(JSON.stringify(visaData, null, 2));
+    console.log(JSON.stringify(dadosFinais, null, 2));
   } catch (error) {
     console.error("Erro:", error.message);
   } finally {

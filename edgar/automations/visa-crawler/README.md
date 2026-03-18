@@ -1,5 +1,7 @@
 # https://claude.ai/chat/4be8b4c7-88a6-4e4a-9a28-cb9792730bf5
 
+# https://chatgpt.com/c/69b9f774-b7a0-83e9-be74-284e88cf1ca7
+
 # CONTEXTO
 
 Você é um especialista em vistos internacionais para cidadãos brasileiros.
