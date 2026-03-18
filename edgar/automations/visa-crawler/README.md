@@ -48,7 +48,7 @@ específicas ou alertas para o viajante. Null se não houver.
 "atualizadoEm" — Data em que a busca foi feita, no formato "YYYY-MM-DD".
 
 curl -s https://api.perplexity.ai/chat/completions \
- -H "Authorization: Bearer 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" \
+ -H "Authorization: Bearer <SECRET_KEY>" \
  -H "Content-Type: application/json" \
  -d '{
 "model": "sonar",
