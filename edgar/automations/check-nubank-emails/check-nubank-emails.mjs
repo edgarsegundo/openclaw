@@ -11,6 +11,8 @@ import winston from "winston";
 import { z } from "zod";
 import { AIClient } from "../ai-client/ai-client.js";
 
+const DISCORD_ONLY_RECEIVED = true;
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.join(__dirname, ".env") });
 
@@ -144,8 +146,18 @@ const aiClient = new AIClient({
 });
 
 // ─── Discord Notification ─────────────────────────────────────────────────────
+//
+// Tipos aceitos:
+//   "received" → transferência recebida confirmada
+//   "error"    → erro crítico que precisa de atenção
+//
+// Qualquer outro tipo é silenciado quando DISCORD_ONLY_RECEIVED = true.
 
-async function notifyDiscord(message) {
+async function notifyDiscord(message, type = "info") {
+  if (DISCORD_ONLY_RECEIVED && type !== "received" && type !== "error") {
+    return;
+  }
+
   const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) {
     logger.warn("DISCORD_WEBHOOK_URL not set, skipping notification");
@@ -153,7 +165,6 @@ async function notifyDiscord(message) {
   }
 
   const separator = "━━━━━━━━━━━━━━━━━━━━━━━";
-
   const formattedMessage = `${separator}\n${message}`;
 
   try {
@@ -302,15 +313,6 @@ function getPendingSyncTransactions(db) {
 }
 
 // ─── Subject Classification ───────────────────────────────────────────────────
-//
-// Classifica cada e-mail recebido do Nubank em três categorias:
-//
-//   'received'  → transferência recebida, deve ser processada
-//   'ignored'   → e-mail conhecido mas irrelevante (fatura, boleto, etc.)
-//   'unknown'   → subject nunca visto antes → alerta imediato no Discord
-//
-// Isso garante que qualquer mudança de template do banco seja detectada,
-// ao invés de silenciosamente cair fora do filtro.
 
 function classifySubject(subject) {
   const lower = subject.toLowerCase().trim();
@@ -408,6 +410,16 @@ async function resyncPendingTransactions(db) {
       logger.info(`[Resync] imap_uid=${tx.imap_uid} synced and marked is_sync=true`);
     } else {
       logger.warn(`[Resync] imap_uid=${tx.imap_uid} still failed, keeping is_sync=false`);
+      // Alerta de falha de resync — pode indicar API fora do ar ou problema persistente
+      await notifyDiscord(
+        `❌ **Falha de sync com API (resync)**\n` +
+          `🆔 **UID IMAP:** ${tx.imap_uid}\n` +
+          `👤 **Pessoa:** ${tx.person_name}\n` +
+          `💰 **Valor:** R$ ${Number(tx.amount).toFixed(2)}\n` +
+          `📅 **Data transação:** ${new Date(tx.transaction_date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}\n` +
+          `⚠️ A transação está salva localmente mas não chegou à API. Verifique a conectividade.`,
+        "error",
+      );
     }
   }
 
@@ -570,14 +582,6 @@ ${plainText.slice(0, 3000)}
 }
 
 // ── LLM: fallback total ───────────────────────────────────────────────────────
-//
-// Usado em dois cenários:
-//   1. E-mail classificado como 'unknown' — o LLM decide se é uma transferência
-//      recebida e, se for, extrai todos os campos.
-//   2. E-mail 'received' onde todos os regex falharam simultaneamente — o LLM
-//      tenta extrair tudo a partir do texto puro.
-//
-// Retorna null se o LLM confirmar que não é uma transferência recebida.
 
 const llmFullExtractionSchema = z.object({
   is_received_transfer: z.boolean(),
@@ -663,8 +667,7 @@ async function parseEmail(email) {
     failedFields.push("transaction_date");
   }
 
-  // Se todos os 4 campos falharam, ir direto pro LLM completo — regex
-  // provavelmente não reconhece mais esse template
+  // Se todos os 4 campos falharam, ir direto pro LLM completo
   if (failedFields.length === 4) {
     logger.warn(`uid=${email.uid} — all regex fields failed, using full LLM extraction`);
     const llmResult = await fullLlmExtraction(plainText, email, "all regex fields failed");
@@ -679,7 +682,7 @@ async function parseEmail(email) {
     amountResult = { value: llmResult.amount, source: "llm" };
     transactionDateResult = { value: llmResult.transaction_date, source: "llm" };
   } else if (failedFields.length > 0) {
-    // Alguns campos falharam — LLM parcial só para os campos específicos
+    // Alguns campos falharam — LLM parcial
     logger.warn(
       `uid=${email.uid} — regex failed for: [${failedFields.join(", ")}]. Delegating to LLM...`,
     );
@@ -718,7 +721,7 @@ async function parseEmail(email) {
   if (stillFailed.length > 0) {
     const msg = `uid=${email.uid} — extraction failed after LLM for: [${stillFailed.join(", ")}]. Discarding.`;
     logger.error(msg);
-    await notifyDiscord(`❌ check-nubank-emails: ${msg}`);
+    await notifyDiscord(`❌ check-nubank-emails: ${msg}`, "error");
     return null;
   }
 
@@ -762,8 +765,6 @@ async function fetchEmailsFromImap(cutoffDate) {
       const lock = await client.getMailboxLock("INBOX");
 
       try {
-        // Filtra apenas pelo sender — sem subject — para garantir que nenhum
-        // e-mail do Nubank passe despercebido, independente do template
         const filter = {
           from: SEARCH_CONFIG.email,
           since: cutoffDate,
@@ -831,7 +832,10 @@ async function main() {
     db = openDatabase();
   } catch (err) {
     logger.error(`Failed to open database: ${err.message}`);
-    await notifyDiscord(`❌ check-nubank-emails: Failed to open database — ${err.message}`);
+    await notifyDiscord(
+      `❌ **Falha crítica — banco de dados**\n` + `Não foi possível abrir o SQLite: ${err.message}`,
+      "error",
+    );
     process.exit(1);
   }
 
@@ -845,7 +849,10 @@ async function main() {
     emails = await fetchEmailsFromImap(cutoffDate);
   } catch (err) {
     logger.error(`IMAP failed after all retries: ${err.message}`);
-    await notifyDiscord(`❌ check-nubank-emails: IMAP failed after all retries — ${err.message}`);
+    await notifyDiscord(
+      `❌ **Falha crítica — IMAP**\n` + `Todas as tentativas de conexão falharam: ${err.message}`,
+      "error",
+    );
     finishRun(db, runId, "failed", { found: 0, saved: 0, skipped: 0, discarded: 0 });
     db.close();
     return;
@@ -864,33 +871,21 @@ async function main() {
       continue;
     }
 
-    // ── Classificação do subject ─────────────────────────────────────────────
     const classification = classifySubject(email.subject);
     logger.debug(
       `uid=${email.uid} subject="${email.subject}" → classification="${classification}"`,
     );
 
     if (classification === "ignored") {
-      // Subject conhecido e irrelevante — descartar silenciosamente
       logger.debug(`uid=${email.uid} — subject is known-ignored. Skipping.`);
       skipped++;
       continue;
     }
 
     if (classification === "unknown") {
-      // Subject nunca visto — alertar imediatamente e tentar LLM completo
-      const alertMsg =
-        `⚠️ **check-nubank-emails: Subject desconhecido detectado**\n` +
-        `📧 **Subject:** ${email.subject}\n` +
-        `🆔 **UID IMAP:** ${email.uid}\n` +
-        `📅 **Data:** ${String(email.date)}\n` +
-        `\nO LLM tentará processar este e-mail. Verifique se o subject deve ser adicionado a \`knownReceived\` ou \`knownIgnored\` no SEARCH_CONFIG.`;
-
+      // Subject nunca visto — tentar LLM completo sem alertar ainda
       logger.warn(`uid=${email.uid} — UNKNOWN subject: "${email.subject}"`);
-      await notifyDiscord(alertMsg);
 
-      // Tentar processar via LLM completo — pode ser uma transferência recebida
-      // com subject novo/alterado pelo banco
       const rawBody = email.body ?? "";
       const htmlBody = extractHtmlBody(rawBody);
       const decoded = decodeQuotedPrintable(htmlBody);
@@ -903,19 +898,16 @@ async function main() {
       );
 
       if (!llmResult || !llmResult.is_received_transfer) {
+        // LLM confirmou que NÃO é transferência recebida — descartar silenciosamente
         logger.warn(
-          `uid=${email.uid} — LLM says not a received transfer. Skipping (alert was sent).`,
+          `uid=${email.uid} — LLM says not a received transfer. Skipping (no Discord alert).`,
         );
         markUidAsSeen(db, email.uid, "unknown_not_transfer");
         skipped++;
         continue;
       }
 
-      // LLM confirmou que é uma transferência recebida — processar
-      logger.info(
-        `uid=${email.uid} — LLM confirmed received transfer from unknown subject. Processing.`,
-      );
-
+      // LLM confirmou transferência recebida — verificar campos extraídos
       const stillFailed = [
         !llmResult.cnpj && "cnpj",
         !llmResult.person_name && "person_name",
@@ -924,9 +916,19 @@ async function main() {
       ].filter(Boolean);
 
       if (stillFailed.length > 0) {
-        const msg = `uid=${email.uid} — LLM could not extract [${stillFailed.join(", ")}] from unknown-subject email. Discarding.`;
+        const msg =
+          `uid=${email.uid} — LLM confirmou transferência recebida (subject desconhecido: "${email.subject}") ` +
+          `mas não extraiu [${stillFailed.join(", ")}]. Descartado.`;
         logger.error(msg);
-        await notifyDiscord(`❌ check-nubank-emails: ${msg}`);
+        await notifyDiscord(
+          `❌ **Transferência recebida não processada**\n` +
+            `📧 **Subject desconhecido:** ${email.subject}\n` +
+            `🆔 **UID IMAP:** ${email.uid}\n` +
+            `⚠️ **Campos ausentes:** ${stillFailed.join(", ")}\n` +
+            `O e-mail parece ser uma transferência recebida mas o LLM não conseguiu extrair os dados. ` +
+            `Adicione o subject a \`knownReceived\` no SEARCH_CONFIG.`,
+          "error",
+        );
         markUidAsSeen(db, email.uid, "unknown_llm_extract_failed");
         discarded++;
         continue;
@@ -959,21 +961,38 @@ async function main() {
         const synced = await syncTransactionToApi({ imap_uid: email.uid, ...parsed });
         if (synced) {
           updateIsSync(db, email.uid, true);
+        } else {
+          // Falha de sync notificada pelo resyncPendingTransactions no próximo run,
+          // mas aqui alertamos imediatamente pois acabou de acontecer
+          await notifyDiscord(
+            `❌ **Falha de sync com API**\n` +
+              `🆔 **UID IMAP:** ${email.uid}\n` +
+              `👤 **Pessoa:** ${parsed.person_name}\n` +
+              `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
+              `⚠️ Transação salva localmente mas não chegou à API. Será reprocessada no próximo run.`,
+            "error",
+          );
         }
 
+        // Notificação de transferência recebida — inclui aviso de subject novo
         await notifyDiscord(
-          `✅ **Nova transação salva (via LLM — subject desconhecido)**\n` +
+          `✅ **Nova transferência recebida**\n` +
             `👤 **Pessoa:** ${parsed.person_name}\n` +
             `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
             `🏦 **CNPJ:** ${parsed.cnpj}\n` +
             `📅 **Data:** ${new Date(parsed.transaction_date).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}\n` +
             `🔗 **Sync:** ${synced ? "✅" : "⏳ pendente"}\n` +
-            `🆔 **UID IMAP:** ${email.uid}`,
+            `🆔 **UID IMAP:** ${email.uid}\n` +
+            `⚠️ **Atenção:** subject desconhecido detectado — considere adicionar "${email.subject}" ao SEARCH_CONFIG.`,
+          "received",
         );
       } catch (err) {
         logger.error(`Failed to insert uid=${email.uid}: ${err.message}`);
         await notifyDiscord(
-          `❌ check-nubank-emails: Failed to insert uid=${email.uid} — ${err.message}`,
+          `❌ **Erro ao salvar transação**\n` +
+            `🆔 **UID IMAP:** ${email.uid}\n` +
+            `💥 **Erro:** ${err.message}`,
+          "error",
         );
         markUidAsSeen(db, email.uid, "unknown_insert_failed");
         discarded++;
@@ -989,7 +1008,10 @@ async function main() {
     } catch (err) {
       logger.error(`Unexpected error parsing uid=${email.uid}: ${err.message}`);
       await notifyDiscord(
-        `❌ check-nubank-emails: Unexpected parse error uid=${email.uid} — ${err.message}`,
+        `❌ **Erro inesperado ao processar e-mail**\n` +
+          `🆔 **UID IMAP:** ${email.uid}\n` +
+          `💥 **Erro:** ${err.message}`,
+        "error",
       );
       discarded++;
       continue;
@@ -1001,24 +1023,30 @@ async function main() {
     }
 
     try {
-      // Insert locally with is_sync = false initially
       insertTransaction(db, { imap_uid: email.uid, ...parsed, is_sync: 0 });
       logger.info(
         `Saved uid=${email.uid} — ${parsed.person_name} R$${parsed.amount} sources=${parsed.parse_sources}`,
       );
       saved++;
 
-      // Attempt external sync
       const synced = await syncTransactionToApi({ imap_uid: email.uid, ...parsed });
       if (synced) {
         updateIsSync(db, email.uid, true);
         logger.info(`uid=${email.uid} — is_sync set to true`);
       } else {
         logger.warn(`uid=${email.uid} — external sync failed, is_sync remains false`);
+        await notifyDiscord(
+          `❌ **Falha de sync com API**\n` +
+            `🆔 **UID IMAP:** ${email.uid}\n` +
+            `👤 **Pessoa:** ${parsed.person_name}\n` +
+            `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
+            `⚠️ Transação salva localmente mas não chegou à API. Será reprocessada no próximo run.`,
+          "error",
+        );
       }
 
       await notifyDiscord(
-        `✅ **Nova transação salva**\n` +
+        `✅ **Nova transferência recebida**\n` +
           `👤 **Pessoa:** ${parsed.person_name}\n` +
           `💰 **Valor:** R$ ${parsed.amount.toFixed(2)}\n` +
           `🏦 **CNPJ:** ${parsed.cnpj}\n` +
@@ -1027,11 +1055,15 @@ async function main() {
           `🔍 **Fontes:** ${parsed.parse_sources}\n` +
           `🔗 **Sync:** ${synced ? "✅" : "⏳ pendente"}\n` +
           `🆔 **UID IMAP:** ${email.uid}`,
+        "received",
       );
     } catch (err) {
       logger.error(`Failed to insert uid=${email.uid}: ${err.message}`);
       await notifyDiscord(
-        `❌ check-nubank-emails: Failed to insert uid=${email.uid} — ${err.message}`,
+        `❌ **Erro ao salvar transação**\n` +
+          `🆔 **UID IMAP:** ${email.uid}\n` +
+          `💥 **Erro:** ${err.message}`,
+        "error",
       );
       discarded++;
     }
@@ -1040,7 +1072,7 @@ async function main() {
   const status = discarded > 0 ? "partial" : "success";
   finishRun(db, runId, status, { found: emails.length, saved, skipped, discarded });
 
-  // Always attempt to resync any pending transactions (current run + previous failures)
+  // Sempre tenta resync de pendências de runs anteriores
   await resyncPendingTransactions(db);
 
   db.close();
@@ -1052,5 +1084,5 @@ async function main() {
 
 main().catch(async (err) => {
   logger.error(`Unexpected error: ${err.message}`);
-  await notifyDiscord(`❌ check-nubank-emails: Unexpected error — ${err.message}`);
+  await notifyDiscord(`❌ **Erro crítico inesperado**\n💥 **Erro:** ${err.message}`, "error");
 });
