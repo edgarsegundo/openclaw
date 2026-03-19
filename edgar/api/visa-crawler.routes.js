@@ -27,8 +27,12 @@ router.get("/visa/:slug", (req, res) => {
   try {
     const row = visaDb
       .prepare(
-        `SELECT id, pais_id, coletado_em, schema_versao, status, type_label, custo, entrevista, validade_min_passaporte, seguro_saude, confiabilidade, json_completo
-       FROM visa_snapshots WHERE pais_id = ? ORDER BY coletado_em DESC LIMIT 1`,
+        `SELECT s.id, s.pais_id, p.nome, s.coletado_em, s.schema_versao, s.status, s.type_label, s.custo, s.entrevista, s.validade_min_passaporte, s.seguro_saude, s.confiabilidade, s.json_completo
+        FROM visa_snapshots s
+        JOIN paises p ON s.pais_id = p.id
+        WHERE s.pais_id = ?
+        ORDER BY s.coletado_em DESC
+        LIMIT 1`,
       )
       .get(slug);
     if (!row) {
@@ -44,6 +48,7 @@ router.get("/visa/:slug", (req, res) => {
     res.json({
       id: row.id,
       pais_id: row.pais_id,
+      nome: row.nome,
       coletado_em: row.coletado_em,
       schema_versao: row.schema_versao,
       status: row.status,
