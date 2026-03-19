@@ -1,3 +1,4 @@
+require("dotenv").config();
 // Simple Express API to serve transactions from SQLite
 const express = require("express");
 const cors = require("cors");
