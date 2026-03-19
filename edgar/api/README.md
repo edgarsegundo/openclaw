@@ -1,6 +1,6 @@
 # README
 
-##
+## Como testar api/visa
 
 curl http://localhost:3099/api/visa/ca
 curl http://localhost:3099/api/visa-countries
