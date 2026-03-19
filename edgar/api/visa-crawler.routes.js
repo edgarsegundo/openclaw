@@ -59,6 +59,24 @@ router.get("/visa/:slug", (req, res) => {
     res.status(500).json({ error: "Erro ao consultar visto", details: err.message });
   }
 });
+
+// GET /visa-countries/timestamps
+router.get("/visa-countries/timestamps", (req, res) => {
+  try {
+    const rows = visaDb
+      .prepare(
+        `SELECT pais_id AS id, MAX(coletado_em) AS atualizadoEm
+       FROM visa_snapshots
+       GROUP BY pais_id
+       ORDER BY pais_id`,
+      )
+      .all();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: "Erro ao consultar timestamps", details: err.message });
+  }
+});
+
 // --- FIM: Endpoints de vistos ---
 
 module.exports = router;
