@@ -2,6 +2,9 @@
 
 ##
 
+curl http://localhost:3099/api/visa/ca
+curl http://localhost:3099/api/visa-countries
+
 ## Rodando a API com PM2
 
 1. Instale o PM2 (se ainda não tiver):

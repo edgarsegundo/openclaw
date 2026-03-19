@@ -1,5 +1,8 @@
 # visa-crawler
 
+https://claude.ai/chat/4be8b4c7-88a6-4e4a-9a28-cb9792730bf5
+https://chatgpt.com/c/69b9f774-b7a0-83e9-be74-284e88cf1ca7
+
 Robô de coleta e atualização de informações de visto internacional para cidadãos brasileiros. Usa a API do Perplexity (Sonar) para buscar dados atualizados, valida os resultados, detecta divergências entre execuções e persiste tudo em SQLite.
 
 ---
