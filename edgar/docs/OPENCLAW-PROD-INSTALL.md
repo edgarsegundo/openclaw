@@ -24,3 +24,7 @@ pnpm run openclaw onboard
 pnpm install && pnpm run build
 openclaw gateway restart
 ```
+
+## How to access form my local computer
+
+http://localhost:18789/?token=<TOEKN>
