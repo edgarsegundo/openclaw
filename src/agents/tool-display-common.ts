@@ -63,6 +63,31 @@ export function resolveActionArg(args: unknown): string | undefined {
   return action || undefined;
 }
 
+export function resolveToolVerbAndDetailForArgs(params: {
+  toolKey: string;
+  args?: unknown;
+  meta?: string;
+  spec?: ToolDisplaySpec;
+  fallbackDetailKeys?: string[];
+  detailMode: "first" | "summary";
+  detailCoerce?: CoerceDisplayValueOptions;
+  detailMaxEntries?: number;
+  detailFormatKey?: (raw: string) => string;
+}): { verb?: string; detail?: string } {
+  return resolveToolVerbAndDetail({
+    toolKey: params.toolKey,
+    args: params.args,
+    meta: params.meta,
+    action: resolveActionArg(params.args),
+    spec: params.spec,
+    fallbackDetailKeys: params.fallbackDetailKeys,
+    detailMode: params.detailMode,
+    detailCoerce: params.detailCoerce,
+    detailMaxEntries: params.detailMaxEntries,
+    detailFormatKey: params.detailFormatKey,
+  });
+}
+
 export function coerceDisplayValue(
   value: unknown,
   opts: CoerceDisplayValueOptions = {},
@@ -1056,9 +1081,10 @@ export function resolveExecDetail(args: unknown): string | undefined {
 
   const displaySummary = cwd ? `${summary} (in ${cwd})` : summary;
 
-  // Append the raw command when the summary differs meaningfully from the command itself.
+  // Keep the raw command inline so chat surfaces do not break "Exec:" onto a
+  // separate paragraph/code block.
   if (compact && compact !== displaySummary && compact !== summary) {
-    return `${displaySummary}\n\n\`${compact}\``;
+    return `${displaySummary} · \`${compact}\``;
   }
 
   return displaySummary;

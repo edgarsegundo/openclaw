@@ -1,13 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   configureCommand,
   ensureConfigReady,
   installBaseProgramMocks,
   installSmokeProgramMocks,
-  onboardCommand,
   runTui,
   runtime,
   setupCommand,
+  setupWizardCommand,
 } from "./program.test-mocks.js";
 
 installBaseProgramMocks();
@@ -26,14 +26,19 @@ vi.mock("./config-cli.js", () => ({
 const { buildProgram } = await import("./program.js");
 
 describe("cli program (smoke)", () => {
+  let program = createProgram();
+
   function createProgram() {
     return buildProgram();
   }
 
   async function runProgram(argv: string[]) {
-    const program = createProgram();
     await program.parseAsync(argv, { from: "user" });
   }
+
+  beforeAll(() => {
+    program = createProgram();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +47,6 @@ describe("cli program (smoke)", () => {
   });
 
   it("registers memory + status commands", () => {
-    const program = createProgram();
     const names = program.commands.map((command) => command.name());
     expect(names).toContain("message");
     expect(names).toContain("memory");
@@ -64,6 +68,6 @@ describe("cli program (smoke)", () => {
     await runProgram(["setup", "--remote-url", "ws://example"]);
 
     expect(setupCommand).not.toHaveBeenCalled();
-    expect(onboardCommand).toHaveBeenCalledTimes(1);
+    expect(setupWizardCommand).toHaveBeenCalledTimes(1);
   });
 });

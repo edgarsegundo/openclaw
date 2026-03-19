@@ -1,6 +1,6 @@
 import path from "node:path";
-import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
-import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk";
+import type { OpenClawPluginApi } from "./api.js";
+import { resolvePreferredOpenClawTmpDir } from "./api.js";
 import {
   diffsPluginConfigSchema,
   resolveDiffsPluginDefaults,
@@ -25,15 +25,18 @@ const plugin = {
     });
 
     api.registerTool(createDiffsTool({ api, store, defaults }));
-    api.registerHttpHandler(
-      createDiffsHttpHandler({
+    api.registerHttpRoute({
+      path: "/plugins/diffs",
+      auth: "plugin",
+      match: "prefix",
+      handler: createDiffsHttpHandler({
         store,
         logger: api.logger,
         allowRemoteViewer: security.allowRemoteViewer,
       }),
-    );
+    });
     api.on("before_prompt_build", async () => ({
-      prependContext: DIFFS_AGENT_GUIDANCE,
+      prependSystemContext: DIFFS_AGENT_GUIDANCE,
     }));
   },
 };
