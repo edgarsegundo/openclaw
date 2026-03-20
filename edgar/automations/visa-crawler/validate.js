@@ -27,6 +27,19 @@ const CAMPOS_OBRIGATORIOS = [
 
 const CONFIABILIDADE_VALIDOS = ["alta", "média", "baixa"];
 
+function isDominioOficial(url) {
+  if (!url.startsWith("http")) {
+    return false;
+  }
+  return (
+    /\.(gov|gob|gouv|govt|gv|mil)(\.|\/|$)/i.test(url) ||
+    /\.gov\.[a-z]{2}(\/|$)/i.test(url) ||
+    /\.(esteri|mofa|mfa|mre|diplo|maec|mzv|mfa)\./i.test(url) ||
+    /(embassy|embaixada|embajada|consulat|consulate|ambasciata|botschaft)/i.test(url) ||
+    /iata\.org|timatic/i.test(url)
+  );
+}
+
 function corrigirBooleanos(data, erros) {
   for (const campo of CAMPOS_BOOLEANOS) {
     if (typeof data[campo] === "string") {
@@ -185,17 +198,15 @@ function sanitizarFontes(data, erros) {
   if (!Array.isArray(data.fonte)) {
     return;
   }
-
   const antes = [...data.fonte];
-
   data.fonte = data.fonte
     .map((url) => url.replace(/^\[\d+\]\s*/, "").trim())
-    .filter((url) => url.length > 0)
-    .filter((url) => !/^\[\d+\]$/.test(url));
-
-  const corrigidas = antes.length - data.fonte.length;
-  if (corrigidas > 0) {
-    erros.push(`[auto-corrigido] "fonte": removidos marcadores de citação de ${corrigidas} URL(s)`);
+    .filter((url) => url.length > 0);
+  const corrigidas = antes.filter((url, i) => url !== data.fonte[i]);
+  if (corrigidas.length) {
+    erros.push(
+      `[auto-corrigido] "fonte": removidos marcadores de citação de ${corrigidas.length} URL(s)`,
+    );
   }
 }
 
@@ -209,37 +220,14 @@ function validarFontes(data, erros, duvidas) {
     return;
   }
 
-  const dominiosConfiaveis = [
-    ".gov.",
-    ".gov.br",
-    ".gob.",
-    ".gouv.",
-    ".govt.",
-    "embaixada",
-    "embassy",
-    "consulat",
-    "embajada",
-    "iata.org",
-    "timatic",
-    "mne.gov",
-    "mofa.",
-    "mfa.",
-  ];
-
-  const todasNaoConfiaveis = data.fonte.every((url) => {
-    if (!url.startsWith("http")) {
-      return true;
-    }
-    return !dominiosConfiaveis.some((d) => url.includes(d));
-  });
+  const todasNaoConfiaveis = data.fonte.every((url) => !isDominioOficial(url));
 
   for (const url of data.fonte) {
     if (!url.startsWith("http")) {
       erros.push(`[aviso] "fonte": URL inválida — "${url}"`);
       continue;
     }
-    const isConfiavel = dominiosConfiaveis.some((d) => url.includes(d));
-    if (!isConfiavel) {
+    if (!isDominioOficial(url)) {
       erros.push(`[aviso] "fonte": domínio não reconhecido como oficial — "${url}"`);
     }
   }
@@ -251,23 +239,6 @@ function validarFontes(data, erros, duvidas) {
     });
   }
 }
-
-const DOMINIOS_OFICIAIS_RECURSOS = [
-  ".gov.",
-  ".gov.br",
-  ".gob.",
-  ".gouv.",
-  ".govt.",
-  "embaixada",
-  "embassy",
-  "consulat",
-  "embajada",
-  "iata.org",
-  "timatic",
-  "mne.gov",
-  "mofa.",
-  "mfa.",
-];
 
 function validarRecursos(data, erros) {
   if (!Array.isArray(data.recursos) || data.recursos.length === 0) {
@@ -293,8 +264,7 @@ function validarRecursos(data, erros) {
 
     // se marcado como oficial mas URL não é de domínio governamental, corrigir
     if (r.tipo === "oficial") {
-      const isOficial = DOMINIOS_OFICIAIS_RECURSOS.some((d) => r.url.includes(d));
-      if (!isOficial) {
+      if (!isDominioOficial(r.url)) {
         erros.push(
           `[auto-corrigido] "recursos": ${r.titulo} marcado como oficial mas URL não é governamental — rebaixado para artigo`,
         );

@@ -3,6 +3,7 @@ import { getUltimoSnapshot, arquivarSnapshotsAnteriores, insertSnapshot } from "
 import { notifyDiscord } from "./discord.js";
 import { healthcheck } from "./healthcheck.js";
 import { logger } from "./logger.js";
+import { polish } from "./polish.js";
 import { revalidar } from "./revalidate.js";
 import { validar } from "./validate.js";
 
@@ -253,13 +254,21 @@ export async function processarPais(db, paisId, paisNome) {
       .forEach((e) => logger.warn(`[${paisNome}] ${e}`));
   }
 
+  // Limpeza cosmética — depois do healthcheck, antes de salvar
+  let dadosPolished = dadosFinais;
+  try {
+    dadosPolished = await polish(paisNome, dadosFinais);
+  } catch (err) {
+    logger.warn(`[${paisNome}] Limpeza cosmética falhou, usando dados originais: ${err.message}`);
+  }
+
   // Comparar com snapshot anterior
   const snapshotAnterior = getUltimoSnapshot(db, paisId);
-  const divergencias = detectarDivergencias(snapshotAnterior, dadosFinais);
+  const divergencias = detectarDivergencias(snapshotAnterior, dadosPolished);
 
   // Arquivar snapshot anterior e inserir novo
   arquivarSnapshotsAnteriores(db, paisId);
-  const snapshotId = insertSnapshot(db, { paisId, data: dadosFinais });
+  const snapshotId = insertSnapshot(db, { paisId, data: dadosPolished });
 
   logger.info(`[${paisNome}] Snapshot #${snapshotId} salvo. Divergências: ${divergencias.length}`);
 
@@ -272,10 +281,8 @@ export async function processarPais(db, paisId, paisNome) {
         `📋 **Campos divergentes:** ${divergencias.map((d) => d.campo).join(", ")}\n` +
         `🔍 **Desempate iniciado automaticamente**`,
     );
-  } else if (snapshotAnterior) {
-    logger.info(`[${paisNome}] Nenhuma divergência nos campos críticos.`);
   } else {
-    logger.info(`[${paisNome}] Primeiro snapshot registrado.`);
+    logger.info(`[${paisNome}] Nenhuma divergência nos campos críticos.`);
   }
 
   return { snapshotId, divergencias: divergencias.length, valido };

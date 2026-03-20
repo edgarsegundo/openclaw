@@ -6,8 +6,15 @@ const API_KEY = process.env.PERPLEXITY_API_KEY;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function normalizar(valor) {
+// campos onde null e false são semanticamente equivalentes
+const CAMPOS_BOOLEANOS_CRITICOS = new Set(["entrevista", "seguroSaude"]);
+
+function normalizar(valor, campo = null) {
   if (valor === null || valor === undefined) {
+    // null equivale a false em campos booleanos críticos
+    if (campo && CAMPOS_BOOLEANOS_CRITICOS.has(campo)) {
+      return "false";
+    }
     return null;
   }
   if (typeof valor === "boolean") {
@@ -45,8 +52,8 @@ export function detectarDivergencias(snapshotAnterior, dadosNovos) {
 
   for (const campo of CAMPOS_CRITICOS) {
     const campoJson = campoSnapshotParaJson(campo);
-    const valorAnterior = normalizar(anteriorJson[campoJson]);
-    const valorNovo = normalizar(dadosNovos[campoJson]);
+    const valorAnterior = normalizar(anteriorJson[campoJson], campo);
+    const valorNovo = normalizar(dadosNovos[campoJson], campo);
 
     if (valorAnterior !== valorNovo) {
       logger.warn(`Divergência em "${campo}": anterior="${valorAnterior}" novo="${valorNovo}"`);
