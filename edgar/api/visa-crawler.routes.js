@@ -15,7 +15,9 @@ router.get("/visa-countries", (req, res) => {
         "SELECT id, nome, codigo_iso FROM paises WHERE ativo = 1 ORDER BY nome COLLATE NOCASE",
       )
       .all();
-    res.json(rows);
+    // Adiciona o campo slug igual ao id em cada item
+    const result = rows.map((row) => ({ ...row, slug: row.id }));
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Erro ao consultar países", details: err.message });
   }
