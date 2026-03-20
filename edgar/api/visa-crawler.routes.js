@@ -1,6 +1,7 @@
 const express = require("express");
 const path = require("path");
 const Database = require("better-sqlite3");
+const slugify = require("slugify");
 const router = express.Router();
 
 // --- INÍCIO: Endpoints de vistos ---
@@ -15,8 +16,11 @@ router.get("/visa-countries", (req, res) => {
         "SELECT id, nome, codigo_iso FROM paises WHERE ativo = 1 ORDER BY nome COLLATE NOCASE",
       )
       .all();
-    // Adiciona o campo slug igual ao id em cada item
-    const result = rows.map((row) => ({ ...row, slug: row.id }));
+    const result = rows.map((row) => ({
+      ...row,
+      slug: slugify(row.nome, { lower: true, strict: true }),
+    }));
+
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: "Erro ao consultar países", details: err.message });
