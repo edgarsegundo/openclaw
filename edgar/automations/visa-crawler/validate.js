@@ -185,15 +185,17 @@ function sanitizarFontes(data, erros) {
   if (!Array.isArray(data.fonte)) {
     return;
   }
+
   const antes = [...data.fonte];
+
   data.fonte = data.fonte
     .map((url) => url.replace(/^\[\d+\]\s*/, "").trim())
-    .filter((url) => url.length > 0);
-  const corrigidas = antes.filter((url, i) => url !== data.fonte[i]);
-  if (corrigidas.length) {
-    erros.push(
-      `[auto-corrigido] "fonte": removidos marcadores de citação de ${corrigidas.length} URL(s)`,
-    );
+    .filter((url) => url.length > 0)
+    .filter((url) => !/^\[\d+\]$/.test(url));
+
+  const corrigidas = antes.length - data.fonte.length;
+  if (corrigidas > 0) {
+    erros.push(`[auto-corrigido] "fonte": removidos marcadores de citação de ${corrigidas} URL(s)`);
   }
 }
 
