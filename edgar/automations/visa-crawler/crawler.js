@@ -265,7 +265,7 @@ export async function processarPais(db, paisId, paisNome) {
 
   // Resolver desempates se houver divergências
   if (divergencias.length > 0) {
-    await resolverDesempates(db, snapshotId, paisId, paisNome, divergencias);
+    await resolverDesempates(db, snapshotId, paisNome, divergencias);
 
     await notifyDiscord(
       `⚠️ **Divergência detectada — ${paisNome}**\n` +

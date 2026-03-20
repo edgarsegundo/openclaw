@@ -1,5 +1,5 @@
+import { logger } from "./logger.js";
 import "dotenv/config";
-
 const apiKey = process.env.PERPLEXITY_API_KEY;
 
 export async function revalidar(pais, visaData, duvidas) {
@@ -62,9 +62,7 @@ Retorne APENAS o JSON solicitado, sem explicações.`,
     ],
   };
 
-  console.log(
-    `\nRevalidando ${duvidas.length} campo(s) para ${pais}: ${camposEmDuvida.join(", ")}...`,
-  );
+  logger.info(`[${pais}] Revalidando ${duvidas.length} campo(s): ${camposEmDuvida.join(", ")}...`);
 
   const response = await fetch("https://api.perplexity.ai/chat/completions", {
     method: "POST",
@@ -77,7 +75,7 @@ Retorne APENAS o JSON solicitado, sem explicações.`,
 
   if (!response.ok) {
     const err = await response.json();
-    console.error("Erro na revalidação:", JSON.stringify(err, null, 2));
+    logger.error(`[${pais}] Erro na revalidação: ${JSON.stringify(err)}`);
     return visaData;
   }
 
@@ -85,13 +83,13 @@ Retorne APENAS o JSON solicitado, sem explicações.`,
   const content = apiData.choices?.[0]?.message?.content;
 
   if (!content) {
-    console.error("Revalidação retornou resposta vazia.");
+    logger.warn(`[${pais}] Revalidação retornou resposta vazia.`);
     return visaData;
   }
 
   const correcoes = JSON.parse(content);
 
-  console.log("\nCorreções aplicadas:", Object.keys(correcoes).join(", "));
+  logger.info(`[${pais}] Correções aplicadas: ${Object.keys(correcoes).join(", ")}`);
 
   // Merge: campos corrigidos sobrescrevem os originais
   return { ...visaData, ...correcoes };
