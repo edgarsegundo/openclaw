@@ -1,0 +1,29 @@
+schema_version: 1
+
+name: "{{NAME}}"
+description: "{{DESCRIPTION}}"
+author: ""
+created_at: "{{DATE}}"
+tags: []
+
+allow_manual: {{ALLOW_MANUAL}}
+allow_cron: {{ALLOW_CRON}}
+
+cron_suggestion: "{{CRON_SUGGESTION}}"
+
+entrypoint: node index.js
+working_dir: ./tasks/{{NAME}}
+
+timeout_seconds:
+
+retry:
+  max_retries: 0
+  delay_seconds: 5
+  backoff: linear
+
+env_vars:
+  common: []
+  manual: []
+  cron: []
+
+inputs: []

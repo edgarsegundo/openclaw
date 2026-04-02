@@ -1,0 +1,56 @@
+schema_version: 1
+
+name: "hello-world"
+description: ""
+author: ""
+created_at: "2026-04-02"
+tags: []
+
+allow_manual: true
+allow_cron: true
+
+cron_suggestion: ""
+
+entrypoint: node index.js
+working_dir: ./tasks/hello-world
+
+timeout_seconds:
+
+retry:
+  max_retries: 0
+  delay_seconds: 5
+  backoff: linear
+
+env_vars:
+  common:
+    - name: GREETING_PREFIX
+      required: true
+      help_tip: Prefix for the greeting (e.g. Hello, Hi)
+  manual:
+    - name: DEBUG_MODE
+      required: false
+      default: "false"
+      help_tip: Enable debug output
+  cron: []
+
+inputs:
+  - name: username
+    type: string
+    required: true
+    default:
+    help_tip: Who do you want to greet?
+  - name: repeat
+    type: number
+    required: false
+    default: 1
+    help_tip: How many times to repeat
+  - name: shout
+    type: boolean
+    required: false
+    default: false
+    help_tip: UPPERCASE the output?
+  - name: date
+    type: date
+    required: false
+    default: "2026-04-02"
+    help_tip: Reference date (YYYY-MM-DD)
