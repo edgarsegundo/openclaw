@@ -14,52 +14,34 @@
  *   saveArtifact — fn(name, data) — saves data as JSON to artifacts/write-article/<name>.json
  */
 export default async function (context) {
-  const { taskName, mode, executionId, runPrompt, saveArtifact } = context;
-
-  // inputs  — values declared in task.config.yaml inputs[]  (e.g. context.inputs.topic)
-  // env     — env vars declared in task.config.yaml env_vars{} (e.g. context.env.MY_API_KEY)
+  const { taskName, mode, executionId, runPrompt, saveArtifact, inputs } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
+  console.log("Inputs:", JSON.stringify(inputs, null, 2));
 
-  // ── Your logic here ───────────────────────────────────────────────────────
-  // ── Using a prompt template (optional) ───────────────────────────────────
-  // runPrompt() sends the rendered prompt to the AI and returns the structured
-  // artifact defined in prompt_templates/<template>/schema.js.
-  //
-  // The template is selected via --template flag or interactively at runtime.
-  // Task inputs (e.g. inputs.topic) are automatically available as {{topic}}
-  // in user.md — no need to pass them explicitly.
-  //
-  // You can also pass extra variables not in task inputs:
-  //   const { artifact } = await runPrompt({ date_today: new Date().toISOString() });
-  //
-  // artifact shape is defined by schema.js in the selected template.
-  // result also contains: template (name), model (string), usage (null).
-
-  if (runPrompt) {
-    const { artifact } = await runPrompt();
-
-    // ── Manipulate before saving (optional) ────────────────────────────────
-    // You have full control — transform, enrich, filter before persisting.
-    //
-    // Example: add metadata
-    // const enriched = { ...artifact, generated_at: new Date().toISOString() };
-    //
-    // Example: dynamic filename from artifact field (for tasks that produce
-    // many files, one per run — e.g. blog articles named after their title):
-    // const slug = artifact.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
-    // await saveArtifact(`article-${slug}`, artifact);
-    //
-    // Example: save multiple artifacts from one run
-    // await saveArtifact("summary", { title: artifact.title, tags: artifact.tags });
-    // await saveArtifact("full", artifact);
-    //
-    // Example: don't save at all — just send to an API
-    // await sendToExternalApi(artifact);
-
-    // Default: save as declared in task.config.yaml artifacts[]
-    await saveArtifact("result", artifact);
-
-    console.log("Done!");
+  if (!runPrompt) {
+    throw new Error("runPrompt não disponível. Execute com --template searchable-ai");
   }
+
+  // Passa todos os inputs obrigatórios para o prompt
+  const { artifact, model } = await runPrompt({
+    ...inputs,
+    date_today: new Date().toISOString().slice(0, 10),
+  });
+
+  console.log("--- Artigo gerado ---");
+  console.log(`Título: ${artifact.title}`);
+  console.log(`Slug: ${artifact.slug}`);
+  console.log(`SEO Meta: ${artifact.seoMetaDescription}`);
+  console.log(`Palavras-chave: ${artifact.keywords.join(", ")}`);
+  console.log("--- Trecho do markdown ---");
+  console.log(artifact.markdownText.slice(0, 400) + (artifact.markdownText.length > 400 ? "..." : ""));
+
+  // Salva como artifact principal
+  await saveArtifact("result", artifact);
+  // Salva também como arquivo dinâmico por slug
+  await saveArtifact(`article-${artifact.slug}`, artifact);
+
+  console.log(`\nModel used: ${model}`);
+  console.log("Done!");
 }

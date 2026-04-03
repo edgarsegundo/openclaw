@@ -51,7 +51,9 @@ import { z } from "zod";
  * All fields are required and validated by zod.
  */
 export default z.object({
-  title: z.string().min(1, "O título do guia não pode estar vazio"),
+  title: z.string().min(1, "O título do artigo não pode estar vazio"),
+  slug: z.string().min(1, "O slug não pode estar vazio"),
   seoMetaDescription: z.string().min(1, "A descrição SEO não pode estar vazia"),
-  markdownText: z.string().min(1, "O conteúdo do guia não pode estar vazio"),
+  keywords: z.array(z.string()).min(1, "Deve haver pelo menos uma palavra-chave"),
+  markdownText: z.string().min(1, "O conteúdo do artigo não pode estar vazio"),
 });

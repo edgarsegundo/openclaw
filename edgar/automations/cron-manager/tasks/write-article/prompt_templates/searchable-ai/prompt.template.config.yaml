@@ -1,15 +1,15 @@
 schema_version: 1
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-name: my-template
-description: "What this template does"
+name: searchable-ai
+description: Geração de artigo SEO com links internos, imagens e intervenções, seguindo cluster e estrutura avançada.
 
 # ── AI provider ───────────────────────────────────────────────────────────────
 # provider: openai      → uses OPENAI_API_KEY from ai-client/.env
 # provider: perplexity  → uses PERPLEXITY_API_KEY from ai-client/.env
 #                          (also has web search capability)
-provider: openai
-model: gpt-4o-mini
+provider: perplexity
+model: sonar
 
 # ── Prompt files ──────────────────────────────────────────────────────────────
 # system.md  — defines the AI's role/persona (keep it short and focused)
@@ -40,11 +40,11 @@ inputs: []
 
 # ── Options ───────────────────────────────────────────────────────────────────
 options:
-  temperature: 0.7          # 0.0 (deterministic) → 1.0 (creative)
+  temperature: 0.5          # 0.0 (deterministic) → 1.0 (creative)
   # max_tokens omitted → model uses its full default limit (~16k for gpt-4o-mini)
   # set explicitly when you need a hard cap, e.g. for short structured outputs:
-  # max_tokens: 1000
-  timeout_ms: 30000         # increase for long outputs (articles, reports)
+  max_tokens: 4000
+  timeout_ms: 60000         # increase for long outputs (articles, reports)
   max_retries: 2
 
 # Output structure is defined in schema.js — no description needed here.

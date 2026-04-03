@@ -54,7 +54,36 @@ env_vars:
 #
 # Inputs are available in index.js as context.inputs.<name>
 # They are also injected as {{name}} variables in prompt templates.
-inputs: []
+inputs:
+  - name: title
+    type: string
+    required: true
+    help_tip: Título do artigo
+  - name: slug
+    type: string
+    required: true
+    help_tip: Slug do artigo (kebab-case, sem acento)
+  - name: keyword
+    type: string
+    required: true
+    help_tip: Palavra-chave principal
+  - name: intent
+    type: string
+    required: true
+    help_tip: Intenção do artigo (ex: informational)
+  - name: language
+    type: string
+    required: true
+    help_tip: Idioma do artigo (ex: pt-BR)
+  - name: cluster
+    type: object
+    required: true
+    help_tip: Cluster de slugs relacionados
+    fields:
+      - name: allSlugs
+        type: array
+        required: true
+        help_tip: Lista de slugs relacionados
   # Examples:
   # - name: topic
   #   type: string
@@ -99,16 +128,14 @@ inputs: []
 #       from_task: write-article
 #       artifact: result          # matches "name" below
 #
-# artifacts:
-#   - name: result
-#     description: Main output of this task
-#     template: my-template
-#     path: result.json
-#
-#   # Dynamic example (one file per execution, named after a field):
-#   - name: article
-#     description: Generated article
-#     template: write-article
-#     path: "article-{slug}.json"
-#     dynamic: true
-#     path_key: title             # artifact.title is slugified → filename
+artifacts:
+  - name: result
+    description: Artigo gerado (output principal)
+    template: searchable-ai
+    path: result.json
+  - name: article
+    description: Artigo individual nomeado pelo slug
+    template: searchable-ai
+    path: "article-{slug}.json"
+    dynamic: true
+    path_key: slug
