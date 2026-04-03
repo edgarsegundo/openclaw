@@ -1,7 +1,7 @@
-import { sendMessageDiscord as sendMessageDiscordImpl } from "openclaw/plugin-sdk/discord";
+import { sendMessageDiscord as sendMessageDiscordImpl } from "../../plugin-sdk/discord-runtime-surface.js";
 
 type RuntimeSend = {
-  sendMessage: typeof import("openclaw/plugin-sdk/discord").sendMessageDiscord;
+  sendMessage: typeof import("../../plugin-sdk/discord-runtime-surface.js").sendMessageDiscord;
 };
 
 export const runtimeSend = {

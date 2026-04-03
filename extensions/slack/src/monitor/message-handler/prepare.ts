@@ -2,26 +2,33 @@ import { resolveAckReaction } from "openclaw/plugin-sdk/agent-runtime";
 import {
   shouldAckReaction as shouldAckReactionGate,
   type AckReactionScope,
-} from "openclaw/plugin-sdk/channel-runtime";
-import { resolveControlCommandGate } from "openclaw/plugin-sdk/channel-runtime";
-import { resolveConversationLabel } from "openclaw/plugin-sdk/channel-runtime";
-import { logInboundDrop } from "openclaw/plugin-sdk/channel-runtime";
-import { resolveMentionGatingWithBypass } from "openclaw/plugin-sdk/channel-runtime";
-import { recordInboundSession } from "openclaw/plugin-sdk/channel-runtime";
-import { readSessionUpdatedAt, resolveStorePath } from "openclaw/plugin-sdk/config-runtime";
-import { enqueueSystemEvent } from "openclaw/plugin-sdk/infra-runtime";
-import { hasControlCommand } from "openclaw/plugin-sdk/reply-runtime";
-import { shouldHandleTextCommands } from "openclaw/plugin-sdk/reply-runtime";
+} from "openclaw/plugin-sdk/channel-feedback";
 import {
+  buildMentionRegexes,
   formatInboundEnvelope,
+  logInboundDrop,
+  matchesMentionWithExplicit,
   resolveEnvelopeFormatOptions,
-} from "openclaw/plugin-sdk/reply-runtime";
+  resolveMentionGatingWithBypass,
+} from "openclaw/plugin-sdk/channel-inbound";
+import { enqueueSystemEvent } from "openclaw/plugin-sdk/channel-runtime";
+import { resolveControlCommandGate } from "openclaw/plugin-sdk/command-auth";
+import { hasControlCommand } from "openclaw/plugin-sdk/command-auth";
+import { shouldHandleTextCommands } from "openclaw/plugin-sdk/command-auth";
+import {
+  readSessionUpdatedAt,
+  resolveChannelContextVisibilityMode,
+  resolveStorePath,
+} from "openclaw/plugin-sdk/config-runtime";
+import {
+  recordInboundSession,
+  resolveConversationLabel,
+} from "openclaw/plugin-sdk/conversation-runtime";
 import {
   buildPendingHistoryContextFromMap,
   recordPendingHistoryEntryIfEnabled,
-} from "openclaw/plugin-sdk/reply-runtime";
+} from "openclaw/plugin-sdk/reply-history";
 import { finalizeInboundContext } from "openclaw/plugin-sdk/reply-runtime";
-import { buildMentionRegexes, matchesMentionWithExplicit } from "openclaw/plugin-sdk/reply-runtime";
 import type { FinalizedMsgContext } from "openclaw/plugin-sdk/reply-runtime";
 import { resolveAgentRoute } from "openclaw/plugin-sdk/routing";
 import { resolveThreadSessionKeys } from "openclaw/plugin-sdk/routing";
@@ -34,6 +41,7 @@ import { hasSlackThreadParticipation } from "../../sent-thread-cache.js";
 import { resolveSlackThreadContext } from "../../threading.js";
 import type { SlackMessageEvent } from "../../types.js";
 import {
+  normalizeAllowListLower,
   normalizeSlackAllowOwnerEntry,
   resolveSlackAllowListMatch,
   resolveSlackUserAllowed,
@@ -433,6 +441,20 @@ export async function prepareSlackMessage(params: {
   }).allowed;
   const channelUsersAllowlistConfigured =
     isRoom && Array.isArray(channelConfig?.users) && channelConfig.users.length > 0;
+  const threadContextAllowFromLower = isRoom
+    ? channelUsersAllowlistConfigured
+      ? normalizeAllowListLower(channelConfig?.users)
+      : []
+    : isDirectMessage
+      ? ctx.dmPolicy === "open"
+        ? []
+        : allowFromLower
+      : [];
+  const contextVisibilityMode = resolveChannelContextVisibilityMode({
+    cfg: ctx.cfg,
+    channel: "slack",
+    accountId: account.accountId,
+  });
   const channelCommandAuthorized =
     isRoom && channelUsersAllowlistConfigured
       ? resolveSlackUserAllowed({
@@ -552,8 +574,12 @@ export async function prepareSlackMessage(params: {
     );
 
   const ackReactionMessageTs = message.ts;
+  const statusReactionsWillHandle =
+    Boolean(ackReactionMessageTs) &&
+    cfg.messages?.statusReactions?.enabled !== false &&
+    shouldAckReaction();
   const ackReactionPromise =
-    shouldAckReaction() && ackReactionMessageTs && ackReactionValue
+    !statusReactionsWillHandle && shouldAckReaction() && ackReactionMessageTs && ackReactionValue
       ? reactSlackMessage(message.channel, ackReactionMessageTs, ackReactionValue, {
           token: ctx.botToken,
           client: ctx.app.client,
@@ -564,7 +590,9 @@ export async function prepareSlackMessage(params: {
             return false;
           },
         )
-      : null;
+      : statusReactionsWillHandle
+        ? Promise.resolve(true)
+        : null;
 
   const roomLabel = channelName ? `#${channelName}` : `#${message.channel}`;
   const senderName = await resolveSenderName();
@@ -660,6 +688,9 @@ export async function prepareSlackMessage(params: {
     roomLabel,
     storePath,
     sessionKey,
+    allowFromLower: threadContextAllowFromLower,
+    allowNameMatching: ctx.allowNameMatching,
+    contextVisibilityMode,
     envelopeOptions,
     effectiveDirectMedia,
   });
@@ -692,7 +723,7 @@ export async function prepareSlackMessage(params: {
     ChatType: isDirectMessage ? "direct" : "channel",
     ConversationLabel: envelopeFrom,
     GroupSubject: isRoomish ? roomLabel : undefined,
-    GroupSystemPrompt: isRoomish ? groupSystemPrompt : undefined,
+    GroupSystemPrompt: groupSystemPrompt,
     UntrustedContext: untrustedChannelMetadata ? [untrustedChannelMetadata] : undefined,
     SenderName: senderName,
     SenderId: senderId,

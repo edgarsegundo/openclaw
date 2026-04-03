@@ -1,17 +1,22 @@
 import {
-  buildOauthProviderAuthResult,
   definePluginEntry,
   type ProviderAuthContext,
   type ProviderAuthResult,
   type ProviderCatalogContext,
-} from "openclaw/plugin-sdk/minimax-portal-auth";
+} from "openclaw/plugin-sdk/plugin-entry";
 import {
   MINIMAX_OAUTH_MARKER,
-  createProviderApiKeyAuthMethod,
   ensureAuthProfileStore,
   listProfilesForProvider,
 } from "openclaw/plugin-sdk/provider-auth";
+import { buildOauthProviderAuthResult } from "openclaw/plugin-sdk/provider-auth";
+import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-auth-api-key";
 import { fetchMinimaxUsage } from "openclaw/plugin-sdk/provider-usage";
+import { isMiniMaxModernModelId, MINIMAX_DEFAULT_MODEL_ID } from "./api.js";
+import {
+  buildMinimaxImageGenerationProvider,
+  buildMinimaxPortalImageGenerationProvider,
+} from "./image-generation-provider.js";
 import {
   minimaxMediaUnderstandingProvider,
   minimaxPortalMediaUnderstandingProvider,
@@ -23,7 +28,7 @@ import { buildMinimaxPortalProvider, buildMinimaxProvider } from "./provider-cat
 const API_PROVIDER_ID = "minimax";
 const PORTAL_PROVIDER_ID = "minimax-portal";
 const PROVIDER_LABEL = "MiniMax";
-const DEFAULT_MODEL = "MiniMax-M2.7";
+const DEFAULT_MODEL = MINIMAX_DEFAULT_MODEL_ID;
 const DEFAULT_BASE_URL_CN = "https://api.minimaxi.com/anthropic";
 const DEFAULT_BASE_URL_GLOBAL = "https://api.minimax.io/anthropic";
 
@@ -37,11 +42,6 @@ function apiModelRef(modelId: string): string {
 
 function portalModelRef(modelId: string): string {
   return `${PORTAL_PROVIDER_ID}/${modelId}`;
-}
-
-function isModernMiniMaxModel(modelId: string): boolean {
-  const lower = modelId.trim().toLowerCase();
-  return lower.startsWith("minimax-m2.7") || lower.startsWith("minimax-m2.5");
 }
 
 function buildPortalProviderCatalog(params: { baseUrl: string; apiKey: string }) {
@@ -135,13 +135,6 @@ function createOAuthHandler(region: MiniMaxRegion) {
                 [portalModelRef("MiniMax-M2.7-highspeed")]: {
                   alias: "minimax-m2.7-highspeed",
                 },
-                [portalModelRef("MiniMax-M2.5")]: { alias: "minimax-m2.5" },
-                [portalModelRef("MiniMax-M2.5-highspeed")]: {
-                  alias: "minimax-m2.5-highspeed",
-                },
-                [portalModelRef("MiniMax-M2.5-Lightning")]: {
-                  alias: "minimax-m2.5-lightning",
-                },
               },
             },
           },
@@ -173,7 +166,9 @@ export default definePluginEntry({
       id: API_PROVIDER_ID,
       label: PROVIDER_LABEL,
       docsPath: "/providers/minimax",
+      aliases: ["minimax-cn"],
       envVars: ["MINIMAX_API_KEY"],
+      resolveReasoningOutputMode: () => "native",
       auth: [
         createProviderApiKeyAuthMethod({
           providerId: API_PROVIDER_ID,
@@ -234,16 +229,20 @@ export default definePluginEntry({
         });
         return apiKey ? { token: apiKey } : null;
       },
-      isModernModelRef: ({ modelId }) => isModernMiniMaxModel(modelId),
+      isModernModelRef: ({ modelId }) => isMiniMaxModernModelId(modelId),
       fetchUsageSnapshot: async (ctx) =>
         await fetchMinimaxUsage(ctx.token, ctx.timeoutMs, ctx.fetchFn),
     });
+
+    api.registerMediaUnderstandingProvider(minimaxMediaUnderstandingProvider);
+    api.registerMediaUnderstandingProvider(minimaxPortalMediaUnderstandingProvider);
 
     api.registerProvider({
       id: PORTAL_PROVIDER_ID,
       label: PROVIDER_LABEL,
       docsPath: "/providers/minimax",
       envVars: ["MINIMAX_OAUTH_TOKEN", "MINIMAX_API_KEY"],
+      resolveReasoningOutputMode: () => "native",
       catalog: {
         run: async (ctx) => resolvePortalCatalog(ctx),
       },
@@ -279,9 +278,9 @@ export default definePluginEntry({
           run: createOAuthHandler("cn"),
         },
       ],
-      isModernModelRef: ({ modelId }) => isModernMiniMaxModel(modelId),
+      isModernModelRef: ({ modelId }) => isMiniMaxModernModelId(modelId),
     });
-    api.registerMediaUnderstandingProvider(minimaxMediaUnderstandingProvider);
-    api.registerMediaUnderstandingProvider(minimaxPortalMediaUnderstandingProvider);
+    api.registerImageGenerationProvider(buildMinimaxImageGenerationProvider());
+    api.registerImageGenerationProvider(buildMinimaxPortalImageGenerationProvider());
   },
 });

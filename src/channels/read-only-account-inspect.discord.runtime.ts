@@ -1,8 +1,9 @@
-import { inspectDiscordAccount as inspectDiscordAccountImpl } from "openclaw/plugin-sdk/discord";
+import { inspectDiscordAccount as inspectDiscordAccountImpl } from "../plugin-sdk/discord-surface.js";
 
-export type { InspectedDiscordAccount } from "openclaw/plugin-sdk/discord";
+export type { InspectedDiscordAccount } from "../plugin-sdk/discord-surface.js";
 
-type InspectDiscordAccount = typeof import("openclaw/plugin-sdk/discord").inspectDiscordAccount;
+type InspectDiscordAccount =
+  typeof import("../plugin-sdk/discord-surface.js").inspectDiscordAccount;
 
 export function inspectDiscordAccount(
   ...args: Parameters<InspectDiscordAccount>
