@@ -7,6 +7,13 @@ import dotenv from "dotenv";
 import inquirer from "inquirer";
 import { initDb, insertRun } from "./db.js";
 import logger from "./logger.js";
+import { hasPromptTemplates, listTemplateNames, loadTemplateConfig } from "./prompt-loader.js";
+import {
+  selectTemplate,
+  prepareTemplateInputs,
+  buildRunPromptFn,
+  buildDryRunPromptPreview,
+} from "./prompt-runner.js";
 import { loadConfig, validateConfig } from "./validator.js";
 
 // ── Paths ────────────────────────────────────────────────────────────────────
@@ -15,13 +22,108 @@ const LIB_DIR = path.dirname(new URL(import.meta.url).pathname);
 const ROOT = path.join(LIB_DIR, "..");
 const TASKS_DIR = path.join(ROOT, "tasks");
 const LOGS_DIR = path.join(ROOT, "logs");
+const ARTIFACTS_DIR = path.join(ROOT, "artifacts");
+
+// ── Artifact helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Resolve inputs of type: artifact by loading JSON files from the artifacts/ directory.
+ * Returns a plain object of { inputName: parsedObject | null }.
+ */
+function resolveArtifactInputs(inputs) {
+  const result = {};
+  if (!inputs) {
+    return result;
+  }
+
+  for (const input of inputs) {
+    if (input.type !== "artifact") {
+      continue;
+    }
+
+    const fromTask = input.from_task;
+    const artifactName = input.artifact;
+
+    if (!fromTask || !artifactName) {
+      logger.warn(
+        `Input "${input.name}" is type artifact but missing from_task or artifact field.`,
+      );
+      result[input.name] = null;
+      continue;
+    }
+
+    // Resolve the artifact path via the from_task's config
+    const fromTaskDir = path.join(TASKS_DIR, fromTask);
+    let artifactFile;
+    try {
+      const fromConfig = loadConfig(fromTaskDir);
+      const decl = (fromConfig.artifacts || []).find((a) => a.name === artifactName);
+      if (!decl) {
+        logger.warn(
+          `Input "${input.name}": artifact "${artifactName}" not declared in ${fromTask} config.`,
+        );
+        artifactFile = null;
+      } else {
+        artifactFile = path.join(ARTIFACTS_DIR, fromTask, decl.path);
+      }
+    } catch {
+      logger.warn(`Input "${input.name}": could not load config for task "${fromTask}".`);
+      artifactFile = null;
+    }
+
+    if (!artifactFile || !fs.existsSync(artifactFile)) {
+      if (input.required) {
+        throw new Error(
+          `Required artifact input "${input.name}" not found at ${artifactFile ?? "(unknown path)"}`,
+        );
+      }
+      result[input.name] = null;
+      continue;
+    }
+
+    try {
+      result[input.name] = JSON.parse(fs.readFileSync(artifactFile, "utf8"));
+    } catch (err) {
+      throw new Error(`Failed to parse artifact at ${artifactFile}: ${err.message}`, {
+        cause: err,
+      });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Save an artifact to the artifacts/ directory.
+ * If the artifact name is declared in the task config, use its declared path.
+ * Otherwise warn and save to artifacts/<taskName>/<name>.json.
+ */
+function saveArtifactFn(taskName, config) {
+  return function saveArtifact(name, data) {
+    const decl = (config.artifacts || []).find((a) => a.name === name);
+    if (!decl) {
+      logger.warn(
+        `saveArtifact: "${name}" is not declared in artifacts config. Saving to ${name}.json.`,
+      );
+    }
+    const savePath = decl
+      ? path.join(ARTIFACTS_DIR, taskName, decl.path)
+      : path.join(ARTIFACTS_DIR, taskName, `${name}.json`);
+
+    fs.mkdirSync(path.dirname(savePath), { recursive: true });
+    fs.writeFileSync(savePath, JSON.stringify(data, null, 2), "utf8");
+    logger.success(`Artifact saved: ${path.relative(ROOT, savePath)}`);
+  };
+}
 
 // ── .env loader ──────────────────────────────────────────────────────────────
 
 function loadDotEnv(taskDir) {
-  // Root .env first (lower priority)
+  // ai-client/.env — shared AI provider keys (lowest priority)
+  dotenv.config({ path: path.join(ROOT, "..", "ai-client", ".env") });
+  // cron-manager root .env
   dotenv.config({ path: path.join(ROOT, ".env") });
-  // Task .env second (overrides root, but never overrides shell env)
+  // task-specific .env (highest priority, never overrides shell env)
   dotenv.config({ path: path.join(taskDir, ".env") });
 }
 
@@ -259,6 +361,7 @@ function writeLogFile(taskName, executionId, startedAt, lines) {
 export async function runTask(taskName, options = {}) {
   const mode = options.mode || "manual";
   const isDryRun = options.dryRun || false;
+  const templateOption = options.template || null;
 
   // Load and validate config
   const taskDir = getTaskDir(taskName);
@@ -293,9 +396,24 @@ export async function runTask(taskName, options = {}) {
   // Resolve env vars
   const { resolved: envVars, missing: missingEnv } = resolveEnvVars(config.env_vars, mode);
 
-  // Dry run
+  // Dry run — show task + optional template info, no inputs prompted, no API calls
   if (isDryRun) {
-    printDryRun(taskName, config, envVars, missingEnv);
+    let dryTemplate = null;
+    let dryTemplateConfig = null;
+    if (templateOption || hasPromptTemplates(taskDir)) {
+      try {
+        // For dry run, only do interactive selection if there's no --template flag
+        // to avoid bothering the user when they just want a quick config check.
+        // If --template was passed, validate and show it; otherwise list what's available.
+        if (templateOption) {
+          dryTemplate = templateOption;
+          dryTemplateConfig = loadTemplateConfig(taskDir, dryTemplate);
+        }
+      } catch (err) {
+        logger.warn(`Template info: ${err.message}`);
+      }
+    }
+    printDryRun(taskName, config, envVars, missingEnv, dryTemplate, dryTemplateConfig, taskDir);
     return;
   }
 
@@ -307,7 +425,10 @@ export async function runTask(taskName, options = {}) {
   // Resolve inputs
   let inputs;
   if (mode === "cron") {
-    const { result, missing: missingInputs } = resolveInputsForCron(config.inputs);
+    const { result, missing: missingInputs } = resolveInputsForCron(
+      // Skip artifact-type inputs — they don't go through cron default resolution
+      (config.inputs || []).filter((i) => i.type !== "artifact"),
+    );
     if (missingInputs.length > 0) {
       for (const name of missingInputs) {
         logger.error(`Missing required input "${name}" for cron mode (no default defined).`);
@@ -316,13 +437,56 @@ export async function runTask(taskName, options = {}) {
     }
     inputs = result;
   } else {
-    inputs = await promptInputs(config.inputs);
+    inputs = await promptInputs((config.inputs || []).filter((i) => i.type !== "artifact"));
   }
 
-  // Build context
+  // Resolve artifact inputs (type: artifact — loaded from artifacts/ directory)
+  const artifactInputs = resolveArtifactInputs(config.inputs);
+  Object.assign(inputs, artifactInputs);
+
+  // Template selection
   const executionId = randomUUID();
   const startedAt = new Date().toISOString();
 
+  let selectedTemplate = null;
+  let runPrompt;
+
+  if (hasPromptTemplates(taskDir) || templateOption) {
+    try {
+      selectedTemplate = await selectTemplate(taskDir, templateOption, mode);
+    } catch (err) {
+      logger.error(err.message);
+      process.exit(1);
+    }
+  }
+
+  if (selectedTemplate) {
+    const templateConfig = loadTemplateConfig(taskDir, selectedTemplate);
+    let preparedTemplateInputs;
+    try {
+      preparedTemplateInputs = await prepareTemplateInputs(templateConfig, mode);
+    } catch (err) {
+      logger.error(err.message);
+      process.exit(1);
+    }
+
+    const contextFields = { taskName, mode, executionId };
+    try {
+      runPrompt = await buildRunPromptFn(
+        taskDir,
+        selectedTemplate,
+        templateConfig,
+        inputs,
+        preparedTemplateInputs,
+        contextFields,
+      );
+    } catch (err) {
+      logger.error(`Failed to build runPrompt: ${err.message}`);
+      process.exit(1);
+    }
+  }
+
+  // Build context
   const context = {
     taskName,
     config,
@@ -330,6 +494,12 @@ export async function runTask(taskName, options = {}) {
     inputs,
     mode,
     executionId,
+    runPrompt:
+      runPrompt ??
+      (() => {
+        throw new Error("No prompt template selected for this run.");
+      }),
+    saveArtifact: saveArtifactFn(taskName, config),
   };
 
   // Init DB
@@ -431,7 +601,15 @@ export async function runTask(taskName, options = {}) {
 
 // ── Dry-run printer ──────────────────────────────────────────────────────────
 
-function printDryRun(taskName, config, envVars, missingEnv) {
+function printDryRun(
+  taskName,
+  config,
+  envVars,
+  missingEnv,
+  selectedTemplate,
+  templateConfig,
+  taskDir,
+) {
   logger.header(`[DRY RUN] Task: ${taskName}`);
 
   logger.step(`Entrypoint:   ${chalk.white(config.entrypoint)}`);
@@ -469,6 +647,41 @@ function printDryRun(taskName, config, envVars, missingEnv) {
       const req = input.required ? chalk.red(" (required)") : "";
       const def = input.default != null ? chalk.gray(` [default: ${input.default}]`) : "";
       logger.step(`  ${chalk.cyan(input.name)} [${input.type || "string"}]${req}${def}`);
+    }
+  }
+
+  // Prompt templates section
+  const templateNames = listTemplateNames(taskDir);
+  if (templateNames.length > 0) {
+    console.log();
+    if (selectedTemplate && templateConfig) {
+      logger.step(`Prompt template: ${chalk.cyan(selectedTemplate)}`);
+      logger.step(
+        `  Provider: ${chalk.white(templateConfig.provider)} / ${chalk.white(templateConfig.model)}`,
+      );
+      const inputs = templateConfig.inputs || [];
+      if (inputs.length > 0) {
+        logger.step(`  Inputs (${inputs.length}):`);
+        for (const inp of inputs) {
+          const req = inp.required ? chalk.red(" (required)") : "";
+          const def = inp.default != null ? chalk.gray(` [default: ${inp.default}]`) : "";
+          logger.step(`    ${chalk.cyan(inp.name)} [${inp.type || "string"}]${req}${def}`);
+        }
+      }
+      console.log();
+      logger.step("  Prompt preview (unresolved vars shown as [name]):");
+      const preview = buildDryRunPromptPreview(taskDir, selectedTemplate, templateConfig);
+      const previewLines = preview.split("\n").slice(0, 10);
+      for (const line of previewLines) {
+        logger.step(`    ${chalk.gray(line)}`);
+      }
+      if (preview.split("\n").length > 10) {
+        logger.step(chalk.gray("    ... (truncated)"));
+      }
+    } else {
+      logger.step(
+        `Prompt templates available: ${templateNames.map((n) => chalk.cyan(n)).join(", ")} (use --template <name>)`,
+      );
     }
   }
 

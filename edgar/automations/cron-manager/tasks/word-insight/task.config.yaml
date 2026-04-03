@@ -1,0 +1,59 @@
+schema_version: 1
+
+name: word-insight
+description: Analyze a word using AI — definition, synonyms, antonyms, example sentence
+created_at: "2026-04-02"
+allow_manual: true
+allow_cron: true
+entrypoint: node index.js
+working_dir: ./tasks/word-insight
+
+inputs:
+  - name: word
+    type: string
+    required: true
+    help_tip: The word you want to analyze (e.g. "ephemeral")
+  - name: language
+    type: string
+    required: false
+    default: English
+    help_tip: Language context for the analysis (e.g. English, Portuguese)
+
+artifacts:
+  # ── Artifact registry ────────────────────────────────────────────────────────
+  # DOCUMENTATION ONLY — the runner does not enforce paths declared here.
+  # This section exists so that other tasks know what files this task produces
+  # and where to find them when declaring `type: artifact` inputs.
+  #
+  # Fields:
+  #   name        — logical id used in saveArtifact("name", data) inside index.js
+  #   description — what the artifact contains
+  #   template    — which prompt template produces it (informational)
+  #   path        — file path relative to artifacts/<task-name>/
+  #                 for dynamic paths (one file per run), use a pattern like
+  #                 "article-{slug}.json" and add path_key + dynamic: true
+  #   dynamic     — (optional) true if filename varies per execution
+  #   path_key    — (optional) artifact field used to build the dynamic filename
+  #
+  # How a consuming task declares this as input:
+  #
+  #   inputs:
+  #     - name: word_data
+  #       type: artifact
+  #       from_task: word-insight   # task that produced it
+  #       artifact: analysis        # matches "name" below — runner resolves the path
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: analysis
+    description: Structured word analysis — definition, part of speech, synonyms, antonyms, example sentence
+    template: analyze-word
+    path: analysis.json
+
+  # Example of a dynamic artifact (one file per execution):
+  #
+  # - name: article
+  #   description: Blog article with metadata
+  #   template: write-article
+  #   path: "article-{slug}.json"  # slug is built from artifact.title at runtime
+  #   dynamic: true
+  #   path_key: title              # artifact field used to generate the slug
+  #   # produced by: index.js → runPrompt() → saveArtifact(`article-${slug}`, artifact)

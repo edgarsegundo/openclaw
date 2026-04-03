@@ -1,29 +1,114 @@
 schema_version: 1
 
+# ── Identity ──────────────────────────────────────────────────────────────────
 name: "{{NAME}}"
 description: "{{DESCRIPTION}}"
 author: ""
 created_at: "{{DATE}}"
-tags: []
+tags: []                        # free-form tags for filtering/searching
 
-allow_manual: {{ALLOW_MANUAL}}
-allow_cron: {{ALLOW_CRON}}
+# ── Execution control ─────────────────────────────────────────────────────────
+allow_manual: {{ALLOW_MANUAL}}  # can be triggered interactively
+allow_cron: {{ALLOW_CRON}}      # can be triggered by a cron job
 
-cron_suggestion: "{{CRON_SUGGESTION}}"
+cron_suggestion: "{{CRON_SUGGESTION}}"  # e.g. "0 8 * * 1-5" (weekdays at 8am)
 
 entrypoint: node index.js
 working_dir: ./tasks/{{NAME}}
 
-timeout_seconds:
+# ── Limits ────────────────────────────────────────────────────────────────────
+timeout_seconds:                # leave blank for no timeout
 
 retry:
-  max_retries: 0
-  delay_seconds: 5
-  backoff: linear
+  max_retries: 0                # number of retries on failure
+  delay_seconds: 5              # wait between retries
+  backoff: linear               # linear | exponential
 
+# ── Environment variables ─────────────────────────────────────────────────────
+# Declare env vars your task needs. The runner will warn if they are missing.
+# Keys are loaded from (in order, lowest → highest priority):
+#   ai-client/.env → cron-manager/.env → tasks/{{NAME}}/.env → shell env
+#
+# Scopes:
+#   common → required in both manual and cron runs
+#   manual → only validated in manual runs
+#   cron   → only validated in cron runs
 env_vars:
   common: []
+    # Example:
+    # - name: MY_API_KEY
+    #   required: true
+    #   help_tip: API key for the external service
   manual: []
   cron: []
 
+# ── Inputs ────────────────────────────────────────────────────────────────────
+# Inputs are collected interactively (manual) or read from defaults (cron).
+# Available types: string | number | boolean | date | artifact
+#
+# For type: artifact — loads a JSON file produced by another task:
+#   - name: previous_result
+#     type: artifact
+#     from_task: other-task-name    # task that produced it
+#     artifact: result              # matches "name" in that task's artifacts list
+#
+# Inputs are available in index.js as context.inputs.<name>
+# They are also injected as {{name}} variables in prompt templates.
 inputs: []
+  # Examples:
+  # - name: topic
+  #   type: string
+  #   required: true
+  #   help_tip: The topic to process (e.g. "renewable energy")
+  #
+  # - name: language
+  #   type: string
+  #   required: false
+  #   default: English
+  #   help_tip: Output language (e.g. English, Portuguese)
+  #
+  # - name: max_items
+  #   type: number
+  #   required: false
+  #   default: 5
+  #   help_tip: Maximum number of items to return
+  #
+  # - name: verbose
+  #   type: boolean
+  #   required: false
+  #   default: false
+  #   help_tip: Enable verbose output
+
+# ── Artifacts ─────────────────────────────────────────────────────────────────
+# DOCUMENTATION ONLY — the runner does not enforce paths declared here.
+# Describes what files this task produces so consuming tasks know where to look.
+#
+# Fields:
+#   name        — id used in saveArtifact("name", data) inside index.js
+#   description — what the artifact contains
+#   template    — prompt template that produces it (informational)
+#   path        — file path relative to artifacts/{{NAME}}/
+#                 for dynamic paths use a pattern: "article-{slug}.json"
+#   dynamic     — (optional) true if filename changes per execution
+#   path_key    — (optional) artifact field used to build the dynamic filename
+#
+# How another task consumes this artifact:
+#   inputs:
+#     - name: my_data
+#       type: artifact
+#       from_task: {{NAME}}
+#       artifact: result          # matches "name" below
+#
+# artifacts:
+#   - name: result
+#     description: Main output of this task
+#     template: my-template
+#     path: result.json
+#
+#   # Dynamic example (one file per execution, named after a field):
+#   - name: article
+#     description: Generated article
+#     template: write-article
+#     path: "article-{slug}.json"
+#     dynamic: true
+#     path_key: title             # artifact.title is slugified → filename

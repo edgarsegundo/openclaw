@@ -1,0 +1,26 @@
+schema_version: 1
+
+name: analyze-word
+description: Deep analysis of a word — definition, synonyms, antonyms, example
+
+provider: openai
+model: gpt-4o-mini
+
+system_prompt_file: system.md
+user_prompt_file: user.md
+
+inputs:
+  - name: depth
+    type: string
+    default: detailed
+    help_tip: "Analysis depth — brief or detailed"
+
+options:
+  temperature: 0.3
+  # max_tokens omitted — model uses its full default limit (~16k tokens for gpt-4o-mini)
+  # set explicitly when you need a hard cap, e.g. max_tokens: 500
+  # max_tokens: 500
+  timeout_ms: 20000
+  max_retries: 2
+
+# Output structure is defined in schema.js — no description needed here.
