@@ -1,0 +1,52 @@
+schema_version: 1
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+name: my-template
+description: "What this template does"
+
+# ── AI provider ───────────────────────────────────────────────────────────────
+# provider: openai      → uses OPENAI_API_KEY from ai-client/.env
+# provider: perplexity  → uses PERPLEXITY_API_KEY from ai-client/.env
+#                          (also has web search capability)
+provider: openai
+model: gpt-4o-mini
+
+# ── Prompt files ──────────────────────────────────────────────────────────────
+# system.md  — defines the AI's role/persona (keep it short and focused)
+# user.md    — the actual request; use {{variable}} for dynamic values
+#
+# Variables available in both files (no extra config needed):
+#   {{<input_name>}}  — any input declared in task.config.yaml inputs[]
+#   {{<input_name>}}  — any input declared in this template's inputs[] below
+#
+# Extra vars can be passed at call time from index.js:
+#   await runPrompt({ date_today: new Date().toISOString() })
+system_prompt_file: system.md
+user_prompt_file: user.md
+
+# ── Template-specific inputs (optional) ───────────────────────────────────────
+# Inputs declared here are asked AFTER the task inputs, specific to this template.
+# Task inputs (from task.config.yaml) are already available as {{variables}} —
+# you do NOT need to redeclare them here.
+#
+# Only add inputs that are meaningful specifically to this template, not the task.
+# Example: analysis depth, output style, etc.
+inputs: []
+  # - name: depth
+  #   type: string           # string | number | boolean
+  #   required: false
+  #   default: detailed
+  #   help_tip: "Output depth — brief or detailed"
+
+# ── Options ───────────────────────────────────────────────────────────────────
+options:
+  temperature: 0.7          # 0.0 (deterministic) → 1.0 (creative)
+  # max_tokens omitted → model uses its full default limit (~16k for gpt-4o-mini)
+  # set explicitly when you need a hard cap, e.g. for short structured outputs:
+  # max_tokens: 1000
+  timeout_ms: 30000         # increase for long outputs (articles, reports)
+  max_retries: 2
+
+# Output structure is defined in schema.js — no description needed here.
+# The schema is sent to the API as json_schema (guaranteed structure)
+# and also used by Zod as a final validation safety net.
