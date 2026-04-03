@@ -1,17 +1,4 @@
-Segue seu prompt **refatorado completo**, já preparado para uso com API (ex: Perplexity com web search), incorporando:
-
-- SEO real (intenção + SERP)
-- UX (escaneabilidade + decisão)
-- Conversão (sem parecer venda)
-- Estrutura narrativa (mantida)
-- Output pronto pra produção
-
----
-
-# 🚀 PROMPT FINAL OTIMIZADO
-
-````md
-{{topic}} em {{language}}.
+{{title}} em {{language}}.
 
 Você é um especialista em **imigração internacional, SEO e criação de conteúdo estratégico**, com capacidade de utilizar **informações atualizadas da web** para gerar conteúdos altamente confiáveis, completos e competitivos.
 

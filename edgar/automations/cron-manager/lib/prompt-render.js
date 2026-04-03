@@ -1,14 +1,35 @@
 /**
+ * Resolve a dot-notation key (e.g. "cluster.allSlugs") against a vars object.
+ * Falls back to a flat lookup first so plain keys still work.
+ */
+function resolveDotNotation(vars, key) {
+  // Try flat key first (covers simple cases and avoids splitting "my.key" accidentally)
+  if (key in vars) return vars[key];
+  // Walk dot path
+  const parts = key.split(".");
+  let cur = vars;
+  for (const part of parts) {
+    if (cur == null || typeof cur !== "object") return undefined;
+    cur = cur[part];
+  }
+  return cur;
+}
+
+/**
  * Renders a prompt template by replacing {{variable}} placeholders.
+ * Supports dot-notation keys (e.g. {{cluster.allSlugs}}).
  * vars: plain object of string-keyed values.
  */
 export function renderPrompt(templateText, vars = {}) {
   return templateText.replace(/\{\{(\s*[\w.]+\s*)\}\}/g, (match, key) => {
     const k = key.trim();
-    const value = vars[k];
+    const value = resolveDotNotation(vars, k);
     if (value === undefined || value === null) {
       return match;
     } // leave unresolved for warning
+    if (Array.isArray(value)) {
+      return value.join(", ");
+    }
     return String(value);
   });
 }

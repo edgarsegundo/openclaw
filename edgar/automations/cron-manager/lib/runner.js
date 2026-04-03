@@ -362,6 +362,7 @@ export async function runTask(taskName, options = {}) {
   const mode = options.mode || "manual";
   const isDryRun = options.dryRun || false;
   const templateOption = options.template || null;
+  const inputFile = options.inputFile || null;
 
   // Load and validate config
   const taskDir = getTaskDir(taskName);
@@ -424,7 +425,19 @@ export async function runTask(taskName, options = {}) {
 
   // Resolve inputs
   let inputs;
-  if (mode === "cron") {
+  if (inputFile) {
+    if (!fs.existsSync(inputFile)) {
+      logger.error(`Input file not found: ${inputFile}`);
+      process.exit(1);
+    }
+    try {
+      inputs = JSON.parse(fs.readFileSync(inputFile, "utf8"));
+      logger.info(`Inputs loaded from: ${inputFile}`);
+    } catch (err) {
+      logger.error(`Failed to parse input file: ${err.message}`);
+      process.exit(1);
+    }
+  } else if (mode === "cron") {
     const { result, missing: missingInputs } = resolveInputsForCron(
       // Skip artifact-type inputs — they don't go through cron default resolution
       (config.inputs || []).filter((i) => i.type !== "artifact"),

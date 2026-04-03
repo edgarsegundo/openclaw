@@ -54,59 +54,18 @@ env_vars:
 #
 # Inputs are available in index.js as context.inputs.<name>
 # They are also injected as {{name}} variables in prompt templates.
-inputs:
-  - name: title
-    type: string
-    required: true
-    help_tip: Título do artigo
-  - name: slug
-    type: string
-    required: true
-    help_tip: Slug do artigo (kebab-case, sem acento)
-  - name: keyword
-    type: string
-    required: true
-    help_tip: Palavra-chave principal
-  - name: intent
-    type: string
-    required: true
-    help_tip: Intenção do artigo (ex: informational)
-  - name: language
-    type: string
-    required: true
-    help_tip: Idioma do artigo (ex: pt-BR)
-  - name: cluster
-    type: object
-    required: true
-    help_tip: Cluster de slugs relacionados
-    fields:
-      - name: allSlugs
-        type: array
-        required: true
-        help_tip: Lista de slugs relacionados
-  # Examples:
-  # - name: topic
-  #   type: string
-  #   required: true
-  #   help_tip: The topic to process (e.g. "renewable energy")
-  #
-  # - name: language
-  #   type: string
-  #   required: false
-  #   default: English
-  #   help_tip: Output language (e.g. English, Portuguese)
-  #
-  # - name: max_items
-  #   type: number
-  #   required: false
-  #   default: 5
-  #   help_tip: Maximum number of items to return
-  #
-  # - name: verbose
-  #   type: boolean
-  #   required: false
-  #   default: false
-  #   help_tip: Enable verbose output
+# ── Inputs ────────────────────────────────────────────────────────────────────
+# Inputs are passed via --input-file <path> (JSON file) when running this task.
+# Expected JSON shape:
+#   {
+#     "title":    "Guia Completo para Obter o Visto Americano",
+#     "slug":     "guia-visto-americano-turismo",
+#     "keyword":  "visto americano de turismo",
+#     "intent":   "informational",
+#     "language": "pt-BR",
+#     "cluster":  { "allSlugs": ["slug-1", "slug-2"] }
+#   }
+inputs: []
 
 # ── Artifacts ─────────────────────────────────────────────────────────────────
 # DOCUMENTATION ONLY — the runner does not enforce paths declared here.
