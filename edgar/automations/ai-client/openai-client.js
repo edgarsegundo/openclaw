@@ -47,9 +47,7 @@ export class OpenAIClient extends BaseClient {
     logger = console,
   }) {
     super({ maxRetries, timeoutMs, logger });
-    if (!apiKey) {
-      throw new Error("OpenAIClient: apiKey is required.");
-    }
+    if (!apiKey) {throw new Error("OpenAIClient: apiKey is required.");}
     this.openai = new OpenAI({ apiKey });
     this.model = model;
     this.defaultTemperature = defaultTemperature;
@@ -65,12 +63,10 @@ export class OpenAIClient extends BaseClient {
    * @returns {Promise<string>}
    */
   async generateText({ userPrompt, systemPrompt, temperature }) {
-    if (!userPrompt) {
-      throw new Error("OpenAIClient.generateText: userPrompt is required.");
-    }
+    if (!userPrompt) {throw new Error("OpenAIClient.generateText: userPrompt is required.");}
     const messages = this._buildMessages(systemPrompt, userPrompt);
     return this._withTimeout(() =>
-      this._chat({ messages, temperature: temperature ?? this.defaultTemperature }),
+      this._chat({ messages, temperature: temperature ?? this.defaultTemperature })
     );
   }
 
@@ -86,9 +82,7 @@ export class OpenAIClient extends BaseClient {
    * @returns {Promise<object>}
    */
   async generateStructured({ userPrompt, systemPrompt, zodSchema, temperature }) {
-    if (!userPrompt) {
-      throw new Error("OpenAIClient.generateStructured: userPrompt is required.");
-    }
+    if (!userPrompt) {throw new Error("OpenAIClient.generateStructured: userPrompt is required.");}
     if (!zodSchema || !(zodSchema instanceof z.ZodType)) {
       throw new Error("OpenAIClient.generateStructured: valid Zod schema is required.");
     }
@@ -101,7 +95,7 @@ export class OpenAIClient extends BaseClient {
           messages,
           temperature: temperature ?? this.defaultTemperature,
           responseFormat: { type: "json_object" },
-        }),
+        })
       );
 
       let parsed;
@@ -113,17 +107,13 @@ export class OpenAIClient extends BaseClient {
       }
 
       const validation = zodSchema.safeParse(parsed);
-      if (validation.success) {
-        return validation.data;
-      }
+      if (validation.success) {return validation.data;}
 
       this.logger.warn?.("[OpenAIClient] Schema validation failed, requesting field repair...");
       parsed = await this._repairFields(userPrompt, parsed, validation.error);
 
       const finalValidation = zodSchema.safeParse(parsed);
-      if (finalValidation.success) {
-        return finalValidation.data;
-      }
+      if (finalValidation.success) {return finalValidation.data;}
 
       throw finalValidation.error;
     }, `model: ${this.model}`);
@@ -133,9 +123,7 @@ export class OpenAIClient extends BaseClient {
 
   async _chat({ messages, temperature, responseFormat }) {
     const params = { model: this.model, temperature, messages };
-    if (responseFormat) {
-      params.response_format = responseFormat;
-    }
+    if (responseFormat) {params.response_format = responseFormat;}
     const res = await this.openai.chat.completions.create(params);
     return res.choices[0].message.content;
   }
@@ -147,7 +135,7 @@ export class OpenAIClient extends BaseClient {
         messages: [{ role: "user", content: repairPrompt }],
         temperature: 0,
         responseFormat: { type: "json_object" },
-      }),
+      })
     );
     try {
       return JSON.parse(extractJson(fixed));
@@ -174,7 +162,7 @@ Fix ONLY the invalid or missing fields. Return ONLY valid JSON, no explanations.
         messages: [{ role: "user", content: repairPrompt }],
         temperature: 0,
         responseFormat: { type: "json_object" },
-      }),
+      })
     );
     try {
       return JSON.parse(extractJson(fixed));

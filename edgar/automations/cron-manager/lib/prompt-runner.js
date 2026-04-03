@@ -1,7 +1,6 @@
-import inquirer from "inquirer";
 import OpenAI from "openai";
 import { z } from "zod";
-import logger from "./logger.js";
+import inquirer from "inquirer";
 import {
   listTemplateNames,
   loadUserPrompt,
@@ -9,22 +8,19 @@ import {
   loadZodSchema,
 } from "./prompt-loader.js";
 import { renderPrompt, mergeVars, warnUnresolvedVars } from "./prompt-render.js";
+import logger from "./logger.js";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 function buildClient(provider) {
   if (provider === "openai") {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not set.");
-    }
+    if (!apiKey) {throw new Error("OPENAI_API_KEY is not set.");}
     return new OpenAI({ apiKey });
   }
   if (provider === "perplexity") {
     const apiKey = process.env.PERPLEXITY_API_KEY;
-    if (!apiKey) {
-      throw new Error("PERPLEXITY_API_KEY is not set.");
-    }
+    if (!apiKey) {throw new Error("PERPLEXITY_API_KEY is not set.");}
     return new OpenAI({ apiKey, baseURL: "https://api.perplexity.ai" });
   }
   throw new Error(`Unknown provider: "${provider}". Supported: openai, perplexity.`);
@@ -35,22 +31,11 @@ function buildClient(provider) {
  * When jsonSchema is provided the API guarantees structurally valid JSON — no text-parsing needed.
  * Retries with linear backoff on failure.
  */
-async function callApi({
-  provider,
-  model,
-  messages,
-  jsonSchema,
-  temperature,
-  maxTokens,
-  maxRetries,
-  timeoutMs,
-}) {
+async function callApi({ provider, model, messages, jsonSchema, temperature, maxTokens, maxRetries, timeoutMs }) {
   const client = buildClient(provider);
   const params = { model, temperature, messages };
   // Only pass max_tokens if explicitly set — omitting lets the model use its full default limit.
-  if (maxTokens != null) {
-    params.max_tokens = maxTokens;
-  }
+  if (maxTokens != null) {params.max_tokens = maxTokens;}
   if (jsonSchema) {
     params.response_format = {
       type: "json_schema",
@@ -73,9 +58,7 @@ async function callApi({
       lastErr = err;
       if (attempt <= maxRetries) {
         const wait = 1000 * attempt;
-        logger.warn(
-          `[prompt-runner] Attempt ${attempt} failed: ${err.message}. Retrying in ${wait}ms…`,
-        );
+        logger.warn(`[prompt-runner] Attempt ${attempt} failed: ${err.message}. Retrying in ${wait}ms…`);
         await new Promise((r) => setTimeout(r, wait));
       }
     }
@@ -97,7 +80,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (templateNames.length === 0) {
     if (templateOption) {
       throw new Error(
-        `No prompt_templates/ folder found in this task, but --template "${templateOption}" was specified.`,
+        `No prompt_templates/ folder found in this task, but --template "${templateOption}" was specified.`
       );
     }
     return null;
@@ -106,7 +89,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (templateOption) {
     if (!templateNames.includes(templateOption)) {
       throw new Error(
-        `Template "${templateOption}" not found. Available: ${templateNames.join(", ")}`,
+        `Template "${templateOption}" not found. Available: ${templateNames.join(", ")}`
       );
     }
     return templateOption;
@@ -116,7 +99,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (mode === "cron") {
     throw new Error(
       `Task has prompt templates but --template was not specified. ` +
-        `In cron mode, --template is required. Available: ${templateNames.join(", ")}`,
+        `In cron mode, --template is required. Available: ${templateNames.join(", ")}`
     );
   }
 
@@ -159,15 +142,15 @@ export async function prepareTemplateInputs(templateConfig, mode) {
       }
     }
     if (missing.length > 0) {
-      throw new Error(`Template inputs missing defaults in cron mode: ${missing.join(", ")}`);
+      throw new Error(
+        `Template inputs missing defaults in cron mode: ${missing.join(", ")}`
+      );
     }
     return result;
   }
 
   // Manual mode — no inputs declared
-  if (inputs.length === 0) {
-    return result;
-  }
+  if (inputs.length === 0) {return result;}
 
   const questions = inputs.map((input) => {
     const base = {
@@ -182,12 +165,8 @@ export async function prepareTemplateInputs(templateConfig, mode) {
       ...base,
       type: "input",
       validate(val) {
-        if (!val && input.required) {
-          return "This field is required";
-        }
-        if (input.type === "number" && val && isNaN(Number(val))) {
-          return "Must be a number";
-        }
+        if (!val && input.required) {return "This field is required";}
+        if (input.type === "number" && val && isNaN(Number(val))) {return "Must be a number";}
         return true;
       },
     };
@@ -217,7 +196,7 @@ export async function buildRunPromptFn(
   templateConfig,
   taskInputs,
   preparedTemplateInputs,
-  contextFields,
+  contextFields
 ) {
   const zodSchema = await loadZodSchema(taskDir, templateName);
   // Convert Zod schema → JSON Schema for native API enforcement.
@@ -226,19 +205,21 @@ export async function buildRunPromptFn(
     ? { name: templateName.replace(/[^a-zA-Z0-9_]/g, "_"), schema: z.toJSONSchema(zodSchema) }
     : null;
 
-  const userPromptText = loadUserPrompt(taskDir, templateName, templateConfig.user_prompt_file);
+  const userPromptText = loadUserPrompt(
+    taskDir,
+    templateName,
+    templateConfig.user_prompt_file
+  );
   const systemPromptRaw = loadSystemPrompt(
     taskDir,
     templateName,
-    templateConfig.system_prompt_file,
+    templateConfig.system_prompt_file
   );
 
   // Collect declared default values from template inputs
   const templateInputDefaults = {};
   for (const input of templateConfig.inputs || []) {
-    if (input.default != null) {
-      templateInputDefaults[input.name] = input.default;
-    }
+    if (input.default != null) {templateInputDefaults[input.name] = input.default;}
   }
 
   return async function runPrompt(extraVars = {}) {
@@ -247,7 +228,7 @@ export async function buildRunPromptFn(
       { ...taskInputs, ...templateInputDefaults, ...contextFields, ...preparedTemplateInputs },
       {},
       {},
-      extraVars,
+      extraVars
     );
 
     const renderedPrompt = renderPrompt(userPromptText, vars);
@@ -256,9 +237,7 @@ export async function buildRunPromptFn(
     const renderedSystem = systemPromptRaw ? renderPrompt(systemPromptRaw, vars) : null;
 
     const messages = [];
-    if (renderedSystem) {
-      messages.push({ role: "system", content: renderedSystem });
-    }
+    if (renderedSystem) {messages.push({ role: "system", content: renderedSystem });}
     messages.push({ role: "user", content: renderedPrompt });
 
     const rawText = await callApi({
@@ -281,15 +260,13 @@ export async function buildRunPromptFn(
       const match = rawText.match(/\{[\s\S]*\}/);
       if (!match) {
         throw new Error(
-          `runPrompt: AI response contained no JSON object. Raw response:\n${rawText.slice(0, 500)}`,
+          `runPrompt: AI response contained no JSON object. Raw response:\n${rawText.slice(0, 500)}`
         );
       }
       try {
         artifact = JSON.parse(match[0]);
       } catch (err) {
-        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, {
-          cause: err,
-        });
+        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, { cause: err });
       }
     }
 
@@ -308,7 +285,11 @@ export async function buildRunPromptFn(
  */
 export function buildDryRunPromptPreview(taskDir, templateName, templateConfig) {
   try {
-    const userPromptText = loadUserPrompt(taskDir, templateName, templateConfig.user_prompt_file);
+    const userPromptText = loadUserPrompt(
+      taskDir,
+      templateName,
+      templateConfig.user_prompt_file
+    );
     // Replace all {{var}} with [var] for readable preview
     const preview = userPromptText.replace(/\{\{(\s*[\w.]+\s*)\}\}/g, (_, k) => `[${k.trim()}]`);
     return preview;
