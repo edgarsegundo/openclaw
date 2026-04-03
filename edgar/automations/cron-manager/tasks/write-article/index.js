@@ -1,3 +1,9 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /**
  * Task: write-article
  *
@@ -41,6 +47,13 @@ export default async function (context) {
   await saveArtifact("result", artifact);
   // Salva também como arquivo dinâmico por slug
   await saveArtifact(`article-${artifact.slug}`, artifact);
+
+  // Salva o markdownText como arquivo .md real (com \n convertidos em quebras de linha)
+  const articlesDir = path.join(__dirname, "..", "..", "artifacts", "write-article");
+  fs.mkdirSync(articlesDir, { recursive: true });
+  const mdPath = path.join(articlesDir, `${artifact.slug}.md`);
+  fs.writeFileSync(mdPath, artifact.markdownText.replace(/\\n/g, "\n"), "utf8");
+  console.log(`Markdown saved: artifacts/write-article/${artifact.slug}.md`);
 
   console.log(`\nModel used: ${model}`);
   console.log("Done!");

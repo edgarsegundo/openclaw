@@ -9,7 +9,7 @@ description: Geração de artigo SEO com links internos, imagens e intervençõe
 # provider: perplexity  → uses PERPLEXITY_API_KEY from ai-client/.env
 #                          (also has web search capability)
 provider: perplexity
-model: sonar
+model: sonar-pro
 
 # ── Prompt files ──────────────────────────────────────────────────────────────
 # system.md  — defines the AI's role/persona (keep it short and focused)
@@ -43,9 +43,13 @@ options:
   temperature: 0.5          # 0.0 (deterministic) → 1.0 (creative)
   # max_tokens omitted → model uses its full default limit (~16k for gpt-4o-mini)
   # set explicitly when you need a hard cap, e.g. for short structured outputs:
-  max_tokens: 4000
-  timeout_ms: 60000         # increase for long outputs (articles, reports)
+  # max_tokens: 8000
+  timeout_ms: 240000        # increase for long outputs (articles, reports)
   max_retries: 2
+  # Disable json_schema API enforcement for long-content generation.
+  # sonar-pro suppresses markdownText content when schema enforcement is active.
+  # The prompt already instructs the model to return JSON — Zod validates after parsing.
+  json_schema_enforcement: false
 
 # Output structure is defined in schema.js — no description needed here.
 # The schema is sent to the API as json_schema (guaranteed structure)

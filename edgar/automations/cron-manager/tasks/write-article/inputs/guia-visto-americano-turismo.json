@@ -3,6 +3,7 @@
    "slug":"guia-visto-americano-turismo",
    "keyword":"visto americano de turismo",
    "intent":"informational",
+   "language":"pt-BR",
    "cluster":{
       "allSlugs":[
          "consultar-status-visto-americano",
