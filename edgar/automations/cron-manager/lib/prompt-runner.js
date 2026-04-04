@@ -81,14 +81,26 @@ function sanitizeSchemaForPerplexity(schema) {
  *
  * mode='schema'      → json_schema enforcement; API guarantees the response matches the Zod schema.
  *                      Perplexity's schema is sanitized to strip Zod Draft 2020-12 extras.
- * mode='json_object' → guarantees valid JSON without schema enforcement; no constrained decoding.
- *                      Best for Perplexity sonar/sonar-pro with long content fields (markdownText, etc.).
+ * mode='json_object' → { type: "json_object" } — OpenAI only.
+ *                      Perplexity does NOT support it (accepted types: text, json_schema, regex).
+ *                      Returns a 400 error if used with provider=perplexity.
+ *                      For Perplexity + long content, use mode='none' instead.
  * mode='none'        → no response_format sent; model generates freely.
  *                      The prompt must instruct the model to return JSON.
  *                      Code fences (```json ... ```) are stripped automatically before parsing.
  */
 function buildResponseFormat(provider, jsonSchema, mode) {
   if (mode === "json_object") {
+    // Perplexity only accepts: text, json_schema, regex — json_object causes a 400.
+    // Fall back to none (free generation + automatic code fence strip).
+    if (provider === "perplexity") {
+      logger.warn(
+        "[prompt-runner] response_format: json_object is not supported by Perplexity " +
+        "(accepted types: text, json_schema, regex). Falling back to 'none'. " +
+        "Update your template config to response_format: none."
+      );
+      return null;
+    }
     return { type: "json_object" };
   }
   if (mode === "schema" && jsonSchema) {

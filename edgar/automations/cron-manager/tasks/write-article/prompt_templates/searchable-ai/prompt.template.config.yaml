@@ -55,8 +55,9 @@ options:
   # │             │    Safe only for short structured outputs (< ~500 tokens per field).      │
   # ├─────────────┼───────────────────────────────────────────────────────────────────────────┤
   # │ json_object │ Sends { type: "json_object" } → valid JSON guaranteed, no schema.         │
-  # │             │ ✅ Perplexity sonar/sonar-pro: best option when content is long but       │
-  # │             │    you still want a JSON guarantee. Zod validates structure after parse.  │
+  # │             │ ❌ Perplexity sonar/sonar-pro: NOT supported — returns HTTP 400.          │
+  # │             │    Perplexity only accepts: text, json_schema, regex.                    │
+  # │             │ ✅ OpenAI only (gpt-4o, gpt-4o-mini, etc.).                              │
   # ├─────────────┼───────────────────────────────────────────────────────────────────────────┤
   # │ none        │ No response_format sent → model generates freely.                         │
   # │             │ ✅ Perplexity sonar/sonar-pro: safest for very long content (articles).   │
@@ -66,7 +67,7 @@ options:
   # └─────────────┴───────────────────────────────────────────────────────────────────────────┘
   # Using 'none' here: sonar-pro with schema enforcement empties markdownText (long article).
   # The system prompt already instructs the model to return JSON.
-  response_format: json_object
+  response_format: none
 
 # Output structure is defined in schema.js — no description needed here.
 # The schema is sent to the API as json_schema (guaranteed structure)

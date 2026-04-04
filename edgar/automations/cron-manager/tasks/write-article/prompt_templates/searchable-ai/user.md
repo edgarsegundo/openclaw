@@ -29,7 +29,7 @@ Antes de gerar o guia:
 1. Estruture o guia como uma **narrativa sequencial**, onde cada etapa leva naturalmente à próxima.
 2. O conteúdo deve ser **prático, claro e acionável**, não apenas descritivo.
 3. Use linguagem natural, humana e fluida (evite padrão robótico de IA).
-4. Utilize **informações atualizadas da web sempre que possível**.
+4. Utilize informações atualizadas da web apenas quando forem aplicáveis ao contexto brasileiro.
 
 ---
 
@@ -66,7 +66,7 @@ Você é um especialista em SEO, conteúdo estratégico e UX. Gere um artigo com
 ### REGRAS OBRIGATÓRIAS
 
 1. O artigo deve conter de 3 a 8 links internos usando APENAS o formato:
-   [[LINK: slug | texto âncora]]
+   <!--[[LINK: slug | texto âncora]]-->
 
    - Use slugs plausíveis, preferindo os de cluster.allSlugs.
    - Distribua os links ao longo do artigo; não concentre vários links no mesmo parágrafo.
@@ -169,7 +169,7 @@ Retorne APENAS o seguinte JSON:
 
 ## EXEMPLO DE LINK INTERNO
 
-[[LINK: consultar-status-visto-americano | como consultar o status do visto]]
+<!--[[LINK: consultar-status-visto-americano | como consultar o status do visto]]-->
 
 ---
 
@@ -190,6 +190,44 @@ Retorne APENAS o seguinte JSON:
 - title: 40–70 caracteres
 - seoMetaDescription: 120–160 caracteres
 - markdownText: 1000–2500 palavras
+
+---
+
+## 🇧🇷 CONTEXTO BRASIL (OBRIGATÓRIO E RESTRITIVO)
+
+- Todo o conteúdo deve ser baseado na realidade de brasileiros
+- Considere que o leitor é cidadão brasileiro solicitando visto a partir do Brasil
+- Utilize apenas regras, processos e exemplos aplicáveis ao Brasil
+
+## 🔎 FONTES (RESTRIÇÃO FORTE)
+
+- Priorize fontes brasileiras (domínios .br ou conteúdo claramente voltado ao Brasil)
+- Priorize fontes oficiais (embaixadas, consulados, governo)
+- NÃO utilize como base conteúdos de países com regras diferentes (ex: países do Visa Waiver Program como Itália, Espanha, Alemanha)
+
+## 🚫 BLOQUEIOS
+
+- Não utilizar exemplos, fluxos ou explicações baseadas em cidadãos europeus
+- Não misturar processos como ESTA com o fluxo padrão de brasileiros
+- Ignorar conteúdos cuja lógica não se aplique ao Brasil, mesmo que sejam bem estruturados
+
+## 🚫 BLOQUEIO DE TRADUÇÃO
+
+- Não traduzir ou adaptar diretamente conteúdos de outros idiomas
+- O conteúdo deve ser originalmente estruturado para o contexto brasileiro
+
+## 🔍 SERP
+
+- Simule exclusivamente o Google Brasil (google.com.br)
+- Baseie-se no que um brasileiro encontra ao pesquisar esse tema
+
+## 🔁 FALLBACK CONTROLADO
+
+Caso não existam informações suficientes em fontes brasileiras:
+
+- Utilize conhecimento geral confiável
+- Adapte completamente para a realidade de brasileiros
+- Não expor diferenças de outros países no texto
 
 ---
 

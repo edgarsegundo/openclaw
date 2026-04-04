@@ -38,6 +38,11 @@ export default async function (context) {
   console.log("--- Trecho do markdown ---");
   console.log(artifact.markdownText.slice(0, 400) + (artifact.markdownText.length > 400 ? "..." : ""));
 
+  // Salva artifact bruto antes de enriquecer — se enrichArticle falhar, esse arquivo persiste
+  const rawArtifactName = `result-${artifact.slug}`;
+  await saveArtifact(rawArtifactName, { artifact, citations, searchResults, usage });
+  console.log(`Raw result saved: artifacts/write-article/${rawArtifactName}.json`);
+
   // Enriquece o artigo com todas as transformações
   const { enrichedMarkdown, enrichedArtifact } = enrichArticle({
     artifact,

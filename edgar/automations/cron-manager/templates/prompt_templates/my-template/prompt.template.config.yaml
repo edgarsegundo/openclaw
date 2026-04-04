@@ -60,9 +60,9 @@ options:
   # │             │    empties content (markdownText, long descriptions, etc.).             │
   # ├─────────────┼─────────────────────────────────────────────────────────────────────────┤
   # │ json_object │ Sends { type: "json_object" } → valid JSON guaranteed, no schema.       │
-  # │             │ ✅ Perplexity sonar/sonar-pro: best balance for long content — no       │
-  # │             │    truncation, no code fences. Zod validates structure after parse.     │
-  # │             │ ✅ OpenAI: also supported.                                              │
+  # │             │ ❌ Perplexity sonar/sonar-pro: NOT supported — returns HTTP 400.        │
+  # │             │    Perplexity only accepts: text, json_schema, regex.                  │
+  # │             │ ✅ OpenAI only (gpt-4o, gpt-4o-mini, etc.).                            │
   # ├─────────────┼─────────────────────────────────────────────────────────────────────────┤
   # │ none        │ No response_format sent → model generates completely freely.            │
   # │             │ ✅ Perplexity sonar/sonar-pro: safest for very long articles/reports.   │
@@ -74,7 +74,7 @@ options:
   # Quick reference:
   #   provider: openai                             → omit (default 'schema' always works)
   #   provider: perplexity + short fields          → omit (default 'schema' is fine)
-  #   provider: perplexity + medium/long fields    → response_format: json_object
+  #   provider: perplexity + medium/long fields    → response_format: none  (json_object NOT supported)
   #   provider: perplexity + very long (articles)  → response_format: none
   #
   # response_format: schema
