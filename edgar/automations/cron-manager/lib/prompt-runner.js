@@ -85,7 +85,13 @@ async function callApi({ provider, model, messages, jsonSchema, temperature, max
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const res = await client.chat.completions.create(params, { signal: controller.signal });
-        return res.choices[0].message.content;
+        return {
+          content: res.choices[0].message.content,
+          // Perplexity-only fields — undefined/empty for OpenAI
+          citations: res.citations ?? [],
+          searchResults: res.search_results ?? [],
+          usage: res.usage ?? null,
+        };
       } finally {
         clearTimeout(timer);
       }
@@ -223,7 +229,14 @@ export async function prepareTemplateInputs(templateConfig, mode) {
  *   taskInputs → templateInputDefaults → contextFields → preparedTemplateInputs → extraVars
  *
  * Returns:
- *   { artifact, template, model, usage: null }
+ *   { artifact, citations, searchResults, usage, template, model }
+ *
+ *   artifact      — object validated against schema.js (the AI-generated payload)
+ *   citations     — string[] of source URLs (Perplexity/sonar only; [] for OpenAI)
+ *   searchResults — SearchResult[] rich metadata aligned 1:1 with citations (Perplexity only)
+ *   usage         — token counts + cost breakdown; Perplexity includes usage.cost.total_cost (USD)
+ *   template      — template name used for this call
+ *   model         — model string from template config
  */
 export async function buildRunPromptFn(
   taskDir,
@@ -278,7 +291,7 @@ export async function buildRunPromptFn(
     if (renderedSystem) {messages.push({ role: "system", content: renderedSystem });}
     messages.push({ role: "user", content: renderedPrompt });
 
-    const rawText = await callApi({
+    const { content: rawText, citations, searchResults, usage } = await callApi({
       provider: templateConfig.provider,
       model: templateConfig.model,
       messages,
@@ -320,9 +333,12 @@ export async function buildRunPromptFn(
 
     return {
       artifact,
+      // Perplexity (sonar models) only — empty arrays / null for OpenAI
+      citations,      // string[] — URLs das fontes consultadas; [1] no texto → citations[0]
+      searchResults,  // SearchResult[] — { title, url, snippet, date } alinhado 1:1 com citations
+      usage,          // { prompt_tokens, completion_tokens, ... } + cost (Perplexity: usage.cost.total_cost)
       template: templateName,
       model: templateConfig.model,
-      usage: null,
     };
   };
 }

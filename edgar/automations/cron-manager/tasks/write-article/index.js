@@ -43,6 +43,9 @@ export default async function (context) {
   console.log("--- Trecho do markdown ---");
   console.log(artifact.markdownText.slice(0, 400) + (artifact.markdownText.length > 400 ? "..." : ""));
 
+
+
+
   // Salva como artifact principal
   await saveArtifact("result", artifact);
   // Salva também como arquivo dinâmico por slug
