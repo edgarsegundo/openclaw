@@ -8,13 +8,9 @@ Sua tarefa é criar um **guia completo, passo a passo e narrativo sobre visto in
 
 ## 🔍 CONTEXTO DE SEO (OBRIGATÓRIO)
 
-Antes de escrever:
+Use o título como principal referência semântica para SEO e adapte o conteúdo ao idioma solicitado.
 
-- Intenção de busca principal: (informacional / navegacional / transacional)
-- Perfil do usuário: (ex: brasileiro solicitando visto pela primeira vez)
-- Nível de conhecimento: (iniciante / intermediário / avançado)
-
-Adapte todo o conteúdo com base nisso.
+Se algum contexto adicional não estiver explícito, inferir de forma conservadora com base no tipo de visto e no público mais provável.
 
 ---
 
@@ -64,55 +60,140 @@ Você é um especialista em SEO, conteúdo estratégico e UX. Gere um artigo com
 ### INPUTS
 - title: {{title}}
 - slug: {{slug}}
-- keyword: {{keyword}}
-- intent: {{intent}}
 - language: {{language}}
 - cluster.allSlugs: {{cluster.allSlugs}}
 
 ### REGRAS OBRIGATÓRIAS
-1. O artigo deve conter de 3 a 8 links internos usando APENAS o formato:
-  [[LINK: slug | texto âncora]]
-  - Use slugs plausíveis, preferindo os de cluster.allSlugs.
-  - O texto âncora deve ser natural e não quebrar a fluidez.
-2. Insira 2 a 3 placeholders de imagem:
-  <!-- INSERIR IMAGEM: descrição curta e objetiva -->
-3. Insira 2 a 3 placeholders de intervenção:
-  <!-- INTERVENCAO FUTURA: tipo — sugestão -->
-4. Estruture o artigo com:
-  - Narrativa passo a passo
-  - Checklist
-  - FAQ (4 a 6 perguntas reais)
-  - Tabela quando necessário
-5. Use H1, H2, H3, listas, parágrafos curtos (máx. 3 linhas).
-6. Use palavras-chave principais e variações semânticas naturalmente.
-7. Não invente fatos, não promova empresas, não use linguagem robótica.
-8. Indique sempre que regras podem mudar e recomende validação em fontes oficiais.
-9. O artigo deve ser prático, claro, útil e confiável.
 
-### OUTPUT OBRIGATÓRIO (JSON)
-Retorne APENAS o seguinte JSON, preenchendo todos os campos:
+1. O artigo deve conter de 3 a 8 links internos usando APENAS o formato:
+   [[LINK: slug | texto âncora]]
+
+   - Use slugs plausíveis, preferindo os de cluster.allSlugs.
+   - Distribua os links ao longo do artigo; não concentre vários links no mesmo parágrafo.
+   - Insira links em seções onde adicionam contexto relevante.
+
+2. Insira 2 a 3 placeholders de imagem em pontos visualmente relevantes do artigo:
+   <!-- INSERIR IMAGEM: descrição curta e objetiva -->
+
+3. Insira 2 a 3 placeholders de intervenção para revisão futura:
+   <!-- INTERVENCAO FUTURA: tipo — sugestão -->
+
+4. Estruture o artigo com:
+   - Narrativa passo a passo
+   - Checklist
+   - Tabela quando necessário
+
+5. NÃO inclua FAQ dentro do markdown. O FAQ deve ser retornado separadamente no campo `faq`.
+
+6. Use H1, H2, H3, listas, parágrafos curtos (máx. 3 linhas).
+
+7. Use palavras-chave principais e variações semânticas naturalmente.
+
+8. Não invente fatos, não promova empresas, não use linguagem robótica.
+
+9. Indique sempre que regras podem mudar e recomende validação em fontes oficiais.
+
+10. O artigo deve ser prático, claro, útil e confiável.
+
+---
+
+## FAQ ESTRUTURADO (OBRIGATÓRIO)
+
+Além do artigo, gere um array `faq` com perguntas reais e úteis que normalmente surgem após a leitura.
+
+### Regras do FAQ:
+- Gere entre 3 e 6 perguntas
+- Perguntas devem ser naturais e específicas
+- Respostas curtas, claras e úteis
+- FAQ deve complementar dúvidas práticas que normalmente surgem após leitura, não apenas resumir seções do artigo.
+- NÃO usar markdown dentro do FAQ
+
+Cada item deve seguir exatamente esta estrutura:
+
+{
+  "question": "Pergunta aqui",
+  "answer": "Resposta aqui"
+}
+
+---
+
+## IMAGE HINTS (OBRIGATÓRIO)
+
+Retorne também um objeto `imageHints` para permitir busca automática de imagem editorial.
+
+### Regras:
+- mainSubject = assunto visual principal concreto
+- secondarySubject = elemento visual complementar
+- visualStyle = estilo visual curto, objetivo e utilizável em busca de imagem
+  (ex: clean editorial realistic, official document style, modern office scene)
+- searchQueries = exatamente 3 consultas curtas com variação semântica real
+  (evitar repetir apenas as mesmas palavras em ordem diferente)
+- suggestedAlt = texto alternativo natural para SEO
+
+Formato:
+
+{
+  "mainSubject": "...",
+  "secondarySubject": "...",
+  "visualStyle": "...",
+  "searchQueries": ["...", "...", "..."],
+  "suggestedAlt": "..."
+}
+
+---
+
+## OUTPUT OBRIGATÓRIO (JSON)
+
+Retorne APENAS o seguinte JSON:
+
 {
   "title": "Título do artigo (40–70 caracteres)",
   "slug": "{{slug}}",
   "seoMetaDescription": "Meta descrição SEO (120–160 caracteres)",
-  "keywords": ["keyword1", "keyword2", ...],
-  "markdownText": "CONTEÚDO COMPLETO EM MARKDOWN, seguindo todas as regras acima, incluindo os placeholders de link, imagem e intervenção."
+  "keywords": ["keyword1", "keyword2"],
+  "markdownText": "CONTEÚDO COMPLETO EM MARKDOWN",
+  "faq": [
+    {
+      "question": "Pergunta aqui",
+      "answer": "Resposta aqui"
+    }
+  ],
+  "imageHints": {
+    "mainSubject": "...",
+    "secondarySubject": "...",
+    "visualStyle": "...",
+    "searchQueries": ["...", "...", "..."],
+    "suggestedAlt": "..."
+  }
 }
 
-### EXEMPLO DE LINK INTERNO (OBRIGATÓRIO)
+## EXEMPLO DE LINK INTERNO
+
 [[LINK: consultar-status-visto-americano | como consultar o status do visto]]
 
-### EXEMPLO DE PLACEHOLDER DE IMAGEM
+---
+
+## EXEMPLO DE PLACEHOLDER DE IMAGEM
+
 <!-- INSERIR IMAGEM: passaporte americano na mão -->
 
-### EXEMPLO DE PLACEHOLDER DE INTERVENÇÃO
+---
+
+## EXEMPLO DE PLACEHOLDER DE INTERVENÇÃO
+
 <!-- INTERVENCAO FUTURA: pesquisa adicional — sugerir fontes oficiais -->
 
-### TAMANHO
+---
+
+## TAMANHO
+
 - title: 40–70 caracteres
 - seoMetaDescription: 120–160 caracteres
 - markdownText: 1000–2500 palavras
 
-### IMPORTANTE
+---
+
+## IMPORTANTE
+
 - Não inclua empresas, propaganda ou linguagem robótica.
 - O output deve ser apenas o JSON, sem comentários ou explicações extras.

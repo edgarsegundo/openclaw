@@ -503,6 +503,9 @@ export function enrichArticle({ artifact, citations = [], searchResults = [], us
     ...artifact,
     markdownText: md,
     generatedAt,
+    citations,
+    searchResults,
+    usage,
     sources: citations.map((url, idx) => {
       const s = searchResults[idx] ?? {};
       const { emoji, label } = classifySource(url);

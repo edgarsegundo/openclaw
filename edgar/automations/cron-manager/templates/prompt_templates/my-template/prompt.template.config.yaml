@@ -47,32 +47,38 @@ options:
   timeout_ms: 30000         # increase for long outputs (articles, reports)
   max_retries: 2
 
-  # ── json_schema_enforcement ────────────────────────────────────────────────
-  # Controls whether the API enforces the output schema natively (response_format).
+  # ── response_format ────────────────────────────────────────────────────────
+  # Controls what the API receives for output formatting.
+  # Omit this option entirely to get the default ('schema').
   #
-  # DEFAULT (omitted or true): schema is sent to the API → structured JSON guaranteed.
-  #   ✅ OpenAI (gpt-4o, gpt-4o-mini, etc.)  — works perfectly for any output length.
-  #   ✅ Perplexity — short/structured outputs (< ~500 tokens), e.g. classifications,
-  #      summaries, ratings, data extraction where fields are short strings/arrays.
-  #
-  # SET TO false: schema NOT sent to the API → model generates freely, Zod validates after.
-  #   Required for Perplexity when the output contains long content fields (e.g. a full
-  #   article in markdownText, a long description, etc.). This applies to ALL Perplexity
-  #   sonar models (sonar, sonar-pro, sonar-reasoning, etc.) — it's not a token-limit
-  #   issue but a behavioral one: Perplexity's json_schema enforcement makes the model
-  #   satisfy the schema with the minimum possible content and stop, ignoring the prompt
-  #   instructions for generating rich/long output.
-  #   When false, the prompt itself MUST instruct the model to return JSON (e.g. via
-  #   system.md: "Always respond with valid JSON matching this structure: {...}").
+  # ┌─────────────┬─────────────────────────────────────────────────────────────────────────┐
+  # │ schema      │ (default) Sends json_schema → API guarantees structured JSON.           │
+  # │             │ ✅ OpenAI (gpt-4o, gpt-4o-mini, etc.): always works, any length.       │
+  # │             │ ✅ Perplexity sonar/sonar-pro: safe only for short fields               │
+  # │             │    (< ~500 tokens each), e.g. classifications, summaries, ratings.      │
+  # │             │ ⚠️  Perplexity + long fields: constrained decoding truncates or         │
+  # │             │    empties content (markdownText, long descriptions, etc.).             │
+  # ├─────────────┼─────────────────────────────────────────────────────────────────────────┤
+  # │ json_object │ Sends { type: "json_object" } → valid JSON guaranteed, no schema.       │
+  # │             │ ✅ Perplexity sonar/sonar-pro: best balance for long content — no       │
+  # │             │    truncation, no code fences. Zod validates structure after parse.     │
+  # │             │ ✅ OpenAI: also supported.                                              │
+  # ├─────────────┼─────────────────────────────────────────────────────────────────────────┤
+  # │ none        │ No response_format sent → model generates completely freely.            │
+  # │             │ ✅ Perplexity sonar/sonar-pro: safest for very long articles/reports.   │
+  # │             │ ⚠️  Model may wrap output in ```json ... ``` — stripped automatically. │
+  # │             │    Prompt MUST instruct the model to return JSON.                       │
+  # │             │    Zod validates structure after parse.                                 │
+  # └─────────────┴─────────────────────────────────────────────────────────────────────────┘
   #
   # Quick reference:
-  #   provider: openai                         → omit (default true is fine always)
-  #   provider: perplexity + short fields      → omit (default true is fine)
-  #   provider: perplexity + long fields       → json_schema_enforcement: false
+  #   provider: openai                             → omit (default 'schema' always works)
+  #   provider: perplexity + short fields          → omit (default 'schema' is fine)
+  #   provider: perplexity + medium/long fields    → response_format: json_object
+  #   provider: perplexity + very long (articles)  → response_format: none
   #
-  # json_schema_enforcement: false
+  # response_format: schema
 
 # Output structure is defined in schema.js — no description needed here.
-# The schema is sent to the API as json_schema (guaranteed structure)
-# and also used by Zod as a final validation safety net.
-# When json_schema_enforcement is false, Zod still validates the parsed output.
+# schema.js is used by Zod as a validation safety net after parsing in all modes,
+# and also sent to the API as json_schema when response_format is 'schema'.

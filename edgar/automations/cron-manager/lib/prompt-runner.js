@@ -32,6 +32,33 @@ function buildClient(provider) {
  * that Perplexity rejects with a 400. Strip them down to what Perplexity actually accepts.
  * OpenAI (and future standards-compliant providers) receive the full schema unchanged.
  */
+
+/**
+ * Strip markdown code fences that some models wrap around JSON responses
+ * when response_format is not enforced (e.g. ```json ... ```).
+ * Only necessary for modes 'json_object' and 'none'.
+ */
+function stripCodeFences(text) {
+  return text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+}
+
+/**
+ * Resolve the response_format mode from template options.
+ * The new 'response_format' string option takes precedence; falls back to the legacy
+ * 'json_schema_enforcement' boolean for backwards compatibility.
+ *
+ * @returns {'schema'|'json_object'|'none'}
+ */
+function resolveResponseFormatMode(options) {
+  const explicit = options?.response_format;
+  if (explicit === "schema" || explicit === "json_object" || explicit === "none") {
+    return explicit;
+  }
+  // Legacy: json_schema_enforcement: false → none
+  if (options?.json_schema_enforcement === false) return "none";
+  // Default: full schema enforcement
+  return "schema";
+}
 const PERPLEXITY_ALLOWED_SCHEMA_KEYS = new Set([
   "type", "properties", "required", "items",
   "anyOf", "oneOf", "allOf", "not",
@@ -50,32 +77,41 @@ function sanitizeSchemaForPerplexity(schema) {
 }
 
 /**
- * Build the response_format payload for a given provider.
- * - Perplexity: json_schema with sanitized schema (strips Zod Draft 2020-12 extras)
- * - OpenAI and others: json_schema with full schema
+ * Build the response_format payload for a given provider and mode.
+ *
+ * mode='schema'      → json_schema enforcement; API guarantees the response matches the Zod schema.
+ *                      Perplexity's schema is sanitized to strip Zod Draft 2020-12 extras.
+ * mode='json_object' → guarantees valid JSON without schema enforcement; no constrained decoding.
+ *                      Best for Perplexity sonar/sonar-pro with long content fields (markdownText, etc.).
+ * mode='none'        → no response_format sent; model generates freely.
+ *                      The prompt must instruct the model to return JSON.
+ *                      Code fences (```json ... ```) are stripped automatically before parsing.
  */
-function buildResponseFormat(provider, jsonSchema) {
-  if (!jsonSchema) return null;
-  const schema = provider === "perplexity"
-    ? sanitizeSchemaForPerplexity(jsonSchema.schema)
-    : jsonSchema.schema;
-  return {
-    type: "json_schema",
-    json_schema: { name: jsonSchema.name, schema },
-  };
+function buildResponseFormat(provider, jsonSchema, mode) {
+  if (mode === "json_object") {
+    return { type: "json_object" };
+  }
+  if (mode === "schema" && jsonSchema) {
+    const schema = provider === "perplexity"
+      ? sanitizeSchemaForPerplexity(jsonSchema.schema)
+      : jsonSchema.schema;
+    return {
+      type: "json_schema",
+      json_schema: { name: jsonSchema.name, schema },
+    };
+  }
+  return null; // mode === 'none'
 }
 
 /**
- * Call the AI API with optional native json_schema enforcement.
- * When jsonSchema is provided the API guarantees structurally valid JSON — no text-parsing needed.
+ * Call the AI API with optional response_format enforcement.
  * Retries with linear backoff on failure.
  */
-async function callApi({ provider, model, messages, jsonSchema, temperature, maxTokens, maxRetries, timeoutMs }) {
+async function callApi({ provider, model, messages, responseFormat, temperature, maxTokens, maxRetries, timeoutMs }) {
   const client = buildClient(provider);
   const params = { model, temperature, messages };
   // Only pass max_tokens if explicitly set — omitting lets the model use its full default limit.
   if (maxTokens != null) {params.max_tokens = maxTokens;}
-  const responseFormat = buildResponseFormat(provider, jsonSchema);
   if (responseFormat) {params.response_format = responseFormat;}
 
   let lastErr;
@@ -247,14 +283,13 @@ export async function buildRunPromptFn(
   contextFields
 ) {
   const zodSchema = await loadZodSchema(taskDir, templateName);
-  // json_schema_enforcement defaults to true. Set to false in template config when the model
-  // is expected to generate long content (e.g. markdownText with 1000+ words) — in that case
-  // json_schema enforcement suppresses content generation in favour of minimal valid JSON.
-  // The prompt itself must instruct the model to return JSON; Zod validates after parsing.
-  const enforceJsonSchema = templateConfig.options?.json_schema_enforcement !== false;
-  const jsonSchema = (zodSchema && enforceJsonSchema)
+  const mode = resolveResponseFormatMode(templateConfig.options);
+  // jsonSchema is only built for mode='schema'; in other modes Zod still validates after parse.
+  const jsonSchemaForApi = (zodSchema && mode === "schema")
     ? { name: templateName.replace(/[^a-zA-Z0-9_]/g, "_"), schema: z.toJSONSchema(zodSchema) }
     : null;
+  const responseFormat = buildResponseFormat(templateConfig.provider, jsonSchemaForApi, mode);
+  logger.info(`[prompt-runner] response_format mode: ${mode}`);
 
   const userPromptText = loadUserPrompt(
     taskDir,
@@ -295,7 +330,7 @@ export async function buildRunPromptFn(
       provider: templateConfig.provider,
       model: templateConfig.model,
       messages,
-      jsonSchema,
+      responseFormat,
       temperature: templateConfig.options?.temperature ?? 0.3,
       maxTokens: templateConfig.options?.max_tokens ?? null,
       maxRetries: templateConfig.options?.max_retries ?? 2,
@@ -306,19 +341,22 @@ export async function buildRunPromptFn(
     logger.info(`[prompt-runner] Raw response preview: ${rawText.slice(0, 300)}…`);
 
     let artifact;
+    // In mode='schema' the API guarantees clean JSON — no code fences possible.
+    // In modes 'json_object' and 'none' the model may wrap the response in ```json ... ```.
+    const textToParse = mode === "schema" ? rawText : stripCodeFences(rawText);
     if (zodSchema) {
       let parsed;
       try {
-        parsed = JSON.parse(rawText);
+        parsed = JSON.parse(textToParse);
       } catch (err) {
-        // Log full raw text to help diagnose truncation
+        // Log full raw text to help diagnose the issue
         logger.warn(`[prompt-runner] JSON parse failed. Full raw response:\n${rawText}`);
         throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, { cause: err });
       }
       artifact = zodSchema.parse(parsed);
     } else {
       // No schema — best-effort JSON extraction from free-text response.
-      const match = rawText.match(/\{[\s\S]*\}/);
+      const match = textToParse.match(/\{[\s\S]*\}/);
       if (!match) {
         throw new Error(
           `runPrompt: AI response contained no JSON object. Raw response:\n${rawText.slice(0, 500)}`

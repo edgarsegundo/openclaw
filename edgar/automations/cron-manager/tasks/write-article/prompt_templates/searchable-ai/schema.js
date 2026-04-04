@@ -50,10 +50,28 @@ import { z } from "zod";
  *
  * All fields are required and validated by zod.
  */
+
+const faqItemSchema = z.object({
+  question: z.string().min(1, "A pergunta não pode estar vazia"),
+  answer: z.string().min(1, "A resposta não pode estar vazia"),
+});
+
+const imageHintsSchema = z.object({
+  mainSubject: z.string().min(1, "Main subject obrigatório"),
+  secondarySubject: z.string().min(1, "Secondary subject obrigatório"),
+  visualStyle: z.string().min(1, "Visual style obrigatório"),
+  searchQueries: z.array(z.string()).min(3, "Pelo menos 3 search queries"),
+  suggestedAlt: z.string().min(1, "Alt sugerido obrigatório"),
+});
+
 export default z.object({
   title: z.string().min(1, "O título do artigo não pode estar vazio"),
   slug: z.string().min(1, "O slug não pode estar vazio"),
   seoMetaDescription: z.string().min(1, "A descrição SEO não pode estar vazia"),
   keywords: z.array(z.string()).min(1, "Deve haver pelo menos uma palavra-chave"),
   markdownText: z.string().min(1, "O conteúdo do artigo não pode estar vazio"),
+  
+  faq: z.array(faqItemSchema),
+  
+  imageHints: imageHintsSchema,
 });

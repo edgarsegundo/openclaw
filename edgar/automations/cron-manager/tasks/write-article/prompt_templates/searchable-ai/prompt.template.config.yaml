@@ -46,10 +46,27 @@ options:
   # max_tokens: 8000
   timeout_ms: 240000        # increase for long outputs (articles, reports)
   max_retries: 2
-  # Disable json_schema API enforcement for long-content generation.
-  # sonar-pro suppresses markdownText content when schema enforcement is active.
-  # The prompt already instructs the model to return JSON — Zod validates after parsing.
-  json_schema_enforcement: false
+  # response_format: controls how the API receives the output schema.
+  # ┌─────────────┬───────────────────────────────────────────────────────────────────────────┐
+  # │ schema      │ Sends json_schema to the API → guaranteed structured JSON.                │
+  # │             │ ✅ OpenAI: works for any output length.                                   │
+  # │             │ ⚠️  Perplexity sonar/sonar-pro: causes constrained decoding that          │
+  # │             │    truncates/empties long content fields (markdownText, etc.).             │
+  # │             │    Safe only for short structured outputs (< ~500 tokens per field).      │
+  # ├─────────────┼───────────────────────────────────────────────────────────────────────────┤
+  # │ json_object │ Sends { type: "json_object" } → valid JSON guaranteed, no schema.         │
+  # │             │ ✅ Perplexity sonar/sonar-pro: best option when content is long but       │
+  # │             │    you still want a JSON guarantee. Zod validates structure after parse.  │
+  # ├─────────────┼───────────────────────────────────────────────────────────────────────────┤
+  # │ none        │ No response_format sent → model generates freely.                         │
+  # │             │ ✅ Perplexity sonar/sonar-pro: safest for very long content (articles).   │
+  # │             │ ⚠️  Model may wrap output in ```json ... ``` fences — stripped auto-      │
+  # │             │    matically by the runner. Prompt must instruct model to return JSON.    │
+  # │             │    Zod validates structure after parse.                                   │
+  # └─────────────┴───────────────────────────────────────────────────────────────────────────┘
+  # Using 'none' here: sonar-pro with schema enforcement empties markdownText (long article).
+  # The system prompt already instructs the model to return JSON.
+  response_format: json_object
 
 # Output structure is defined in schema.js — no description needed here.
 # The schema is sent to the API as json_schema (guaranteed structure)
