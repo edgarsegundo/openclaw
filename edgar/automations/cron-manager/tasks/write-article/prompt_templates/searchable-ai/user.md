@@ -69,10 +69,9 @@ Você é um especialista em SEO, conteúdo estratégico e UX. Gere um artigo com
    `[texto âncora](/blog/slug)`
 
    - Use EXCLUSIVAMENTE os slugs de cluster.allSlugs. NUNCA invente slugs.
-   - O formato da URL é SEMPRE `/blog/` seguido do slug exato. Exemplo:
-     `[como consultar o status do visto](/blog/consultar-status-visto-americano)`
+   - O formato da URL é SEMPRE `/blog/` seguido do slug exato.
+   - Os links devem ser inseridos **dentro de frases**, de forma sutil e natural, quando o assunto do artigo linkado for mencionado no texto — como uma sugestão de aprofundamento para quem quiser saber mais. NUNCA coloque o link em linha isolada.
    - Distribua os links ao longo do artigo; não concentre vários links no mesmo parágrafo.
-   - Insira links em seções onde adicionam contexto relevante.
    - **PROIBIDO** criar links aninhados. NUNCA escreva:
      `[anchor]([texto](/blog/slug))` — isso quebra o markdown.
    - **PROIBIDO** usar texto livre como href. NUNCA escreva:
@@ -175,7 +174,7 @@ Retorne APENAS o seguinte JSON:
 
 ## EXEMPLO DE LINK INTERNO
 
-[como consultar o status do visto](/blog/consultar-status-visto-americano)
+Após a entrevista, você pode acompanhar a situação pela internet — veja [como consultar o status do visto](/blog/consultar-status-visto-americano) em tempo real.
 
 ---
 
