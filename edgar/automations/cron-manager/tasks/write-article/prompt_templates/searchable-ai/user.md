@@ -65,15 +65,18 @@ Você é um especialista em SEO, conteúdo estratégico e UX. Gere um artigo com
 
 ### REGRAS OBRIGATÓRIAS
 
-1. O artigo deve conter de 3 a 5 links internos usando APENAS o formato standalone:
-   <!--[[LINK: slug | texto âncora]]-->
+1. O artigo deve conter de 3 a 5 links internos usando APENAS este formato:
+   `[texto âncora](/blog/slug)`
 
-   - Use slugs plausíveis, preferindo os de cluster.allSlugs.
+   - Use EXCLUSIVAMENTE os slugs de cluster.allSlugs. NUNCA invente slugs.
+   - O formato da URL é SEMPRE `/blog/` seguido do slug exato. Exemplo:
+     `[como consultar o status do visto](/blog/consultar-status-visto-americano)`
    - Distribua os links ao longo do artigo; não concentre vários links no mesmo parágrafo.
    - Insira links em seções onde adicionam contexto relevante.
-   - **PROIBIDO** usar o placeholder como href de link markdown. NUNCA escreva:
-     `[texto](<!--[[LINK: slug | label]])` — isso é inválido e quebra o markdown.
-   - O placeholder é SEMPRE standalone no texto (linha própria ou inline), jamais dentro de `[texto](...)`.
+   - **PROIBIDO** criar links aninhados. NUNCA escreva:
+     `[anchor]([texto](/blog/slug))` — isso quebra o markdown.
+   - **PROIBIDO** usar texto livre como href. NUNCA escreva:
+     `[documentos para entrevista](lista completa de documentos para entrevista e CASV)`
 
 2. Insira 2 a 3 placeholders de imagem em pontos visualmente relevantes do artigo:
    <!--[[INSERIR IMAGEM: descrição curta e objetiva]]-->
@@ -172,7 +175,7 @@ Retorne APENAS o seguinte JSON:
 
 ## EXEMPLO DE LINK INTERNO
 
-<!--[[LINK: consultar-status-visto-americano | como consultar o status do visto]]-->
+[como consultar o status do visto](/blog/consultar-status-visto-americano)
 
 ---
 
