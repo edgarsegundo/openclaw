@@ -73,10 +73,10 @@ Você é um especialista em SEO, conteúdo estratégico e UX. Gere um artigo com
    - Insira links em seções onde adicionam contexto relevante.
 
 2. Insira 2 a 3 placeholders de imagem em pontos visualmente relevantes do artigo:
-   <!-- INSERIR IMAGEM: descrição curta e objetiva -->
+   <!--[[INSERIR IMAGEM: descrição curta e objetiva]]-->
 
 3. Insira 2 a 3 placeholders de intervenção para revisão futura:
-   <!-- INTERVENCAO FUTURA: tipo — sugestão -->
+    <!--[[INTERVENCAO FUTURA: sugestão]]-->
 
 4. Estruture o artigo com:
    - Narrativa passo a passo
