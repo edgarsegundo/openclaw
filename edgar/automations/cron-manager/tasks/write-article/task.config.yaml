@@ -65,7 +65,15 @@ env_vars:
 #     "language": "pt-BR",
 #     "cluster":  { "allSlugs": ["slug-1", "slug-2"] }
 #   }
-inputs: []
+#
+# Inputs declared here with a default are merged into --input-file data
+# when the JSON file does not include them (useful for shared defaults).
+inputs:
+  - name: language
+    type: string
+    required: false
+    default: "pt-BR"
+    help_tip: "Idioma do artigo (ex: pt-BR, en-US)"
 
 # ── Artifacts ─────────────────────────────────────────────────────────────────
 # DOCUMENTATION ONLY — the runner does not enforce paths declared here.

@@ -437,6 +437,13 @@ export async function runTask(taskName, options = {}) {
       logger.error(`Failed to parse input file: ${err.message}`);
       process.exit(1);
     }
+    // Merge defaults from config inputs into file-loaded data
+    for (const input of config.inputs || []) {
+      if (input.type === "artifact") continue;
+      if (inputs[input.name] === undefined && input.default !== undefined && input.default !== null) {
+        inputs[input.name] = input.default;
+      }
+    }
   } else if (mode === "cron") {
     const { result, missing: missingInputs } = resolveInputsForCron(
       // Skip artifact-type inputs — they don't go through cron default resolution

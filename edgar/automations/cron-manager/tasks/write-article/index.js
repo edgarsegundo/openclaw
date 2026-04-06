@@ -5,8 +5,27 @@ import { enrichArticle } from "./article-enricher.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function resolveInputs(inputs, context) {
+  // Se inputs._clusterJsonFile e inputs._articleIndex vieram do wrapper, faz o split
+  if (inputs && typeof inputs === "object" && inputs._clusterJsonFile && typeof inputs._articleIndex === "number") {
+    const clusterData = JSON.parse(fs.readFileSync(inputs._clusterJsonFile, "utf8"));
+    if (!Array.isArray(clusterData.articleInputs)) {
+      throw new Error("Arquivo JSON não contém campo articleInputs[]");
+    }
+    const idx = inputs._articleIndex;
+    if (idx < 0 || idx >= clusterData.articleInputs.length) {
+      throw new Error(`article-index ${idx} fora do intervalo (0-${clusterData.articleInputs.length - 1})`);
+    }
+    return clusterData.articleInputs[idx];
+  }
+  return inputs;
+}
+
 export default async function (context) {
-  const { taskName, mode, executionId, runPrompt, saveArtifact, inputs } = context;
+  let { taskName, mode, executionId, runPrompt, saveArtifact, inputs } = context;
+
+  // Suporte a cluster.result.json + índice
+  inputs = resolveInputs(inputs, context);
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
   console.log("Inputs:", JSON.stringify(inputs, null, 2));

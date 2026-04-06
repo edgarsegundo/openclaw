@@ -161,13 +161,14 @@ function getMostRecentDate(searchResults) {
 /**
  * Extrai índices de citação únicos de um bloco de texto.
  * "[1][3][8] ... [3]" → [1, 3, 8]
+ * Também detecta citações já transformadas: href="#fonte-N"
  * @param {string} text
  * @returns {number[]}
  */
 function extractCitationIndices(text) {
-  return [
-    ...new Set([...text.matchAll(/\[(\d+)\]/g)].map((m) => parseInt(m[1], 10))),
-  ].toSorted((a, b) => a - b);
+  const fromBrackets = [...text.matchAll(/\[(\d+)\]/g)].map((m) => parseInt(m[1], 10));
+  const fromAnchors = [...text.matchAll(/href="#fonte-(\d+)"/g)].map((m) => parseInt(m[1], 10));
+  return [...new Set([...fromBrackets, ...fromAnchors])].toSorted((a, b) => a - b);
 }
 
 /**
@@ -206,10 +207,9 @@ function buildFreshnessHtml(searchResults, usage, generatedAt) {
       : null,
   ].filter(Boolean).join("\n  ");
 
-  return `
-<div class="article-freshness">
-  ${parts}
-</div>`;
+  // \n\n after </div> is required: CommonMark needs a blank line to exit an HTML
+  // block and resume parsing the next content as Markdown.
+  return `\n<div class="article-freshness">\n  ${parts}\n</div>\n\n`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -217,18 +217,61 @@ function buildFreshnessHtml(searchResults, usage, generatedAt) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Remove markdown e caracteres problemáticos do texto plano de um título de fonte.
+ * Usado em atributos HTML (data-title) e textos de link.
+ */
+function sanitizeSourceTitle(title) {
+  return (title ?? "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")  // [texto](url) → texto
+    .replace(/[*_`~]/g, "")                    // markdown inline formatting
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .trim();
+}
+
+/**
+ * Normaliza o texto de um snippet de fonte para uso seguro dentro de um bloco HTML.
+ * - Colapsa todas as quebras de linha (incluindo linhas em branco) em espaço
+ *   para evitar que o CommonMark encerre o bloco HTML prematuramente.
+ * - Remove marcadores Markdown de heading (#) no início de linhas.
+ */
+function sanitizeSnippetText(text) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/^#+\s+/gm, "")        // remove # headings ANTES do colapso (m flag: ^ = início de cada linha)
+    .replace(/\n+/g, " ")           // quebras de linha → espaço (impede blank line dentro do div)
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .trim();
+}
+
+/**
+ * Escapa caracteres problemáticos em URLs para uso em atributos href.
+ */
+function safeHref(url) {
+  return url.replace(/"/g, "%22").replace(/'/g, "%27");
+}
+
+/**
  * Substitui [N] por HTML de citação com tooltip.
  * Preserva qualquer [N] cujo índice não existe em searchResults.
+ * Não transforma [N] dentro de inline code spans (`...`).
  */
 function transformInlineCitations(markdown, searchResults) {
-  return markdown.replace(/\[(\d+)\]/g, (match, numStr) => {
-    const idx = parseInt(numStr, 10) - 1; // [1] → índice 0
-    const source = searchResults[idx];
-    if (!source) {return match;}
-    // Escapa aspas duplas do título para não quebrar o atributo data-title
-    const safeTitle = (source.title ?? "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-    return `<a class="cite-ref" href="#fonte-${numStr}" data-title="${safeTitle}"><sup>[${numStr}]</sup></a>`;
-  });
+  // Split preservando code spans e code fences para não transformar [N] dentro deles
+  const parts = markdown.split(/(```[\s\S]*?```|`[^`\n]+`)/g);
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part; // índices ímpares são code spans/fences — não tocar
+    return part.replace(/\[(\d+)\]/g, (match, numStr) => {
+      const idx = parseInt(numStr, 10) - 1; // [1] → índice 0
+      const source = searchResults[idx];
+      if (!source) {return match;}
+      const safeTitle = sanitizeSourceTitle(source.title);
+      return `<a class="cite-ref" href="#fonte-${numStr}" data-title="${safeTitle}"><sup>[${numStr}]</sup></a>`;
+    });
+  }).join("");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -250,16 +293,16 @@ function injectLearnMoreBlocks(markdown, citations, searchResults, enableLearnMo
         const source = searchResults[n - 1];
         const url = citations[n - 1];
         if (!source || !url) {return null;}
-        const title = (source.title ?? url).replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        return `<a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>`;
+        const title = sanitizeSourceTitle(source.title ?? url);
+        return `<a href="${safeHref(url)}" target="_blank" rel="noopener noreferrer">${title}</a>`;
       })
       .filter(Boolean)
       .join(" · ");
 
     if (!links) {return `${heading}\n${body}`;}
-    const learnMore = `
-    <div class="learn-more"><strong>📖 Saiba mais:</strong> ${links}</div>`;
-    return `${heading}\n${body}\n\n${learnMore}`;
+    // \n\n before and after the div ensures it is an isolated HTML block
+    const learnMore = `\n\n<div class="learn-more"><strong>📖 Saiba mais:</strong> ${links}</div>\n\n`;
+    return `${heading}\n${body}${learnMore}`;
 
   }).join("\n");
 }
@@ -283,48 +326,41 @@ function buildSourceCardsHtml(citations, searchResults) {
 
   items.sort((a, b) => b.dateObj - a.dateObj);
 
-  // ❌ NÃO sanitizar dentro do map
   const cards = items.map(({ n, url, source }) => {
     const { emoji, label, cssClass } = classifySource(url);
-    const title = (source.title ?? url).replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const title = sanitizeSourceTitle(source.title ?? url);
     const date = fmtDate(source.last_updated ?? source.date);
 
     const dateHtml = date
       ? `<div class="source-date">🗓 ${date}</div>`
       : "";
 
+    // sanitizeSnippetText colapsa quebras de linha e linhas em branco em espaço —
+    // necessário porque CommonMark encerra um bloco HTML na primeira linha em branco.
     const snippet = source.snippet
-      ? `<div class="source-snippet">
-           ${source.snippet.slice(0, 240)
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")}
-           ${source.snippet.length > 240 ? "…" : ""}
-         </div>`
+      ? `<div class="source-snippet">${sanitizeSnippetText(source.snippet.slice(0, 240))}${source.snippet.length > 240 ? "…" : ""}</div>`
       : "";
+
+    // Filtra partes opcionais para não gerar linhas em branco dentro do bloco HTML.
+    // Uma linha `    ${""}` vira só espaços → sanitizeMarkdownHtml descarta → blank line.
+    const extras = [dateHtml, snippet].filter(Boolean).join("\n    ");
+    const extrasHtml = extras ? `\n    ${extras}` : "";
 
     return `<div class="source-card" id="fonte-${n}">
   <div class="source-num">[${n}]</div>
   <div class="source-body">
     <div class="source-title">
-      <a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a>
+      <a href="${safeHref(url)}" target="_blank" rel="noopener noreferrer">${title}</a>
       <span class="source-badge ${cssClass}">${emoji} ${label}</span>
-    </div>
-    ${dateHtml}
-    ${snippet}
+    </div>${extrasHtml}
   </div>
 </div>`;
   }).join("\n");
 
-  // ✅ Sanitiza o bloco inteiro UMA vez
-  return sanitizeMarkdownHtml(`
-  
----
-
-<div class="sources-section">
-<h2>📚 Fontes</h2>
-${cards}
-</div>
-`);
+  // Retorna sem sanitizar aqui — o pipeline principal chama sanitizeMarkdownHtml
+  // uma única vez sobre o md completo. O separador \n\n garante que o --- fique
+  // isolado do parágrafo anterior após a concatenação com md.trimEnd().
+  return `\n\n---\n\n<div class="sources-section">\n<h2>📚 Fontes</h2>\n${cards}\n</div>\n`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -353,6 +389,16 @@ export function enrichArticle({ artifact, citations = [], searchResults = [], us
   const generatedAt = new Date().toISOString().slice(0, 10);
   let md = artifact.markdownText;
 
+  // 0. Normaliza placeholders LINK embutidos errado pelo LLM como href de link markdown:
+  //    [texto](<!--[[LINK: slug | label]])   — falta --> antes do )
+  //    [texto](<!--[[LINK: slug | label]]--> — com --> mas dentro de ()
+  //    Ambos viram: texto standalone + placeholder correto
+  md = md.replace(/\[([^\]]+)\]\(<!--\[\[LINK:[^\]]*\]\](?:-->)?\)/g, (_, anchor, offset, str) => {
+    const raw = str.slice(offset).match(/\((<!--\[\[LINK:[^\]]*\]\])(?:-->)?\)/);
+    const placeholder = raw ? raw[1] + "-->" : "";
+    return `${anchor}${placeholder}`;
+  });
+
   // 1. Badge de frescor — logo após o H1
   const freshnessHtml = buildFreshnessHtml(searchResults, usage, generatedAt);
   md = md.replace(/^(# .+)$/m, `$1\n\n${freshnessHtml}`);
@@ -371,9 +417,10 @@ export function enrichArticle({ artifact, citations = [], searchResults = [], us
   }
 
   // 4. Seção de fontes com cards no final do .md
-  md = md + buildSourceCardsHtml(citations, searchResults);
+  // trimEnd() + separador explícito evita o --- grudar no último parágrafo
+  md = md.trimEnd() + buildSourceCardsHtml(citations, searchResults);
 
-  // 5. SANITIZE
+  // 5. SANITIZE — chamado uma única vez aqui sobre o md completo
   md = sanitizeMarkdownHtml(md.trim());
 
   // ── enrichedArtifact ──────────────────────────────────────────────────────

@@ -15,8 +15,9 @@ export function sanitizeMarkdownHtml(md) {
     .replace(/([^\n])(<(div|table|ul|ol|pre|blockquote))/gi, "$1\n\n$2")
     .replace(/(<\/(div|table|ul|ol|pre|blockquote)>)([^\n])/gi, "$1\n\n$3")
 
-    // remove espaços após fechamento de tag
-    .replace(/<\/(div|table|ul|ol|pre|blockquote)>\s+\n/gi, "</$1>\n")
+    // remove espaços/tabs após fechamento de tag (não remove quebras de linha —
+    // CommonMark precisa de linha em branco após </div> para retomar o Markdown)
+    .replace(/<\/(div|table|ul|ol|pre|blockquote)>[ \t]+\n/gi, "</$1>\n")
 
     // normaliza múltiplas quebras
     .replace(/\n{3,}/g, "\n\n")
