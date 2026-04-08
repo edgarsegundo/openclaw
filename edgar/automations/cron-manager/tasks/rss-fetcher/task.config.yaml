@@ -1,0 +1,145 @@
+schema_version: 1
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+name: "rss-fetcher"
+description: "Fetch news from RSS feeds based on a topic and generate a structured article draft"
+author: "Edgar Segundo"
+created_at: "2026-04-08"
+tags: []                        # free-form tags for filtering/searching
+
+# ── Execution control ─────────────────────────────────────────────────────────
+allow_manual: true  # can be triggered interactively
+allow_cron: true      # can be triggered by a cron job
+
+cron_suggestion: ""  # e.g. "0 8 * * 1-5" (weekdays at 8am)
+
+entrypoint: node index.js
+working_dir: ./tasks/rss-fetcher
+
+# ── Limits ────────────────────────────────────────────────────────────────────
+timeout_seconds:                # leave blank for no timeout
+
+retry:
+  max_retries: 0                # number of retries on failure
+  delay_seconds: 5              # wait between retries
+  backoff: linear               # linear | exponential
+
+# ── Environment variables ─────────────────────────────────────────────────────
+# Declare env vars your task needs. The runner will warn if they are missing.
+# Keys are loaded from (in order, lowest → highest priority):
+#   ai-client/.env → cron-manager/.env → tasks/rss-fetcher/.env → shell env
+#
+# Scopes:
+#   common → required in both manual and cron runs
+#   manual → only validated in manual runs
+#   cron   → only validated in cron runs
+env_vars:
+  common: []
+    # Example:
+    # - name: MY_API_KEY
+    #   required: true
+    #   help_tip: API key for the external service
+  manual: []
+  cron: []
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+# Inputs are collected interactively (manual) or read from defaults (cron).
+# Available types: string | number | boolean | date | artifact
+#
+# For type: artifact — loads a JSON file produced by another task:
+#   - name: previous_result
+#     type: artifact
+#     from_task: other-task-name    # task that produced it
+#     artifact: result              # matches "name" in that task's artifacts list
+#
+# Inputs are available in index.js as context.inputs.<name>
+# They are also injected as {{name}} variables in prompt templates.
+
+inputs:
+  - name: topic
+    type: string
+    required: true
+    help_tip: "Main topic label (e.g. visto americano, bitcoin, openai)"
+
+  - name: patterns
+    type: string
+    required: false
+    default: ""
+    help_tip: "Optional matching patterns separated by semicolon (e.g. visto americano; consulado americano; ds-160)"
+
+  - name: exclude_patterns
+    type: string
+    required: false
+    default: ""
+    help_tip: "Optional exclusion patterns separated by semicolon"
+
+  - name: feeds
+    type: string
+    required: false
+    default: ""
+    help_tip: "Comma-separated list of RSS feed URLs. If empty, uses the default feed list in feeds.js"
+
+  - name: max_items
+    type: number
+    required: false
+    default: 10
+    help_tip: Maximum number of news items to collect across all feeds
+
+  - name: language
+    type: string
+    required: false
+    default: "pt"
+    help_tip: "Preferred language for filtering articles (pt, en, es)"
+
+  - name: since_hours
+    type: number
+    required: false
+    default: 0
+    help_tip: "Only include items published in the last X hours. Use 0 to disable (fetch all available)"
+ 
+  - name: category
+    type: string
+    required: false
+    default: ""
+    help_tip: "Filter default feeds by category: general, technology, finance, business. Empty = all categories"
+
+
+# ── Artifacts ─────────────────────────────────────────────────────────────────
+# DOCUMENTATION ONLY — the runner does not enforce paths declared here.
+# Describes what files this task produces so consuming tasks know where to look.
+#
+# Fields:
+#   name        — id used in saveArtifact("name", data) inside index.js
+#   description — what the artifact contains
+#   template    — prompt template that produces it (informational)
+#   path        — file path relative to artifacts/rss-fetcher/
+#                 for dynamic paths use a pattern: "article-{slug}.json"
+#   dynamic     — (optional) true if filename changes per execution
+#   path_key    — (optional) artifact field used to build the dynamic filename
+#
+# How another task consumes this artifact:
+#   inputs:
+#     - name: my_data
+#       type: artifact
+#       from_task: rss-fetcher
+#       artifact: result          # matches "name" below
+#
+# artifacts:
+#   - name: result
+#     description: Main output of this task
+#     template: my-template
+#     path: result.json
+#
+#   # Dynamic example (one file per execution, named after a field):
+#   - name: article
+#     description: Generated article
+#     template: write-article
+#     path: "article-{slug}.json"
+#     dynamic: true
+#     path_key: title             # artifact.title is slugified → filename
+
+artifacts:
+  - name: raw_news
+    description: Raw collected news items from RSS feeds, filtered by topic
+    template: none
+    path: raw_news.json

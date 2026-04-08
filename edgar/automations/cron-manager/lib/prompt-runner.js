@@ -164,6 +164,11 @@ async function callApi({ provider, model, messages, responseFormat, temperature,
  * - Returns null if the user skips or no templates exist.
  */
 export async function selectTemplate(taskDir, templateOption, mode) {
+  // Explicit skip sentinels: --template skip | --template none | --template ""
+  if (templateOption === "skip" || templateOption === "none" || templateOption === "") {
+    return null;
+  }
+
   const templateNames = listTemplateNames(taskDir);
 
   if (templateNames.length === 0) {

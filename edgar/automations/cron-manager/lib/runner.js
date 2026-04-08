@@ -5,7 +5,7 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import dotenv from "dotenv";
 import inquirer from "inquirer";
-import { initDb, insertRun } from "./db.js";
+import { initDb, insertRun, closeDb } from "./db.js";
 import logger from "./logger.js";
 import { hasPromptTemplates, listTemplateNames, loadTemplateConfig } from "./prompt-loader.js";
 import {
@@ -586,6 +586,7 @@ export async function runTask(taskName, options = {}) {
       status: "success",
       error_message: null,
     });
+    closeDb();
 
     writeLogFile(taskName, executionId, startedAt, logLines);
   } catch (err) {
@@ -613,6 +614,7 @@ export async function runTask(taskName, options = {}) {
       status: "failure",
       error_message: err.message,
     });
+    closeDb();
 
     writeLogFile(taskName, executionId, startedAt, logLines);
     process.exit(1);

@@ -105,3 +105,13 @@ export function getAllTaskNames() {
     .all()
     .map((r) => r.task);
 }
+
+/**
+ * Close the SQLite connection and release file handles.
+ */
+export function closeDb() {
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
+}
