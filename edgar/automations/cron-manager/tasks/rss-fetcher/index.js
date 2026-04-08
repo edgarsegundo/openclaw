@@ -346,9 +346,10 @@ export default async function (context) {
   }
 
   // ── 8. Save artifact ──────────────────────────────────────────────────────
-  // Salva um arquivo por dia: raw_news-YYYY-MM-DD.json
+  // Salva um arquivo por id+data: raw_news-<id>-YYYY-MM-DD.json
   const today = new Date().toISOString().slice(0, 10); // "2026-04-08"
-  const artifactName = `raw_news-${today}`;
+  const inputId = (inputs.id || "").trim();
+  const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
   await saveArtifact(artifactName, artifact);
 
   console.log(`\nArtifact saved: ${artifactName}.json`);
