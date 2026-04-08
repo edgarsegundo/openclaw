@@ -1,5 +1,7 @@
 import Parser from "rss-parser";
 import { DEFAULT_FEEDS, parseCustomFeeds } from "./feeds.js";
+import fs from "fs";
+import path from "path";
 
 /**
  * rss-fetcher task
@@ -344,8 +346,34 @@ export default async function (context) {
   }
 
   // ── 8. Save artifact ──────────────────────────────────────────────────────
-  await saveArtifact("raw_news", artifact);
+  // Salva um arquivo por dia: raw_news-YYYY-MM-DD.json
+  const today = new Date().toISOString().slice(0, 10); // "2026-04-08"
+  const artifactName = `raw_news-${today}`;
+  await saveArtifact(artifactName, artifact);
 
-  console.log("\nArtifact saved: raw_news.json");
+  console.log(`\nArtifact saved: ${artifactName}.json`);
   console.log("Next step: run the article-writer task consuming this artifact.");
+
+  // ── 9. Cleanup: remove arquivos antigos (>7 dias) ─────────────────────────────
+
+  const artifactsDir = path.resolve("artifacts/rss-fetcher");
+  const keepDays = 7;
+  const now = new Date();
+
+  try {
+    const files = fs.readdirSync(artifactsDir);
+    for (const file of files) {
+      const match = file.match(/^raw_news-(\d{4}-\d{2}-\d{2})\.json$/);
+      if (match) {
+        const fileDate = new Date(match[1]);
+        const diffDays = (now - fileDate) / (1000 * 60 * 60 * 24);
+        if (diffDays > keepDays) {
+          fs.unlinkSync(path.join(artifactsDir, file));
+          console.log("Deleted old artifact:", file);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[cleanup] Failed to delete old artifacts:", err.message);
+  }
 }

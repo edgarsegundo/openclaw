@@ -56,6 +56,11 @@ env_vars:
 # They are also injected as {{name}} variables in prompt templates.
 
 inputs:
+  - name: id
+    type: string
+    required: true
+    help_tip: "Unique identifier for this execution (e.g. rss-inputs-visto-americano). Used for tracking and artifact naming."
+
   - name: topic
     type: string
     required: true
