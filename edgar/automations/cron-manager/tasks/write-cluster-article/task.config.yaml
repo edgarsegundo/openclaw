@@ -1,7 +1,7 @@
 schema_version: 1
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-name: "write-article"
+name: "write-cluster-article"
 description: ""
 author: ""
 created_at: "2026-04-03"
@@ -14,7 +14,7 @@ allow_cron: true      # can be triggered by a cron job
 cron_suggestion: ""  # e.g. "0 8 * * 1-5" (weekdays at 8am)
 
 entrypoint: node index.js
-working_dir: ./tasks/write-article
+working_dir: ./tasks/write-cluster-article
 
 # ── Limits ────────────────────────────────────────────────────────────────────
 timeout_seconds:                # leave blank for no timeout
@@ -27,7 +27,7 @@ retry:
 # ── Environment variables ─────────────────────────────────────────────────────
 # Declare env vars your task needs. The runner will warn if they are missing.
 # Keys are loaded from (in order, lowest → highest priority):
-#   ai-client/.env → cron-manager/.env → tasks/write-article/.env → shell env
+#   ai-client/.env → cron-manager/.env → tasks/write-cluster-article/.env → shell env
 #
 # Scopes:
 #   common → required in both manual and cron runs
@@ -83,7 +83,7 @@ inputs:
 #   name        — id used in saveArtifact("name", data) inside index.js
 #   description — what the artifact contains
 #   template    — prompt template that produces it (informational)
-#   path        — file path relative to artifacts/write-article/
+#   path        — file path relative to artifacts/write-cluster-article/
 #                 for dynamic paths use a pattern: "article-{slug}.json"
 #   dynamic     — (optional) true if filename changes per execution
 #   path_key    — (optional) artifact field used to build the dynamic filename
@@ -92,17 +92,17 @@ inputs:
 #   inputs:
 #     - name: my_data
 #       type: artifact
-#       from_task: write-article
+#       from_task: write-cluster-article
 #       artifact: result          # matches "name" below
 #
 artifacts:
   - name: result
     description: Artigo gerado (output principal)
-    template: searchable-ai
+    template: cluster
     path: result.json
   - name: article
     description: Artigo individual nomeado pelo slug
-    template: searchable-ai
+    template: cluster
     path: "article-{slug}.json"
     dynamic: true
     path_key: slug

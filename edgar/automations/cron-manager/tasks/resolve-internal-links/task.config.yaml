@@ -5,7 +5,7 @@ name: "resolve-internal-links"
 description: "Substitui placeholders <!--[[LINK: slug | anchor]]--> nos artigos .md por links markdown reais, usando o cluster.result.json como fonte de slugs válidos."
 author: ""
 created_at: "2026-04-06"
-tags: ["write-article", "internal-links", "post-processing"]
+tags: ["write-cluster-article", "internal-links", "post-processing"]
 
 # ── Execution control ─────────────────────────────────────────────────────────
 allow_manual: true  # can be triggered interactively
@@ -58,7 +58,7 @@ inputs:
   - name: cluster_folder
     type: string
     required: true
-    help_tip: "Nome da pasta dentro de tasks/write-article/inputs/ que contém o cluster.result.json (ex: guia-visto-americano-turismo)"
+    help_tip: "Nome da pasta dentro de tasks/write-cluster-article/inputs/ que contém o cluster.result.json (ex: guia-visto-americano-turismo)"
 
 # ── Artifacts ─────────────────────────────────────────────────────────────────
 # DOCUMENTATION ONLY — the runner does not enforce paths declared here.

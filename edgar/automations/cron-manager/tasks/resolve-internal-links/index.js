@@ -38,7 +38,7 @@ export default async function (context) {
 
   const clusterFolder = inputs.cluster_folder;
   const clusterJsonPath = path.join(
-    __dirname, "..", "write-article", "inputs", clusterFolder, "cluster.result.json"
+    __dirname, "..", "write-cluster-article", "inputs", clusterFolder, "cluster.result.json"
   );
 
   if (!fs.existsSync(clusterJsonPath)) {
@@ -58,7 +58,7 @@ export default async function (context) {
     console.log(`  • ${slug}`);
   }
 
-  const articlesDir = path.join(__dirname, "..", "..", "artifacts", "write-article");
+  const articlesDir = path.join(__dirname, "..", "..", "artifacts", "write-cluster-article");
 
   const summary = {
     clusterFolder,
@@ -70,7 +70,7 @@ export default async function (context) {
     const mdPath = path.join(articlesDir, `${article.slug}.md`);
 
     if (!fs.existsSync(mdPath)) {
-      console.warn(`\n⚠ Arquivo não encontrado, pulando: artifacts/write-article/${article.slug}.md`);
+      console.warn(`\n⚠ Arquivo não encontrado, pulando: artifacts/write-cluster-article/${article.slug}.md`);
       summary.articles.push({ slug: article.slug, status: "skipped", reason: "file not found" });
       continue;
     }

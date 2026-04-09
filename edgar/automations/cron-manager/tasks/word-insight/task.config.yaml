@@ -52,7 +52,7 @@ artifacts:
   #
   # - name: article
   #   description: Blog article with metadata
-  #   template: write-article
+  #   template: write-cluster-article
   #   path: "article-{slug}.json"  # slug is built from artifact.title at runtime
   #   dynamic: true
   #   path_key: title              # artifact field used to generate the slug

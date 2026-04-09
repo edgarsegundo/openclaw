@@ -138,7 +138,7 @@ inputs:
 #   # Dynamic example (one file per execution, named after a field):
 #   - name: article
 #     description: Generated article
-#     template: write-article
+#     template: write-cluster-article
 #     path: "article-{slug}.json"
 #     dynamic: true
 #     path_key: title             # artifact.title is slugified → filename

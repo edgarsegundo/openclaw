@@ -31,7 +31,7 @@ export default async function (context) {
   console.log("Inputs:", JSON.stringify(inputs, null, 2));
 
   if (!runPrompt) {
-    throw new Error("runPrompt não disponível. Execute com --template searchable-ai");
+    throw new Error("runPrompt não disponível. Execute com --template cluster");
   }
 
   // Busca artigo + metadados completos do Sonar
@@ -60,7 +60,7 @@ export default async function (context) {
   // Salva artifact bruto antes de enriquecer — se enrichArticle falhar, esse arquivo persiste
   const rawArtifactName = `result-${artifact.slug}`;
   await saveArtifact(rawArtifactName, { artifact, citations, searchResults, usage });
-  console.log(`Raw result saved: artifacts/write-article/${rawArtifactName}.json`);
+  console.log(`Raw result saved: artifacts/write-cluster-article/${rawArtifactName}.json`);
 
   // Enriquece o artigo com todas as transformações
   const { enrichedMarkdown, enrichedArtifact } = enrichArticle({
@@ -74,12 +74,12 @@ export default async function (context) {
   await saveArtifact(`article-${artifact.slug}`, enrichedArtifact);
 
   // Salva o .md enriquecido — o Astro cuida da conversão para HTML estático
-  const articlesDir = path.join(__dirname, "..", "..", "artifacts", "write-article");
+  const articlesDir = path.join(__dirname, "..", "..", "artifacts", "write-cluster-article");
   fs.mkdirSync(articlesDir, { recursive: true });
 
   const mdPath = path.join(articlesDir, `${artifact.slug}.md`);
   fs.writeFileSync(mdPath, enrichedMarkdown.replace(/\\n/g, "\n"), "utf8");
-  console.log(`Markdown saved: artifacts/write-article/${artifact.slug}.md`);
+  console.log(`Markdown saved: artifacts/write-cluster-article/${artifact.slug}.md`);
 
   console.log(`\nModel used: ${model}`);
   console.log("Done!");
