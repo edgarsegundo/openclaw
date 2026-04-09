@@ -40,18 +40,12 @@ import { z } from "zod";
 export default z.object({
   topic: z.string(),
   evaluated_at: z.string(),
-  total_evaluated: z.number(),
-  total_approved: z.number(),
   results: z.array(
     z.object({
       title: z.string(),
       link: z.string(),
       published: z.string().nullable().optional(),
-      source: z.string(),
-      summary: z.string(),
       score: z.number().min(0).max(10),
-      approved: z.boolean(),
-      reason: z.string(),
     })
   ),
 });

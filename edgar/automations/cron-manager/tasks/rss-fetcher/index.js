@@ -268,6 +268,7 @@ export default async function (context) {
           language: feed.lang,
           category: feed.category,
           score,
+          fetched_at_item: new Date().toISOString(),
         });
       }
     } catch (err) {

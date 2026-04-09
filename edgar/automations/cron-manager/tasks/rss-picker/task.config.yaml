@@ -1,0 +1,36 @@
+schema_version: 1
+
+name: rss-picker
+description: Triage raw RSS news items using AI to select only those worth turning into blog articles
+created_at: "2026-04-08"
+allow_manual: true
+allow_cron: true
+entrypoint: node index.js
+working_dir: ./tasks/rss-picker
+
+env_vars:
+  common: []
+
+inputs:
+  - name: rss_fetcher_output_artifact_file_name_pattern
+    type: string
+    required: true
+    help_tip: "Path pattern to today's rss-fetcher artifact. Use {date} as placeholder for today's date. e.g. artifacts/rss-fetcher/rss-artifact-visto-americano-{date}.json"
+
+  - name: blog_context
+    type: string
+    required: false
+    default: "Blog voltado para brasileiros que querem tirar ou renovar o visto americano. O público quer informações práticas, atualizadas e confiáveis sobre o processo de visto."
+    help_tip: "Description of your blog and audience. Used by the AI to judge relevance."
+
+  - name: min_items
+    type: number
+    required: false
+    default: 3
+    help_tip: "Minimum number of NEW items (since last run) required to trigger AI triage. If below this, task exits silently."
+
+  - name: min_score
+    type: number
+    required: false
+    default: 7
+    help_tip: "Minimum relevance score (0-10) for an item to be approved. 7 = strict, 5 = permissive."
