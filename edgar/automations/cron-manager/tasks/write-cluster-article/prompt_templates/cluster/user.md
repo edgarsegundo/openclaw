@@ -180,13 +180,13 @@ Após a entrevista, você pode acompanhar a situação pela internet — veja [c
 
 ## EXEMPLO DE PLACEHOLDER DE IMAGEM
 
-<!-- INSERIR IMAGEM: passaporte americano na mão -->
+<!--[[INSERIR IMAGEM: descrição curta e objetiva]]-->
 
 ---
 
 ## EXEMPLO DE PLACEHOLDER DE INTERVENÇÃO
 
-<!-- INTERVENCAO FUTURA: pesquisa adicional — sugerir fontes oficiais -->
+<!--[[INTERVENCAO FUTURA: sugestão]]-->
 
 ---
 

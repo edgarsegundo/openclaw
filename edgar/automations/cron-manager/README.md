@@ -2,6 +2,8 @@
 
 Modular task automation manager for Node.js — create isolated tasks, run them manually or on a cron schedule, track history, and monitor reliability metrics.
 
+> Para criar tasks, pode usar essa [thread de claude](https://claude.ai/chat/c756e573-2198-4dcb-b670-7465deb68e1c) que já tem o contexto de como criar uma task em cron-manager
+
 ---
 
 ## Requirements

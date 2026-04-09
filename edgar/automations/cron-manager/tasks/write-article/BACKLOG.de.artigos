@@ -1,0 +1,1 @@
+node bin/cron-manager.js run write-article --template news --input-file tasks/write-article/inputs/inputs-visto-americano.json
