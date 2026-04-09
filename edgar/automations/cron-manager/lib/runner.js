@@ -480,7 +480,7 @@ export async function runTask(taskName, options = {}) {
     }
   }
 
-  if (selectedTemplate) {
+  if (selectedTemplate && selectedTemplate !== "none" && selectedTemplate !== "skip") {
     const templateConfig = loadTemplateConfig(taskDir, selectedTemplate);
     let preparedTemplateInputs;
     try {
@@ -504,6 +504,8 @@ export async function runTask(taskName, options = {}) {
       logger.error(`Failed to build runPrompt: ${err.message}`);
       process.exit(1);
     }
+  } else {
+    runPrompt = undefined;
   }
 
   // Build context
@@ -514,11 +516,7 @@ export async function runTask(taskName, options = {}) {
     inputs,
     mode,
     executionId,
-    runPrompt:
-      runPrompt ??
-      (() => {
-        throw new Error("No prompt template selected for this run.");
-      }),
+    runPrompt: runPrompt, // undefined if no template selected
     saveArtifact: saveArtifactFn(taskName, config),
   };
 

@@ -112,20 +112,69 @@ export default async function (context) {
     console.log("Done!");
   }
 
-  const url = "wss://stream.binance.com:9443/ws/ethbrl@kline_1h";
 
-  function connect() {
-    const ws = new WebSocket(url);
 
-    ws.on("open", () => {
-      console.log("🟢 Conectado");
-    });
 
-    ws.on("message", (event) => {
-      const data = JSON.parse(event.toString());
+
+  const url =
+    "wss://stream.binance.com:9443/stream?streams=ethbrl@bookTicker/ethbrl@kline_1h";
+
+  const ws = new WebSocket(url);
+
+  let lastLineLength = 0;
+
+  function updateLine(text) {
+    const padding = " ".repeat(Math.max(0, lastLineLength - text.length));
+    process.stdout.write("\r" + text + padding);
+    lastLineLength = text.length;
+  }  
+
+  ws.on("open", () => {
+    console.log("🟢 Conectado (multi-stream)");
+  });
+
+
+  // 🔥 Quando usar cada um
+  // ✅ Use @trade se você quer:
+  // Ver movimento real do mercado
+  // Detectar:
+  // volume forte
+  // agressão (compras/vendas rápidas)
+  // Criar:
+  // candles personalizados (5s, 10s)
+  // análise de fluxo (order flow)
+
+  // 👉 É mais “cru” e mais detalhado
+
+  // ✅ Use @bookTicker se você quer:
+  // Saber por quanto você pode comprar/vender agora
+  // Tomar decisão de entrada/saída
+  // Criar bots simples e rápidos
+
+  // 👉 É o mais usado porque:
+
+  // é mais leve
+  // mais direto
+  // menos ruído
+
+  ws.on("message", (event) => {
+    const msg = JSON.parse(event.toString());
+    const { stream, data } = msg;
+
+    // 🔹 Preço em tempo real (linha fixa)
+    if (stream.includes("bookTicker")) {
+      const bid = Number(data.b).toFixed(2);
+      const ask = Number(data.a).toFixed(2);
+
+      updateLine(`💰 ETH/BRL | BID: ${bid} | ASK: ${ask}`);
+    }
+
+    // 🔹 Candle fechado (log abaixo)
+    if (stream.includes("kline")) {
       const k = data.k;
 
-      if (k.x) { // só candle fechado
+      if (k.x) {
+        process.stdout.write("\n"); // quebra linha sem bugar o layout
         console.log("📊 Candle fechado:", {
           open: k.o,
           high: k.h,
@@ -134,17 +183,19 @@ export default async function (context) {
           volume: k.v
         });
       }
-    });
+    }    
 
-    ws.on("close", () => {
-      console.log("🔴 Desconectado. Reconectando...");
-      setTimeout(connect, 2000);
-    });
+  });
 
-    ws.on("error", () => {
-      ws.close();
-    });
-  }
+  ws.on("close", () => {
+    console.log("🔴 Desconectado");
+  });
 
-  connect();
+  ws.on("error", (err) => {
+    console.error("Erro:", err.message);
+  });
+
+
+
+
 }
