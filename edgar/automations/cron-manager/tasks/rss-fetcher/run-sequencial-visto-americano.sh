@@ -19,7 +19,7 @@
 #
 # 3. Adicione o cron (ajuste o caminho absoluto):
 #    Use >> para acumular ou > para sobrescrever o log:
-#    ex: */10 * * * * /caminho/para/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto.log 2>&1
+#    ex: */10 * * * * /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
 #
 #   Ou para rotacionar o log automaticamente (recomendado se usar >>):
 #       1. Crie um arquivo /etc/logrotate.d/rss-fetcher-visto com o conteúdo:
