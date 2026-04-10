@@ -1,20 +1,20 @@
 schema_version: 1
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-name: "publish-article"
+name: "image-picker"
 description: ""
 author: ""
-created_at: "2026-04-09"
+created_at: "2026-04-10"
 tags: []                        # free-form tags for filtering/searching
 
 # ── Execution control ─────────────────────────────────────────────────────────
 allow_manual: true  # can be triggered interactively
-allow_cron: true      # can be triggered by a cron job
+allow_cron: false      # can be triggered by a cron job
 
 cron_suggestion: ""  # e.g. "0 8 * * 1-5" (weekdays at 8am)
 
 entrypoint: node index.js
-working_dir: ./tasks/publish-article
+working_dir: ./tasks/image-picker
 
 # ── Limits ────────────────────────────────────────────────────────────────────
 timeout_seconds:                # leave blank for no timeout
@@ -27,7 +27,7 @@ retry:
 # ── Environment variables ─────────────────────────────────────────────────────
 # Declare env vars your task needs. The runner will warn if they are missing.
 # Keys are loaded from (in order, lowest → highest priority):
-#   ai-client/.env → cron-manager/.env → tasks/publish-article/.env → shell env
+#   ai-client/.env → cron-manager/.env → tasks/image-picker/.env → shell env
 #
 # Scopes:
 #   common → required in both manual and cron runs
@@ -54,15 +54,7 @@ env_vars:
 #
 # Inputs are available in index.js as context.inputs.<name>
 # They are also injected as {{name}} variables in prompt templates.
-inputs:
-  - name: articles_dir
-    type: string
-    required: true
-    help_tip: Caminho da pasta onde estão os artigos gerados (*.json e *.md)
-  - name: destinations
-    type: artifact
-    required: true
-    help_tip: Caminho para um arquivo JSON com a lista de destinos (array de objetos { business_id, blog_topic_slug })
+inputs: []
   # Examples:
   # - name: topic
   #   type: string
@@ -95,7 +87,7 @@ inputs:
 #   name        — id used in saveArtifact("name", data) inside index.js
 #   description — what the artifact contains
 #   template    — prompt template that produces it (informational)
-#   path        — file path relative to artifacts/publish-article/
+#   path        — file path relative to artifacts/image-picker/
 #                 for dynamic paths use a pattern: "article-{slug}.json"
 #   dynamic     — (optional) true if filename changes per execution
 #   path_key    — (optional) artifact field used to build the dynamic filename
@@ -104,7 +96,7 @@ inputs:
 #   inputs:
 #     - name: my_data
 #       type: artifact
-#       from_task: publish-article
+#       from_task: image-picker
 #       artifact: result          # matches "name" below
 #
 # artifacts:
