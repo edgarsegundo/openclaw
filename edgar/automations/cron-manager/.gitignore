@@ -1,0 +1,6 @@
+cron-manager.db
+logs/
+artifacts/
+node_modules/
+
+!.gitignore
