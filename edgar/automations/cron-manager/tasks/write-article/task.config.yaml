@@ -12,15 +12,15 @@ env_vars:
   common: []
 
 inputs:
-  - name: title
+  - name: rss_picker_file_pattern
     type: string
     required: true
-    help_tip: "Title of the news item to base the article on (e.g. 'Estados Unidos mantêm regras mais rígidas para imigração e vistos')"
+    help_tip: "File pattern for RSS-picked articles (e.g. 'approved-visto-americano-[aaaa-mm-dd].json', where [aaaa-mm-dd] is auto-replaced with current date)"
 
-  - name: link
+  - name: current_approved_list_path
     type: string
     required: true
-    help_tip: "URL of the reference article. Used as the primary source — Sonar will also search for additional sources."
+    help_tip: "Directory path where the approved articles list file is stored (e.g. '/path/to/approved-lists')"
 
   - name: language
     type: string

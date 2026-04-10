@@ -6,7 +6,6 @@ BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
 cd "$BASE" || exit 1
 
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
-[ -f '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' | xargs)
 
 # Executa rss-fetcher
 echo "[1/2] Rodando rss-fetcher..."

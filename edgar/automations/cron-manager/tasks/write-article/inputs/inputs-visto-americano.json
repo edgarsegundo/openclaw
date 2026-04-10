@@ -1,6 +1,6 @@
 {
-    "title": "Ter visto já não garante entrada? O que está mudando nos aeroportos dos EUA - Gizmodo",
-    "link": "https://www.gizmodo.com.br/ter-visto-ja-nao-garante-entrada-o-que-esta-mudando-nos-aeroportos-dos-eua-49485",
+    "rss_picker_file_pattern": "approved-visto-americano-[aaaa-mm-dd].json",
+    "current_approved_list_path": "artifacts/rss-fetcher",
     "language": "pt-BR",
     "blog_context": "Blog voltado para brasileiros que querem tirar ou renovar o visto americano ou outros tipos de visto. O público quer informações práticas, atualizadas e confiáveis sobre o processo de visto de qualquer país, sobretudo dos Estados Unidos."
 }

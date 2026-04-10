@@ -5,49 +5,123 @@ import { enrichArticle } from "./article-enricher.js";
 /**
  * write-article task
  *
- * Receives a news title and reference link, calls Sonar Pro (Perplexity)
- * to research the topic on the web and write a completely original article.
- * Saves the article as a Markdown file and a structured JSON artifact.
+ * Reads from an RSS-picked articles list file (JSON format), maintains an index
+ * of which article was last processed, and generates an article from the next item
+ * in the list using Perplexity Sonar Pro for web research.
  *
  * Inputs:
- *   title        - news title to base the article on (required)
- *   link         - reference article URL (required)
- *   language     - output language, e.g. pt-BR, en-US (default: pt-BR)
- *   blog_context - description of your blog and audience (optional)
+ *   rss_picker_file_pattern      - pattern with [aaaa-mm-dd] placeholder (e.g. 'approved-visto-americano-[aaaa-mm-dd].json')
+ *   current_approved_list_path   - directory where the list file is stored
+ *   language                     - output language, e.g. pt-BR, en-US (default: pt-BR)
+ *   blog_context                 - description of your blog and audience (optional)
+ *
+ * Behavior:
+ *   1. Constructs the filename by replacing [aaaa-mm-dd] with today's date (YYYY-MM-DD)
+ *   2. Reads the approved articles list from <current_approved_list_path>/<filename>
+ *   3. Checks for an index file (same name without .json extension)
+ *   4. If index exists, reads current position; otherwise starts at 0
+ *   5. Picks the article at that position, increments index, saves it back
+ *   6. Uses the article's title and link to write the blog post
  *
  * Template:
  *   news — uses Perplexity sonar-pro with web search to research and write
  *
  * Artifact output:
- *   artifacts/write-article/article-{slug}-{today}.json  — structured data
- *   artifacts/write-article/article-{slug}-{today}.md    — raw markdown file
+ *   artifacts/write-article/{slug}.json  — structured data
+ *   artifacts/write-article/{slug}.md    — raw markdown file
  */
 export default async function (context) {
-  // ─── context properties ────────────────────────────────────────────────────
-  //   taskName     — string, name of this task
-  //   mode         — "manual" | "cron"
-  //   executionId  — unique UUID for this run (useful for dynamic artifact names)
-  //   inputs       — values declared in task.config.yaml inputs[]
-  //   env          — env vars declared in task.config.yaml env_vars{}
-  //   runPrompt    — async fn — renders template, calls AI, validates via schema.js
-  //   saveArtifact — fn(name, data) — writes JSON to artifacts/write-article/<n>.json
   const { taskName, mode, executionId, inputs, runPrompt, saveArtifact } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
-  // ── runPrompt() ───────────────────────────────────────────────────────────
-  // Task inputs auto-injected: title, link, language, blog_context
-  //
-  // result.artifact      — validated JSON: { title, slug, language, seoMetaDescription, markdownText, imageHints }
-  // result.citations     — source URLs consulted by Sonar Pro
-  // result.searchResults — rich metadata for each source
-  // result.usage         — token counts and cost breakdown
+  // ─── Resolve file path with date pattern ──────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const pattern = inputs.rss_picker_file_pattern;
+  const resolvedFilename = pattern.replace("[aaaa-mm-dd]", today);
+  const listPath = path.join(inputs.current_approved_list_path, resolvedFilename);
+  const indexPath = path.join(inputs.current_approved_list_path, resolvedFilename.replace(/\.json$/, ""));
 
-  console.log(`\nWriting article for: "${inputs.title}"`);
-  console.log(`Reference:           ${inputs.link}`);
-  console.log(`Language:            ${inputs.language}`);
+  console.log(`\nResolving approved articles list:`);
+  console.log(`  Pattern:     ${pattern}`);
+  console.log(`  Date:        ${today}`);
+  console.log(`  List file:   ${listPath}`);
+  console.log(`  Index file:  ${indexPath}`);
 
-  // const { artifact, citations, usage } = await runPrompt();
+  // ─── Read approved articles list ───────────────────────────────────────────
+  if (!fs.existsSync(listPath)) {
+    throw new Error(`Articles list not found: ${listPath}`);
+  }
+
+  let articles;
+  try {
+    const content = fs.readFileSync(listPath, "utf8");
+    articles = JSON.parse(content);
+    if (!Array.isArray(articles)) {
+      throw new Error("Expected articles to be an array");
+    }
+  } catch (err) {
+    throw new Error(`Failed to parse articles list: ${err.message}`);
+  }
+
+  console.log(`  Articles in list: ${articles.length}`);
+
+  // ─── Read or initialize index ───────────────────────────────────────────────
+  let currentIndex = 0;
+  if (fs.existsSync(indexPath)) {
+    try {
+      const indexContent = fs.readFileSync(indexPath, "utf8").trim();
+      currentIndex = parseInt(indexContent, 10);
+      if (isNaN(currentIndex)) {
+        currentIndex = 0;
+      }
+    } catch (err) {
+      console.warn(`Warning: Failed to read index file, starting at 0: ${err.message}`);
+      currentIndex = 0;
+    }
+  }
+
+  console.log(`  Current index: ${currentIndex}`);
+
+  // ─── Get article at current index ──────────────────────────────────────────
+  if (currentIndex >= articles.length) {
+    throw new Error(`Index ${currentIndex} is out of bounds (list has ${articles.length} articles)`);
+  }
+
+  const article = articles[currentIndex];
+  if (!article.title || !article.link) {
+    throw new Error(`Article at index ${currentIndex} is missing 'title' or 'link' field`);
+  }
+
+  console.log(`\n✓ Article selected from list:`);
+  console.log(`  Index: ${currentIndex}`);
+  console.log(`  Title: ${article.title}`);
+  console.log(`  Link:  ${article.link}`);
+
+  // ─── Lock next position BEFORE generating (simple and safe) ─────────────────
+  // if index update fails, abort (cron will retry with same article)
+  // if generation fails AFTER index update, it's acceptable (index is safe)
+  const nextIndex = currentIndex + 1;
+  
+  if (nextIndex <= articles.length) {
+    try {
+      fs.writeFileSync(indexPath, nextIndex.toString(), "utf8");
+      console.log(`\n📊 Index locked: ${currentIndex} → ${nextIndex}`);
+    } catch (err) {
+      throw new Error(`Failed to lock index (aborting): ${err.message}`);
+    }
+  }
+
+  // ─── Prepare inputs for prompt template ────────────────────────────────────
+  const promptInputs = {
+    title: article.title,
+    link: article.link,
+    language: inputs.language,
+    blog_context: inputs.blog_context,
+    date_today: today,
+  };
+
+  console.log(`\n📝 Generating article content...`);
 
   const {
     artifact,
@@ -55,10 +129,7 @@ export default async function (context) {
     citations = [],
     searchResults = [],
     usage = {},
-  } = await runPrompt({
-    ...inputs,
-    date_today: new Date().toISOString().slice(0, 10),
-  });
+  } = await runPrompt(promptInputs);
 
   // ── Print summary ─────────────────────────────────────────────────────────
   const wordCount = (artifact.markdownText ?? "").split(/\s+/).length;
@@ -113,8 +184,8 @@ export default async function (context) {
   // ── Save JSON artifact (ENRICHED) ───────────────────────────────────────────
   await saveArtifact(artifactName, {
     ...enrichedArtifact,
-    reference_title: inputs.title,
-    reference_link: inputs.link,
+    reference_title: article.title,
+    reference_link: article.link,
     generated_at: generatedAt,
     word_count: wordCount,
   });
@@ -129,12 +200,12 @@ export default async function (context) {
   const mdPath = path.join(markdownDir, `${artifact.slug}.md`);
   fs.writeFileSync(mdPath, finalMarkdown, "utf8");
 
-  console.log(`Markdown saved: artifacts/write-article/${artifact.slug}.md`);
+  console.log(`\n📁 Artifacts saved:`);
+  console.log(`   JSON:       artifacts/write-article/${artifactName}.json`);
+  console.log(`   Markdown:   artifacts/write-article/${artifact.slug}.md`);
 
-  // ── Final summary ───────────────────────────────────────────────────────────
+  // ─── Final summary ────────────────────────────────────────────────────────
   console.log("\n─────────────────────────────────────────────────────────");
-  console.log(`✅ Done!`);
-  console.log(`   RAW JSON:  artifacts/write-article/${artifactName}-raw.json`);
-  console.log(`   JSON:      artifacts/write-article/${artifactName}.json`);
-  console.log(`   Markdown:  artifacts/write-article/${artifact.slug}.md`);
+  console.log(`✅ Task completed successfully!`);
+  console.log(`   Articles processed: ${nextIndex} / ${articles.length}`);
 }
