@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import { getAcpSessionManager } from "../acp/control-plane/manager.js";
 import {
   cleanupFailedAcpSpawn,
@@ -19,7 +20,6 @@ import {
 import {
   formatThreadBindingDisabledError,
   formatThreadBindingSpawnDisabledError,
-  requiresNativeThreadContextForThreadHere,
   resolveThreadBindingIdleTimeoutMsForChannel,
   resolveThreadBindingMaxAgeMsForChannel,
   resolveThreadBindingSpawnPolicy,
@@ -44,7 +44,12 @@ import {
   isSubagentSessionKey,
   normalizeAgentId,
   parseAgentSessionKey,
+  resolveAgentIdFromSessionKey,
 } from "../routing/session-key.js";
+import {
+  normalizeOptionalLowercaseString,
+  normalizeOptionalString,
+} from "../shared/string-coerce.js";
 import { createRunningTaskRun } from "../tasks/task-executor.js";
 import {
   deliveryContextFromSession,
@@ -59,6 +64,7 @@ import {
 } from "./acp-spawn-parent-stream.js";
 import { resolveAgentConfig, resolveDefaultAgentId } from "./agent-scope.js";
 import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
+import { resolveSpawnedWorkspaceInheritance } from "./spawned-context.js";
 import { resolveInternalSessionKey, resolveMainSessionAlias } from "./tools/sessions-helpers.js";
 
 const log = createSubsystemLogger("agents/acp-spawn");
@@ -93,15 +99,46 @@ export type SpawnAcpContext = {
   sandboxed?: boolean;
 };
 
-export type SpawnAcpResult = {
-  status: "accepted" | "forbidden" | "error";
+export const ACP_SPAWN_ERROR_CODES = [
+  "acp_disabled",
+  "requester_session_required",
+  "runtime_policy",
+  "thread_required",
+  "target_agent_required",
+  "agent_forbidden",
+  "cwd_resolution_failed",
+  "thread_binding_invalid",
+  "spawn_failed",
+  "dispatch_failed",
+] as const;
+export type SpawnAcpErrorCode = (typeof ACP_SPAWN_ERROR_CODES)[number];
+
+type SpawnAcpResultFields = {
   childSessionKey?: string;
   runId?: string;
   mode?: SpawnAcpMode;
   streamLogPath?: string;
   note?: string;
-  error?: string;
 };
+
+type SpawnAcpAcceptedResult = SpawnAcpResultFields & {
+  status: "accepted";
+  childSessionKey: string;
+  runId: string;
+  mode: SpawnAcpMode;
+};
+
+type SpawnAcpFailedResult = SpawnAcpResultFields & {
+  status: "forbidden" | "error";
+  error: string;
+  errorCode: SpawnAcpErrorCode;
+};
+
+export type SpawnAcpResult = SpawnAcpAcceptedResult | SpawnAcpFailedResult;
+
+export function isSpawnAcpAcceptedResult(result: SpawnAcpResult): result is SpawnAcpAcceptedResult {
+  return result.status === "accepted";
+}
 
 export const ACP_SPAWN_ACCEPTED_NOTE =
   "initial ACP task queued in isolated session; follow-ups continue in the bound thread.";
@@ -172,6 +209,66 @@ type AcpSpawnBootstrapDeliveryPlan = {
   threadId?: string;
 };
 
+function resolvePlacementWithoutChannelPlugin(params: {
+  channel: string;
+  capabilities: { placements: Array<"current" | "child"> };
+}): "current" | "child" {
+  switch (params.channel) {
+    case "discord":
+    case "matrix":
+      return params.capabilities.placements.includes("child") ? "child" : "current";
+    case "line":
+    case "telegram":
+      return "current";
+  }
+  return params.capabilities.placements.includes("child") ? "child" : "current";
+}
+
+function normalizeLineConversationIdFallback(value: string | undefined): string | undefined {
+  const trimmed = normalizeOptionalString(value) ?? "";
+  if (!trimmed) {
+    return undefined;
+  }
+  const normalized = trimmed.match(/^line:(?:(?:user|group|room):)?(.+)$/i)?.[1]?.trim() ?? trimmed;
+  return normalized ? normalized : undefined;
+}
+
+function normalizeTelegramConversationIdFallback(params: {
+  to?: string;
+  threadId?: string | number;
+  groupId?: string;
+}): string | undefined {
+  const explicitGroupId = normalizeOptionalString(params.groupId);
+  const explicitThreadId =
+    params.threadId != null ? normalizeOptionalString(String(params.threadId)) : undefined;
+  if (
+    explicitGroupId &&
+    explicitThreadId &&
+    /^-?\d+$/.test(explicitGroupId) &&
+    /^\d+$/.test(explicitThreadId)
+  ) {
+    return `${explicitGroupId}:topic:${explicitThreadId}`;
+  }
+
+  const trimmed = normalizeOptionalString(params.to) ?? "";
+  if (!trimmed) {
+    return undefined;
+  }
+  const normalized = trimmed.replace(/^telegram:(?:group:|channel:|direct:)?/i, "");
+  const topicMatch = /^(-?\d+):topic:(\d+)$/i.exec(normalized);
+  if (topicMatch?.[1] && topicMatch[2]) {
+    return `${topicMatch[1]}:topic:${topicMatch[2]}`;
+  }
+  return /^-?\d+$/.test(normalized) ? normalized : undefined;
+}
+
+const threadBindingFallbackConversationResolvers = {
+  line: (params: { to?: string; groupId?: string }) =>
+    normalizeLineConversationIdFallback(params.groupId ?? params.to),
+  telegram: (params: { to?: string; threadId?: string | number; groupId?: string }) =>
+    normalizeTelegramConversationIdFallback(params),
+} as const;
+
 function resolveSpawnMode(params: {
   requestedMode?: SpawnAcpMode;
   threadRequested: boolean;
@@ -214,7 +311,7 @@ function isHeartbeatEnabledForSessionAgent(params: {
     resolveAgentConfig(params.cfg, requesterAgentId)?.heartbeat?.every ??
     params.cfg.agents?.defaults?.heartbeat?.every ??
     DEFAULT_HEARTBEAT_EVERY;
-  const trimmedEvery = typeof heartbeatEvery === "string" ? heartbeatEvery.trim() : "";
+  const trimmedEvery = normalizeOptionalString(heartbeatEvery) ?? "";
   if (!trimmedEvery) {
     return false;
   }
@@ -260,10 +357,10 @@ function hasSessionLocalHeartbeatRelayRoute(params: {
 
   // Explicit delivery overrides are not session-local and can route updates
   // to unrelated destinations (for example a pinned ops channel).
-  if (typeof heartbeat?.to === "string" && heartbeat.to.trim().length > 0) {
+  if (normalizeOptionalString(heartbeat?.to)) {
     return false;
   }
-  if (typeof heartbeat?.accountId === "string" && heartbeat.accountId.trim().length > 0) {
+  if (normalizeOptionalString(heartbeat?.accountId)) {
     return false;
   }
 
@@ -298,7 +395,7 @@ function resolveTargetAcpAgentId(params: {
 }
 
 function normalizeOptionalAgentId(value: string | undefined | null): string | undefined {
-  const trimmed = (value ?? "").trim();
+  const trimmed = normalizeOptionalString(value) ?? "";
   if (!trimmed) {
     return undefined;
   }
@@ -315,12 +412,52 @@ function summarizeError(err: unknown): string {
   return "error";
 }
 
+function createAcpSpawnFailure(params: {
+  status: "forbidden" | "error";
+  errorCode: SpawnAcpErrorCode;
+  error: string;
+  childSessionKey?: string;
+}): SpawnAcpFailedResult {
+  return {
+    status: params.status,
+    errorCode: params.errorCode,
+    error: params.error,
+    ...(params.childSessionKey ? { childSessionKey: params.childSessionKey } : {}),
+  };
+}
+
+function isMissingPathError(error: unknown): boolean {
+  const code = error instanceof Error ? (error as NodeJS.ErrnoException).code : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
+async function resolveRuntimeCwdForAcpSpawn(params: {
+  resolvedCwd?: string;
+  explicitCwd?: string;
+}): Promise<string | undefined> {
+  if (!params.resolvedCwd) {
+    return undefined;
+  }
+  if (normalizeOptionalString(params.explicitCwd)) {
+    return params.resolvedCwd;
+  }
+  try {
+    await fs.access(params.resolvedCwd);
+    return params.resolvedCwd;
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
 function resolveRequesterInternalSessionKey(params: {
   cfg: OpenClawConfig;
   requesterSessionKey?: string;
 }): string {
   const { mainKey, alias } = resolveMainSessionAlias(params.cfg);
-  const requesterSessionKey = params.requesterSessionKey?.trim();
+  const requesterSessionKey = normalizeOptionalString(params.requesterSessionKey);
   return requesterSessionKey
     ? resolveInternalSessionKey({
         key: requesterSessionKey,
@@ -365,8 +502,9 @@ function resolveConversationIdForThreadBinding(params: {
   threadId?: string | number;
   groupId?: string;
 }): string | undefined {
-  const channel = params.channel?.trim().toLowerCase();
+  const channel = normalizeOptionalLowercaseString(params.channel);
   const normalizedChannelId = channel ? normalizeChannelId(channel) : null;
+  const channelKey = normalizedChannelId ?? channel ?? null;
   const pluginResolvedConversationId = normalizedChannelId
     ? getChannelPlugin(normalizedChannelId)?.messaging?.resolveInboundConversation?.({
         to: params.groupId ?? params.to,
@@ -375,8 +513,17 @@ function resolveConversationIdForThreadBinding(params: {
         isGroup: true,
       })?.conversationId
     : null;
-  if (pluginResolvedConversationId?.trim()) {
-    return pluginResolvedConversationId.trim();
+  if (normalizeOptionalString(pluginResolvedConversationId)) {
+    return normalizeOptionalString(pluginResolvedConversationId);
+  }
+  const compatibilityConversationId =
+    channelKey && Object.hasOwn(threadBindingFallbackConversationResolvers, channelKey)
+      ? threadBindingFallbackConversationResolvers[
+          channelKey as keyof typeof threadBindingFallbackConversationResolvers
+        ](params)
+      : undefined;
+  if (compatibilityConversationId) {
+    return compatibilityConversationId;
   }
   const genericConversationId = resolveConversationIdFromTargets({
     threadId: params.threadId,
@@ -393,8 +540,8 @@ function resolveAcpSpawnChannelAccountId(params: {
   channel?: string;
   accountId?: string;
 }): string | undefined {
-  const channel = params.channel?.trim().toLowerCase();
-  const explicitAccountId = params.accountId?.trim();
+  const channel = normalizeOptionalLowercaseString(params.channel);
+  const explicitAccountId = normalizeOptionalString(params.accountId);
   if (explicitAccountId) {
     return explicitAccountId;
   }
@@ -403,9 +550,7 @@ function resolveAcpSpawnChannelAccountId(params: {
   }
   const channels = params.cfg.channels as Record<string, { defaultAccount?: unknown } | undefined>;
   const configuredDefaultAccountId = channels?.[channel]?.defaultAccount;
-  return typeof configuredDefaultAccountId === "string" && configuredDefaultAccountId.trim()
-    ? configuredDefaultAccountId.trim()
-    : "default";
+  return normalizeOptionalString(configuredDefaultAccountId) ?? "default";
 }
 
 function prepareAcpThreadBinding(params: {
@@ -416,7 +561,7 @@ function prepareAcpThreadBinding(params: {
   threadId?: string | number;
   groupId?: string;
 }): { ok: true; binding: PreparedAcpThreadBinding } | { ok: false; error: string } {
-  const channel = params.channel?.trim().toLowerCase();
+  const channel = normalizeOptionalLowercaseString(params.channel);
   if (!channel) {
     return {
       ok: false,
@@ -466,11 +611,18 @@ function prepareAcpThreadBinding(params: {
       error: `Thread bindings are unavailable for ${policy.channel}.`,
     };
   }
-  const placement = requiresNativeThreadContextForThreadHere(policy.channel) ? "child" : "current";
-  if (!capabilities.bindSupported || !capabilities.placements.includes(placement)) {
+  const pluginPlacement = getChannelPlugin(policy.channel)?.conversationBindings
+    ?.defaultTopLevelPlacement;
+  const placementToUse =
+    pluginPlacement ??
+    resolvePlacementWithoutChannelPlugin({
+      channel: policy.channel,
+      capabilities,
+    });
+  if (!capabilities.bindSupported || !capabilities.placements.includes(placementToUse)) {
     return {
       ok: false,
-      error: `Thread bindings do not support ${placement} placement for ${policy.channel}.`,
+      error: `Thread bindings do not support ${placementToUse} placement for ${policy.channel}.`,
     };
   }
   const conversationIdRaw = resolveConversationIdForThreadBinding({
@@ -491,7 +643,7 @@ function prepareAcpThreadBinding(params: {
     binding: {
       channel: policy.channel,
       accountId: policy.accountId,
-      placement,
+      placement: placementToUse,
       conversationId: conversationIdRaw,
     },
   };
@@ -514,7 +666,7 @@ function resolveAcpSpawnRequesterState(params: {
       : false;
   const hasThreadContext =
     typeof params.ctx.agentThreadId === "string"
-      ? params.ctx.agentThreadId.trim().length > 0
+      ? Boolean(normalizeOptionalString(params.ctx.agentThreadId))
       : params.ctx.agentThreadId != null;
   const requesterAgentId = requesterParsedSession?.agentId;
 
@@ -679,7 +831,7 @@ async function bindPreparedAcpThread(params: {
 
   let sessionEntry = params.initializedRuntime.sessionEntry;
   if (params.initializedRuntime.sessionId && params.preparedBinding.placement === "child") {
-    const boundThreadId = String(binding.conversation.conversationId).trim() || undefined;
+    const boundThreadId = normalizeOptionalString(String(binding.conversation.conversationId));
     if (boundThreadId) {
       sessionEntry = await persistAcpSpawnSessionFileBestEffort({
         sessionId: params.initializedRuntime.sessionId,
@@ -708,10 +860,12 @@ function resolveAcpSpawnBootstrapDeliveryPlan(params: {
   // Child-thread ACP spawns deliver bootstrap output to the new thread; current-conversation
   // binds deliver back to the originating target.
   const boundThreadIdRaw = params.binding?.conversation.conversationId;
-  const boundThreadId = boundThreadIdRaw ? String(boundThreadIdRaw).trim() || undefined : undefined;
+  const boundThreadId = boundThreadIdRaw
+    ? normalizeOptionalString(String(boundThreadIdRaw))
+    : undefined;
   const fallbackThreadIdRaw = params.requester.origin?.threadId;
   const fallbackThreadId =
-    fallbackThreadIdRaw != null ? String(fallbackThreadIdRaw).trim() || undefined : undefined;
+    fallbackThreadIdRaw != null ? normalizeOptionalString(String(fallbackThreadIdRaw)) : undefined;
   const deliveryThreadId = boundThreadId ?? fallbackThreadId;
   const requesterConversationId = resolveConversationIdForThreadBinding({
     channel: params.requester.origin?.channel,
@@ -736,9 +890,11 @@ function resolveAcpSpawnBootstrapDeliveryPlan(params: {
     parentConversationId: params.binding?.conversation.parentConversationId,
   });
   const inferredDeliveryTo =
-    (bindingMatchesRequesterConversation ? params.requester.origin?.to?.trim() : undefined) ??
+    (bindingMatchesRequesterConversation
+      ? normalizeOptionalString(params.requester.origin?.to)
+      : undefined) ??
     boundDeliveryTarget.to ??
-    params.requester.origin?.to?.trim() ??
+    normalizeOptionalString(params.requester.origin?.to) ??
     formatConversationTarget({
       channel: params.requester.origin?.channel,
       conversationId: deliveryThreadId,
@@ -774,18 +930,20 @@ export async function spawnAcpDirect(
     requesterSessionKey: ctx.agentSessionKey,
   });
   if (!isAcpEnabledByPolicy(cfg)) {
-    return {
+    return createAcpSpawnFailure({
       status: "forbidden",
+      errorCode: "acp_disabled",
       error: "ACP is disabled by policy (`acp.enabled=false`).",
-    };
+    });
   }
   const streamToParentRequested = params.streamTo === "parent";
-  const parentSessionKey = ctx.agentSessionKey?.trim();
+  const parentSessionKey = normalizeOptionalString(ctx.agentSessionKey);
   if (streamToParentRequested && !parentSessionKey) {
-    return {
+    return createAcpSpawnFailure({
       status: "error",
+      errorCode: "requester_session_required",
       error: 'sessions_spawn streamTo="parent" requires an active requester session context.',
-    };
+    });
   }
 
   let requestThreadBinding = params.thread === true;
@@ -796,10 +954,11 @@ export async function spawnAcpDirect(
     sandbox: params.sandbox,
   });
   if (runtimePolicyError) {
-    return {
+    return createAcpSpawnFailure({
       status: "forbidden",
+      errorCode: "runtime_policy",
       error: runtimePolicyError,
-    };
+    });
   }
 
   const spawnMode = resolveSpawnMode({
@@ -807,10 +966,11 @@ export async function spawnAcpDirect(
     threadRequested: requestThreadBinding,
   });
   if (spawnMode === "session" && !requestThreadBinding) {
-    return {
+    return createAcpSpawnFailure({
       status: "error",
+      errorCode: "thread_required",
       error: 'mode="session" requires thread=true so the ACP session can stay bound to a thread.',
-    };
+    });
   }
 
   const requesterState = resolveAcpSpawnRequesterState({
@@ -830,22 +990,43 @@ export async function spawnAcpDirect(
     cfg,
   });
   if (!targetAgentResult.ok) {
-    return {
+    return createAcpSpawnFailure({
       status: "error",
+      errorCode: "target_agent_required",
       error: targetAgentResult.error,
-    };
+    });
   }
   const targetAgentId = targetAgentResult.agentId;
   const agentPolicyError = resolveAcpAgentPolicyError(cfg, targetAgentId);
   if (agentPolicyError) {
-    return {
+    return createAcpSpawnFailure({
       status: "forbidden",
+      errorCode: "agent_forbidden",
       error: agentPolicyError.message,
-    };
+    });
   }
 
   const sessionKey = `agent:${targetAgentId}:acp:${crypto.randomUUID()}`;
   const runtimeMode = resolveAcpSessionMode(spawnMode);
+  const resolvedCwd = resolveSpawnedWorkspaceInheritance({
+    config: cfg,
+    targetAgentId,
+    requesterSessionKey: ctx.agentSessionKey,
+    explicitWorkspaceDir: params.cwd,
+  });
+  let runtimeCwd: string | undefined;
+  try {
+    runtimeCwd = await resolveRuntimeCwdForAcpSpawn({
+      resolvedCwd,
+      explicitCwd: params.cwd,
+    });
+  } catch (error) {
+    return createAcpSpawnFailure({
+      status: "error",
+      errorCode: "cwd_resolution_failed",
+      error: summarizeError(error),
+    });
+  }
 
   let preparedBinding: PreparedAcpThreadBinding | null = null;
   if (requestThreadBinding) {
@@ -858,10 +1039,11 @@ export async function spawnAcpDirect(
       groupId: ctx.agentGroupId,
     });
     if (!prepared.ok) {
-      return {
+      return createAcpSpawnFailure({
         status: "error",
+        errorCode: "thread_binding_invalid",
         error: prepared.error,
-      };
+      });
     }
     preparedBinding = prepared.binding;
   }
@@ -886,7 +1068,7 @@ export async function spawnAcpDirect(
       targetAgentId,
       runtimeMode,
       resumeSessionId: params.resumeSessionId,
-      cwd: params.cwd,
+      cwd: runtimeCwd,
     });
     initializedRuntime = initializedSession.runtimeCloseHandle;
 
@@ -908,10 +1090,11 @@ export async function spawnAcpDirect(
       deleteTranscript: true,
       runtimeCloseHandle: initializedRuntime,
     });
-    return {
+    return createAcpSpawnFailure({
       status: "error",
+      errorCode: isSessionBindingError(err) ? "thread_binding_invalid" : "spawn_failed",
       error: isSessionBindingError(err) ? err.message : summarizeError(err),
-    };
+    });
   }
 
   const deliveryPlan = resolveAcpSpawnBootstrapDeliveryPlan({
@@ -930,6 +1113,19 @@ export async function spawnAcpDirect(
           childSessionKey: sessionKey,
         })
       : undefined;
+  // Resolve parent session delivery context so system events route to the
+  // correct thread/topic instead of falling back to the main DM.
+  const parentDeliveryCtx =
+    effectiveStreamToParent && parentSessionKey
+      ? deliveryContextFromSession(
+          loadSessionStore(
+            resolveStorePath(cfg.session?.store, {
+              agentId: resolveAgentIdFromSessionKey(parentSessionKey),
+            }),
+          )[parentSessionKey],
+        )
+      : undefined;
+
   let parentRelay: AcpSpawnParentRelayHandle | undefined;
   if (effectiveStreamToParent && parentSessionKey) {
     // Register relay before dispatch so fast lifecycle failures are not missed.
@@ -939,6 +1135,7 @@ export async function spawnAcpDirect(
       childSessionKey: sessionKey,
       agentId: targetAgentId,
       logPath: streamLogPath,
+      deliveryContext: parentDeliveryCtx,
       emitStartNotice: false,
     });
   }
@@ -958,8 +1155,9 @@ export async function spawnAcpDirect(
       },
       timeoutMs: 10_000,
     });
-    if (typeof response?.runId === "string" && response.runId.trim()) {
-      childRunId = response.runId.trim();
+    const responseRunId = normalizeOptionalString(response?.runId);
+    if (responseRunId) {
+      childRunId = responseRunId;
     }
   } catch (err) {
     parentRelay?.dispose();
@@ -969,11 +1167,12 @@ export async function spawnAcpDirect(
       shouldDeleteSession: true,
       deleteTranscript: true,
     });
-    return {
+    return createAcpSpawnFailure({
       status: "error",
+      errorCode: "dispatch_failed",
       error: summarizeError(err),
       childSessionKey: sessionKey,
-    };
+    });
   }
 
   if (effectiveStreamToParent && parentSessionKey) {
@@ -986,6 +1185,7 @@ export async function spawnAcpDirect(
         childSessionKey: sessionKey,
         agentId: targetAgentId,
         logPath: streamLogPath,
+        deliveryContext: parentDeliveryCtx,
         emitStartNotice: false,
       });
     }
@@ -1002,7 +1202,7 @@ export async function spawnAcpDirect(
         label: params.label,
         task: params.task,
         preferMetadata: true,
-        deliveryStatus: requesterInternalKey.trim() ? "pending" : "parent_missing",
+        deliveryStatus: requesterInternalKey ? "pending" : "parent_missing",
         startedAt: Date.now(),
       });
     } catch (error) {
@@ -1034,7 +1234,7 @@ export async function spawnAcpDirect(
       label: params.label,
       task: params.task,
       preferMetadata: true,
-      deliveryStatus: requesterInternalKey.trim() ? "pending" : "parent_missing",
+      deliveryStatus: requesterInternalKey ? "pending" : "parent_missing",
       startedAt: Date.now(),
     });
   } catch (error) {

@@ -9,7 +9,9 @@ import {
 } from "@mariozechner/pi-ai";
 import { parseGeminiAuth } from "../infra/gemini-auth.js";
 import { normalizeGoogleApiBaseUrl } from "../infra/google-api-base-url.js";
+import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 import { buildGuardedModelFetch } from "./provider-transport-fetch.js";
+import { stripSystemPromptCacheBoundary } from "./system-prompt-cache-boundary.js";
 import { transformTransportMessages } from "./transport-message-transform.js";
 import {
   createEmptyTransportUsage,
@@ -29,6 +31,7 @@ type GoogleTransportModel = Model<"google-generative-ai"> & {
 type GoogleThinkingLevel = "MINIMAL" | "LOW" | "MEDIUM" | "HIGH";
 
 type GoogleTransportOptions = SimpleStreamOptions & {
+  cachedContent?: string;
   toolChoice?:
     | "auto"
     | "none"
@@ -48,6 +51,7 @@ type GoogleTransportOptions = SimpleStreamOptions & {
 };
 
 type GoogleGenerateContentRequest = {
+  cachedContent?: string;
   contents: Array<Record<string, unknown>>;
   generationConfig?: Record<string, unknown>;
   systemInstruction?: Record<string, unknown>;
@@ -109,11 +113,11 @@ type GoogleSseChunk = {
 let toolCallCounter = 0;
 
 function isGemini3ProModel(modelId: string): boolean {
-  return /gemini-3(?:\.\d+)?-pro/.test(modelId.toLowerCase());
+  return /gemini-3(?:\.\d+)?-pro/.test(normalizeLowercaseStringOrEmpty(modelId));
 }
 
 function isGemini3FlashModel(modelId: string): boolean {
-  return /gemini-3(?:\.\d+)?-flash/.test(modelId.toLowerCase());
+  return /gemini-3(?:\.\d+)?-flash/.test(normalizeLowercaseStringOrEmpty(modelId));
 }
 
 function requiresToolCallId(modelId: string): boolean {
@@ -121,7 +125,7 @@ function requiresToolCallId(modelId: string): boolean {
 }
 
 function supportsMultimodalFunctionResponse(modelId: string): boolean {
-  const match = modelId.toLowerCase().match(/^gemini(?:-live)?-(\d+)/);
+  const match = normalizeLowercaseStringOrEmpty(modelId).match(/^gemini(?:-live)?-(\d+)/);
   if (!match) {
     return true;
   }
@@ -440,12 +444,19 @@ export function buildGoogleGenerativeAiParams(
   const params: GoogleGenerateContentRequest = {
     contents: convertGoogleMessages(model, context),
   };
+  if (typeof options?.cachedContent === "string" && options.cachedContent.trim()) {
+    params.cachedContent = options.cachedContent.trim();
+  }
   if (Object.keys(generationConfig).length > 0) {
     params.generationConfig = generationConfig;
   }
   if (context.systemPrompt) {
     params.systemInstruction = {
-      parts: [{ text: sanitizeTransportPayloadText(context.systemPrompt) }],
+      parts: [
+        {
+          text: sanitizeTransportPayloadText(stripSystemPromptCacheBoundary(context.systemPrompt)),
+        },
+      ],
     };
   }
   if (context.tools?.length) {

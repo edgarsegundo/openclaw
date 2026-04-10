@@ -5,10 +5,8 @@ import {
   createInboundDebouncer,
   resolveInboundDebounceMs,
 } from "openclaw/plugin-sdk/channel-inbound";
-import {
-  buildCommandsMessagePaginated,
-  resolveStoredModelOverride,
-} from "openclaw/plugin-sdk/command-auth";
+import { resolveStoredModelOverride } from "openclaw/plugin-sdk/command-auth";
+import { buildCommandsMessagePaginated } from "openclaw/plugin-sdk/command-status";
 import { writeConfigFile } from "openclaw/plugin-sdk/config-runtime";
 import {
   loadSessionStore,
@@ -45,6 +43,7 @@ import {
   resolveDefaultAgentId,
   resolveDefaultModelForAgent,
 } from "./bot-handlers.agent.runtime.js";
+import { buildTelegramInboundDebounceKey } from "./bot-handlers.debounce-key.js";
 import {
   hasInboundMedia,
   hasReplyTargetMedia,
@@ -101,7 +100,6 @@ import {
   resolveModelSelection,
   type ProviderInfo,
 } from "./model-buttons.js";
-import { buildTelegramInboundDebounceKey } from "./bot-handlers.debounce-key.js";
 import { buildInlineKeyboard } from "./send.js";
 
 export const registerTelegramHandlers = ({
@@ -639,7 +637,7 @@ export const registerTelegramHandlers = ({
   type TelegramEventAuthorizationContext = TelegramGroupAllowContext & { dmPolicy: DmPolicy };
   const getChat =
     typeof (bot.api as { getChat?: unknown }).getChat === "function"
-      ? ((bot.api as { getChat: TelegramGetChat }).getChat.bind(bot.api) as TelegramGetChat)
+      ? (bot.api as { getChat: TelegramGetChat }).getChat.bind(bot.api)
       : undefined;
 
   const TELEGRAM_EVENT_AUTH_RULES: Record<
@@ -1412,6 +1410,7 @@ export const registerTelegramHandlers = ({
         });
         const result = buildCommandsMessagePaginated(runtimeCfg, skillCommands, {
           page,
+          forcePaginatedList: true,
           surface: "telegram",
         });
 

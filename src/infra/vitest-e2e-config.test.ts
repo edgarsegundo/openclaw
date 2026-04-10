@@ -11,8 +11,14 @@ describe("e2e vitest config", () => {
     expect(e2eConfig.test?.include).toEqual([
       "test/**/*.e2e.test.ts",
       "src/**/*.e2e.test.ts",
+      "src/gateway/gateway.test.ts",
+      "src/gateway/server.startup-matrix-migration.integration.test.ts",
+      "src/gateway/sessions-history-http.test.ts",
       BUNDLED_PLUGIN_E2E_TEST_GLOB,
     ]);
+    expect(e2eConfig.test?.pool).toBe("threads");
+    expect(e2eConfig.test?.isolate).toBe(false);
+    expect(e2eConfig.test?.runner).toBe("./test/non-isolated-runner.ts");
     expect(e2eConfig.test?.setupFiles).toContain("test/setup-openclaw-runtime.ts");
   });
 });
