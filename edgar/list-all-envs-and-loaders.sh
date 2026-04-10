@@ -27,4 +27,19 @@ done < /tmp/envs-encontrados.txt
 
 echo '```' >> "$ARQUIVO_SAIDA"
 
-echo "\nLinhas de loader salvas em: $ARQUIVO_SAIDA"
+# ─── Seção 2: Variáveis de cada .env (sem valores) ──────────────────────────────
+echo -e "\n# Variáveis por .env:\n" >> "$ARQUIVO_SAIDA"
+
+while IFS= read -r ENVFILE; do
+  echo "## $ENVFILE" >> "$ARQUIVO_SAIDA"
+  echo "" >> "$ARQUIVO_SAIDA"
+  echo '```' >> "$ARQUIVO_SAIDA"
+  
+  # Extrai nomes das variáveis (antes do '='), ignora comentários e linhas vazias
+  grep -v '^#' "$ENVFILE" | grep -v '^$' | cut -d '=' -f 1 | sort >> "$ARQUIVO_SAIDA"
+  
+  echo '```' >> "$ARQUIVO_SAIDA"
+  echo "" >> "$ARQUIVO_SAIDA"
+done < /tmp/envs-encontrados.txt
+
+echo "\nLinhas de loader e variáveis salvas em: $ARQUIVO_SAIDA"
