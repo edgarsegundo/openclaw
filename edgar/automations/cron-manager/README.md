@@ -269,4 +269,4 @@ CREATE TABLE schedules (
 2. Wire it into `index.js` with `program.command(...)`.
 3. If it needs the DB, call `await initDb()` before the handler runs.
 
-The architecture is intentionally flat — no framework magic, just plain modules.
+> The architecture is intentionally flat — no framework magic, just plain modules.
