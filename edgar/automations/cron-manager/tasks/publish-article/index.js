@@ -101,7 +101,7 @@ export default async function (context) {
 
   console.log(`\nPosting: "${payload.title}"`);
 
-  const apiKey = env.API_KEY ?? env.X_API_KEY ?? env["x-api-key"] ?? "";
+  const apiKey = env.MYSITESAPP_API_KEY ?? env.MYSITESAPP_API_KEY ?? env["x-api-key"] ?? "";
   const success = await postArticle(payload, apiKey);
 
   if (!success) {
