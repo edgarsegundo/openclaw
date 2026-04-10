@@ -86,21 +86,21 @@ export default async function (context) {
   const artifactName = `${artifact.slug}`;
   const generatedAt = new Date().toISOString();
 
-  await saveArtifact(`${artifactName}-raw`, {
-    title: artifact.title,
-    slug: artifact.slug,
-    language: artifact.language,
-    seoMetaDescription: artifact.seoMetaDescription,
-    imageHints: artifact.imageHints,
-    reference_title: inputs.title,
-    reference_link: inputs.link,
-    generated_at: generatedAt,
-    word_count: wordCount,
-    sources: citations || [],
-    searchResults: searchResults || [],
-    usage: usage || {},
-    markdownText: artifact.markdownText,
-  });
+  // await saveArtifact(`${artifactName}-raw`, {
+  //   title: artifact.title,
+  //   slug: artifact.slug,
+  //   language: artifact.language,
+  //   seoMetaDescription: artifact.seoMetaDescription,
+  //   imageHints: artifact.imageHints,
+  //   reference_title: inputs.title,
+  //   reference_link: inputs.link,
+  //   generated_at: generatedAt,
+  //   word_count: wordCount,
+  //   sources: citations || [],
+  //   searchResults: searchResults || [],
+  //   usage: usage || {},
+  //   markdownText: artifact.markdownText,
+  // });
 
   // Enriquece o artigo com todas as transformações
   const { enrichedMarkdown, enrichedArtifact } = enrichArticle({
