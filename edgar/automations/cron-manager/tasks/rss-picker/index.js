@@ -255,7 +255,7 @@ export default async function (context) {
     .filter((item) => !savedLinks.has(extractRealUrl(item.link)))
     .map((item) => ({
       title: item.title,
-      link: item.link,
+      link: sanitizeGoogleLink(item.link),
       published: item.published,
       source: item.source,
       score: item.score,
@@ -331,6 +331,22 @@ function extractRealUrl(link) {
   try {
     const parsed = new URL(link);
     const realUrl = parsed.searchParams.get("url");
+    return realUrl ? decodeURIComponent(realUrl) : link;
+  } catch {
+    return link;
+  }
+}
+
+/**
+ * Sanitiza links do Google, extraindo a URL real apenas se for um link do Google.
+ * Se não for possível extrair, retorna o link original.
+ */
+function sanitizeGoogleLink(link) {
+  try {
+    if (typeof link !== 'string') return link;
+    if (!link.startsWith('https://www.google.com/url?')) return link;
+    const urlObj = new URL(link);
+    const realUrl = urlObj.searchParams.get('url');
     return realUrl ? decodeURIComponent(realUrl) : link;
   } catch {
     return link;
