@@ -1,3 +1,8 @@
+# Também é possível agendar sem flock, mas nesse caso, se a execução do script demorar mais que o intervalo do cron, múltiplas instâncias podem rodar em paralelo (não recomendado para tarefas longas):
+#
+#    */30 * * * * timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
+#
+# Use flock para evitar concorrência, especialmente se o script pode demorar mais que a periodicidade do cron.
 #!/bin/bash
 
 set -e
@@ -18,6 +23,17 @@ node cron-manager.js run rss-picker --template feed-selector-visto-americano --i
 echo "Sequência finalizada com sucesso."
 
 # Como agendar este script no cron (a cada 10 minutos):
+#
+# Existem duas formas principais de evitar execuções concorrentes ("lock") usando flock:
+#
+# 1. Usando flock com sh -c para rodar um comando composto (permite adicionar notificações, como heartbeat):
+#    #*/30 * * * * flock -n /tmp/rss-fetcher.lock sh -c 'timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1 && curl -fsS https://heartbeat>'
+#
+# 2. Usando flock diretamente com timeout (mais simples):
+#    */30 * * * * flock -n /tmp/rss-fetcher.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
+#
+# A forma mais sofisticada de monitorar a execução e garantir que o cron está rodando corretamente é usar um serviço de heartbeat/monitoramento externo (exemplo: UptimeRobot, Healthchecks.io, Cronitor, etc). Esses serviços geralmente são pagos, como:
+#    https://app.uptimerobot.com/billing/pricing
 #
 # Para atualizar a lista de .envs usados neste script:
 #   1. Execute o script list-all-envs-and-loaders.sh a partir do diretório /edgar:
