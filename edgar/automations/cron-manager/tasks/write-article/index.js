@@ -56,9 +56,17 @@ export default async function (context) {
   let articles;
   try {
     const content = fs.readFileSync(listPath, "utf8");
-    articles = JSON.parse(content);
-    if (!Array.isArray(articles)) {
-      throw new Error("Expected articles to be an array");
+    const parsed = JSON.parse(content);
+    
+    // Support both formats:
+    // 1. Direct array: [{ title, link }, ...]
+    // 2. rss-picker format: { topic, items: [{ title, link }, ...] }
+    if (Array.isArray(parsed)) {
+      articles = parsed;
+    } else if (parsed && Array.isArray(parsed.items)) {
+      articles = parsed.items;
+    } else {
+      throw new Error("Expected articles to be an array or object with 'items' array");
     }
   } catch (err) {
     throw new Error(`Failed to parse articles list: ${err.message}`);
