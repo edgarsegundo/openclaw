@@ -7,14 +7,14 @@ import inquirer from "inquirer";
 import chalk from "chalk";
 
 import logger from "./lib/logger.js";
-import { loadConfig, validateConfig, validateCronExpression } from "../lib/validator.js";
-import { initDb, getLastRun, getHistory, getFailedHistory } from "../lib/db.js";
-import { runTask, listTaskNames, getTaskDir, taskExists } from "../lib/runner.js";
+import { loadConfig, validateConfig, validateCronExpression } from "./lib/validator.js";
+import { initDb, getLastRun, getHistory, getFailedHistory } from "./lib/db.js";
+import { runTask, listTaskNames, getTaskDir, taskExists } from "./lib/runner.js";
 import {
   listTemplateNames,
   loadTemplateConfig,
   validateTemplateConfig,
-} from "../lib/prompt-loader.js";
+} from "./lib/prompt-loader.js";
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 
