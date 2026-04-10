@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import fs from "fs/promises";
 import path from "path";
 
@@ -79,16 +82,21 @@ export default async function (context) {
   const nextIdx = (lastIdx + 1) % destinations.length;
   const destination = destinations[nextIdx];
 
+  // Remove dashes do business_id se for string
+  const sanitizedBusinessId = typeof destination.business_id === "string"
+    ? destination.business_id.replace(/-/g, "")
+    : destination.business_id;
+
   console.log(
-    `Destination: business_id=${destination.business_id} | blog_topic_slug=${destination.blog_topic_slug}`,
+    `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`,
   );
 
-  // Persist new index before POST — avoids re-sending to same dest on failure
+  // Persist new index antes do POST — evita reenvio ao mesmo destino em caso de falha
   await fs.writeFile(statePath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
 
   // ── 6. Build and send payload ─────────────────────────────────────────────
   const payload = {
-    business_id: destination.business_id,
+    business_id: sanitizedBusinessId,
     blog_topic_slug: destination.blog_topic_slug,
     title: json.title,
     seo_description: json.seoMetaDescription,
@@ -101,7 +109,10 @@ export default async function (context) {
 
   console.log(`\nPosting: "${payload.title}"`);
 
-  const apiKey = env.MYSITESAPP_API_KEY ?? env.MYSITESAPP_API_KEY ?? env["x-api-key"] ?? "";
+  const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
+  
+  console.log(`Using API key: ${apiKey ? "****" + apiKey.slice(-4) : "(none)"}`);
+
   const success = await postArticle(payload, apiKey);
 
   if (!success) {

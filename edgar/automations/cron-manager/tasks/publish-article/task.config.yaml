@@ -60,7 +60,7 @@ inputs:
     required: true
     help_tip: Caminho da pasta onde estão os artigos gerados (*.json e *.md)
   - name: destinations
-    type: artifact
+    type: string
     required: true
     help_tip: Caminho para um arquivo JSON com a lista de destinos (array de objetos { business_id, blog_topic_slug })
   # Examples:
