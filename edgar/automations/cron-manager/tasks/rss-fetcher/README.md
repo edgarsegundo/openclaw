@@ -34,10 +34,10 @@ Task responsável pela **Fase 1** da automação de blog: buscar notícias em fe
 cd tasks/rss-fetcher && npm install && cd ../..
 
 # Rodar interativamente
-node bin/cron-manager.js run rss-fetcher
+node cron-manager.js run rss-fetcher
 
 # Ver artifact gerado
-node bin/cron-manager.js list-artifacts
+node cron-manager.js list-artifacts
 ```
 
 ---

@@ -10,10 +10,10 @@ cd "$BASE" || exit 1
 
 # Executa rss-fetcher
 echo "[1/2] Rodando rss-fetcher..."
-node bin/cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/rss-inputs-visto-americano.json
+node cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/rss-inputs-visto-americano.json
 
 echo "[2/2] Rodando rss-picker..."
-node bin/cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
+node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
 
 echo "Sequência finalizada com sucesso."
 

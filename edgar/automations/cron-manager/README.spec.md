@@ -33,8 +33,8 @@ O agendamento oficial é feito pelo **cron do Linux**.
 ## Fluxo oficial
 
 ```text
-Manual:   usuário → node bin/cron-manager.js run my-task → prompts → task → resultado → fim
-Cron:     Linux cron → node bin/cron-manager.js run my-task --mode cron → defaults → task → resultado → fim
+Manual:   usuário → node cron-manager.js run my-task → prompts → task → resultado → fim
+Cron:     Linux cron → node cron-manager.js run my-task --mode cron → defaults → task → resultado → fim
 ```
 
 ---
@@ -186,7 +186,7 @@ export default async function (context) {
 ## create-task
 
 ```bash
-node bin/cron-manager.js create-task <name>
+node cron-manager.js create-task <name>
 ```
 
 ### Fluxo interativo obrigatório
@@ -234,7 +234,7 @@ Se houver cron_suggestion, exibir também:
 ```text
 Suggested crontab entry:
 
-0 3 * * * cd /absolute/path && node bin/cron-manager.js run backup-db --mode cron
+0 3 * * * cd /absolute/path && node cron-manager.js run backup-db --mode cron
 ```
 
 Path absoluto via `process.cwd()`.
@@ -244,9 +244,9 @@ Path absoluto via `process.cwd()`.
 ## run
 
 ```bash
-node bin/cron-manager.js run <task>
-node bin/cron-manager.js run <task> --mode cron
-node bin/cron-manager.js run <task> --dry-run
+node cron-manager.js run <task>
+node cron-manager.js run <task> --mode cron
+node cron-manager.js run <task> --dry-run
 ```
 
 ### Modo manual (default)
@@ -300,7 +300,7 @@ Regras:
 ## list
 
 ```bash
-node bin/cron-manager.js list
+node cron-manager.js list
 ```
 
 Saída:
@@ -317,8 +317,8 @@ my-new-task     —                     —
 ## history
 
 ```bash
-node bin/cron-manager.js history <task>
-node bin/cron-manager.js history <task> --failed
+node cron-manager.js history <task>
+node cron-manager.js history <task> --failed
 ```
 
 Mostra últimas N execuções (default: 20).
@@ -329,7 +329,7 @@ Com `--failed`, filtra apenas status `failure`.
 ## inspect
 
 ```bash
-node bin/cron-manager.js inspect <task>
+node cron-manager.js inspect <task>
 ```
 
 Mostra:
@@ -345,7 +345,7 @@ Mostra:
 ## doctor
 
 ```bash
-node bin/cron-manager.js doctor
+node cron-manager.js doctor
 ```
 
 Valida:
@@ -489,7 +489,7 @@ node_modules/
 4. `lib/validator.js`
 5. `lib/db.js`
 6. `lib/runner.js`
-7. `bin/cron-manager.js` (CLI wiring)
+7. `cron-manager.js` (CLI wiring)
 8. Comando `create-task`
 9. Comando `run` (manual + cron + dry-run)
 10. Comando `list`

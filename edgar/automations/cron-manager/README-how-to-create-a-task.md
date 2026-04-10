@@ -9,7 +9,7 @@ relatório com IA e salva o resultado como artifact.
 
 ```bash
 cd edgar/automations/cron-manager
-node bin/cron-manager.js create-task news-report
+node cron-manager.js create-task news-report
 ```
 
 Responda:
@@ -216,23 +216,23 @@ export OPENAI_API_KEY=sk-...
 
 ```bash
 # Valida tudo (task + template)
-node bin/cron-manager.js doctor
+node cron-manager.js doctor
 
 # Preview sem chamar a API
-node bin/cron-manager.js run news-report --dry-run
-node bin/cron-manager.js run news-report --template summarize-news --dry-run
+node cron-manager.js run news-report --dry-run
+node cron-manager.js run news-report --template summarize-news --dry-run
 
 # Rodar com seleção interativa do template
-node bin/cron-manager.js run news-report
+node cron-manager.js run news-report
 
 # Rodar passando o template direto
-node bin/cron-manager.js run news-report --template summarize-news
+node cron-manager.js run news-report --template summarize-news
 
 # Ver artifact salvo
-node bin/cron-manager.js list-artifacts
+node cron-manager.js list-artifacts
 
 # Ver detalhes da task (mostra templates + artifacts)
-node bin/cron-manager.js inspect news-report
+node cron-manager.js inspect news-report
 ```
 
 ### Fluxo esperado ao rodar

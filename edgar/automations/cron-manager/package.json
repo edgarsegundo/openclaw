@@ -2,11 +2,11 @@
   "name": "cron-manager",
   "version": "1.0.0",
   "bin": {
-    "cron-manager": "./bin/cron-manager.js"
+    "cron-manager": "./cron-manager.js"
   },
   "type": "module",
   "scripts": {
-    "start": "node bin/cron-manager.js"
+    "start": "node cron-manager.js"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",

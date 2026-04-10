@@ -161,8 +161,8 @@ Qualquer `{{var}}` que não for resolvida gera um aviso — nunca um crash silen
 ## Fluxo completo de execução
 
 ```
-node bin/cron-manager.js run my-task
-node bin/cron-manager.js run my-task --template summarize-results
+node cron-manager.js run my-task
+node cron-manager.js run my-task --template summarize-results
 ```
 
 ### Passo a passo
@@ -348,7 +348,7 @@ export default async function (context) {
 
 ```bash
 # Lista todos os artifacts declarados por todas as tasks
-node bin/cron-manager.js list-artifacts
+node cron-manager.js list-artifacts
 ```
 
 Saída:
@@ -363,7 +363,7 @@ another-task     result            artifacts/.../result...     2026-04-01 14:30
 O `inspect` já mostra a seção de artifacts da task inspecionada:
 
 ```bash
-node bin/cron-manager.js inspect data-collector
+node cron-manager.js inspect data-collector
 ```
 
 ```
@@ -457,7 +457,7 @@ No modo `--mode cron`, a seleção interativa de template não acontece.
 **Comportamento:** requer que `--template` seja passado explicitamente na linha de comando. Todos os inputs do template devem ter `default` definido no `prompt.template.config.yaml` — caso contrário, o processo falha com mensagem clara.
 
 ```bash
-node bin/cron-manager.js run my-task --mode cron --template summarize-results
+node cron-manager.js run my-task --mode cron --template summarize-results
 ```
 
 ---
@@ -465,7 +465,7 @@ node bin/cron-manager.js run my-task --mode cron --template summarize-results
 ## Dry run com template
 
 ```bash
-node bin/cron-manager.js run my-task --template summarize-results --dry-run
+node cron-manager.js run my-task --template summarize-results --dry-run
 ```
 
 Exibe:
@@ -482,7 +482,7 @@ Exibe:
 ## `inspect` com templates
 
 ```bash
-node bin/cron-manager.js inspect my-task
+node cron-manager.js inspect my-task
 ```
 
 Passa a listar também os templates disponíveis:
