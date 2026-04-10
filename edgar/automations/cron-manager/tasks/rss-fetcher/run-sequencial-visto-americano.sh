@@ -1,3 +1,22 @@
+#!/bin/bash
+
+set -e
+
+BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
+cd "$BASE" || exit 1
+
+[ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
+[ -f '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' | xargs)
+
+# Executa rss-fetcher
+echo "[1/2] Rodando rss-fetcher..."
+node bin/cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/rss-inputs-visto-americano.json
+
+echo "[2/2] Rodando rss-picker..."
+node bin/cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
+
+echo "Sequência finalizada com sucesso."
+
 # Como agendar este script no cron (a cada 10 minutos):
 #
 # Para atualizar a lista de .envs usados neste script:
@@ -38,18 +57,3 @@
 #
 # Este script executa rss-fetcher e, ao terminar, executa rss-picker em sequência.
 #
-
-#!/bin/bash
-set -e
-
-[ -f '/Users/edgar/Repos/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/Users/edgar/Repos/openclaw/edgar/automations/ai-client/.env' | xargs)
-[ -f '/Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/.env' ] && export $(grep -v '^#' '/Users/edgar/Repos/openclaw/edgar/automations/visa-crawler/.env' | xargs)
-
-# Executa rss-fetcher
-echo "[1/2] Rodando rss-fetcher..."
-node ../../../../bin/cron-manager.js run rss-fetcher --template skip --input-file ../rss-fetcher/inputs/rss-inputs-visto-americano.json
-
-echo "[2/2] Rodando rss-picker..."
-node ../../../../bin/cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file ../rss-picker/inputs/inputs-visto-americano.json
-
-echo "Sequência finalizada com sucesso."
