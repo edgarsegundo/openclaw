@@ -6,7 +6,7 @@ BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
 LOCK_FILE="/tmp/publish-article.lock"
 cd "$BASE" || exit 1
 
-# Garante que o lock seja removido ao sair (mesmo em caso de erro)
+# Garante que o lock seja removido ao sair (mesmo em caso de erro)c
 trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
@@ -14,7 +14,7 @@ trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
 # Executa publish-article
 echo "[1/1] Rodando publish-article..."
-node cron-manager.js run publish-article --template blog --input-file tasks/publish-article/inputs/inputs-visto-americano.json
+node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-visto-americano.json
 
 echo "✅ Execução finalizada com sucesso."
 
