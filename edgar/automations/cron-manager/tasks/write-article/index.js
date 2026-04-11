@@ -210,13 +210,16 @@ export default async function (context) {
   });
 
   // ── Save JSON artifact (ENRICHED) ───────────────────────────────────────────
-  await saveArtifact(artifactName, {
+
+  // Salva o JSON no outputDir, igual ao Markdown
+  const jsonPath = path.join(outputDir, `${artifactName}.json`);
+  fs.writeFileSync(jsonPath, JSON.stringify({
     ...enrichedArtifact,
     reference_title: article.title,
     reference_link: article.link,
     generated_at: generatedAt,
     word_count: wordCount,
-  });
+  }, null, 2), "utf8");
 
   // ── Save Markdown final ─────────────────────────────────────────────────────
   const finalMarkdown = enrichedMarkdown.includes("\\n")
