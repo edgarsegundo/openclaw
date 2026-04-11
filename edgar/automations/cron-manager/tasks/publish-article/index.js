@@ -3,6 +3,7 @@ dotenv.config();
 
 import fs from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
 
 /**
  * publish-article task
@@ -96,6 +97,7 @@ export default async function (context) {
 
   // ── 6. Build and send payload ─────────────────────────────────────────────
   const payload = {
+    id: randomUUID(),
     business_id: sanitizedBusinessId,
     blog_topic_slug: destination.blog_topic_slug,
     title: json.title,
