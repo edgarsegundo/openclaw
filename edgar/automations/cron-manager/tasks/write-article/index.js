@@ -53,7 +53,10 @@ export default async function (context) {
 
   // ─── Read approved articles list ───────────────────────────────────────────
   if (!fs.existsSync(listPath)) {
-    throw new Error(`Articles list not found: ${listPath}`);
+    console.log(`\n⚠️  Articles list not found: ${listPath}`);
+    console.log(`   No articles to process today.`);
+    console.log(`   Run again when the list is available.`);
+    process.exit(0);
   }
 
   let articles;
