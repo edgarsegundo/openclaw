@@ -34,6 +34,11 @@ inputs:
     default: "Blog voltado para brasileiros que querem tirar ou renovar o visto americano. O público quer informações práticas, atualizadas e confiáveis sobre o processo de visto."
     help_tip: "Description of your blog and audience. Used to tailor the article tone and focus."
 
+  - name: output_dir
+    type: string
+    required: true
+    help_tip: "Diretório onde salvar os arquivos gerados (JSON e Markdown) - será criado se não existir"
+
 # artifacts:
 #   - name: article
 #     description: The generated original article in Markdown format

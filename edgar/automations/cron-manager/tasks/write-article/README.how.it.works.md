@@ -7,11 +7,14 @@
 5. Seleciona artigo na posição do índice.
 6. Chama IA (Perplexity Sonar Pro) para pesquisar e gerar artigo original.
 7. Enriquece o artigo via `enrichArticle()`.
-8. Salva JSON estruturado e Markdown em `artifacts/write-article/`.
-9. Mostra resumo, fontes consultadas, custo e contagem de artigos processados.
+8. Cria `output_dir` se não existir.
+9. Salva JSON estruturado e Markdown em `output_dir`.
+10. Mostra resumo, fontes consultadas, custo e contagem de artigos processados.
 
 **Inputs:**
+
 - `rss_picker_file_pattern` (ex: `approved-visto-americano-[aaaa-mm-dd].json`)
 - `current_approved_list_path` (diretório onde a lista está)
 - `language` (padrão: pt-BR)
 - `blog_context` (opcional, contexto do blog)
+- `output_dir` (diretório onde salvar JSON e Markdown gerados - será criado se não existir)

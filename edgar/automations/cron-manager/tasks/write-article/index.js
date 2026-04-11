@@ -35,6 +35,16 @@ export default async function (context) {
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
+  // ─── Validate output directory ────────────────────────────────────────────
+  const outputDir = inputs.output_dir;
+  if (!outputDir) {
+    throw new Error("Missing required input: output_dir");
+  }
+
+  // Create output directory if it doesn't exist
+  fs.mkdirSync(outputDir, { recursive: true });
+  console.log(`Output directory: ${outputDir}`);
+
   // ─── Resolve file path with date pattern ──────────────────────────────────
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const pattern = inputs.rss_picker_file_pattern;
@@ -209,18 +219,15 @@ export default async function (context) {
   });
 
   // ── Save Markdown final ─────────────────────────────────────────────────────
-  const markdownDir = path.resolve("artifacts/write-article");
-  fs.mkdirSync(markdownDir, { recursive: true });
-
   const finalMarkdown = enrichedMarkdown.includes("\\n")
     ? enrichedMarkdown.replace(/\\n/g, "\n")
     : enrichedMarkdown;
-  const mdPath = path.join(markdownDir, `${artifact.slug}.md`);
+  const mdPath = path.join(outputDir, `${artifact.slug}.md`);
   fs.writeFileSync(mdPath, finalMarkdown, "utf8");
 
   console.log(`\n📁 Artifacts saved:`);
-  console.log(`   JSON:       artifacts/write-article/${artifactName}.json`);
-  console.log(`   Markdown:   artifacts/write-article/${artifact.slug}.md`);
+  console.log(`   JSON:       ${outputDir}/${artifactName}.json`);
+  console.log(`   Markdown:   ${outputDir}/${artifact.slug}.md`);
 
   // ─── Final summary ────────────────────────────────────────────────────────
   console.log("\n─────────────────────────────────────────────────────────");
