@@ -40,7 +40,10 @@ export default async function (context) {
   const pattern = inputs.rss_picker_file_pattern;
   const resolvedFilename = pattern.replace("[aaaa-mm-dd]", today);
   const listPath = path.join(inputs.current_approved_list_path, resolvedFilename);
-  const indexPath = path.join(inputs.current_approved_list_path, resolvedFilename.replace(/\.json$/, ""));
+  const indexPath = path.join(
+    inputs.current_approved_list_path,
+    resolvedFilename.replace(/\.json$/, ""),
+  );
 
   console.log(`\nResolving approved articles list:`);
   console.log(`  Pattern:     ${pattern}`);
@@ -57,7 +60,7 @@ export default async function (context) {
   try {
     const content = fs.readFileSync(listPath, "utf8");
     const parsed = JSON.parse(content);
-    
+
     // Support both formats:
     // 1. Direct array: [{ title, link }, ...]
     // 2. rss-picker format: { topic, items: [{ title, link }, ...] }
@@ -92,8 +95,14 @@ export default async function (context) {
   console.log(`  Current index: ${currentIndex}`);
 
   // ─── Get article at current index ──────────────────────────────────────────
+  // If all articles processed, exit gracefully with success
   if (currentIndex >= articles.length) {
-    throw new Error(`Index ${currentIndex} is out of bounds (list has ${articles.length} articles)`);
+    console.log(`\n✅ All articles processed!`);
+    console.log(
+      `   Current index (${currentIndex}) reached end of list (${articles.length} articles)`,
+    );
+    console.log(`   Run again tomorrow or reset the index file to restart the cycle.`);
+    process.exit(0);
   }
 
   const article = articles[currentIndex];
@@ -110,7 +119,7 @@ export default async function (context) {
   // if index update fails, abort (cron will retry with same article)
   // if generation fails AFTER index update, it's acceptable (index is safe)
   const nextIndex = currentIndex + 1;
-  
+
   if (nextIndex <= articles.length) {
     try {
       fs.writeFileSync(indexPath, nextIndex.toString(), "utf8");
@@ -148,9 +157,7 @@ export default async function (context) {
   console.log(`Language:    ${artifact.language}`);
   console.log(`Words:       ~${wordCount}`);
   console.log(`SEO desc:    ${artifact.seoMetaDescription}`);
-  console.log(
-    `Image hints: ${artifact.imageHints?.searchQueries?.join(" | ") ?? "-"}`
-  );
+  console.log(`Image hints: ${artifact.imageHints?.searchQueries?.join(" | ") ?? "-"}`);
 
   if (citations?.length > 0) {
     console.log(`Sources:     ${citations.length} web source(s) consulted`);
