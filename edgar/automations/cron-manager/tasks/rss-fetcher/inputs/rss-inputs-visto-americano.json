@@ -3,5 +3,6 @@
   "topic": "visto americano",
   "patterns": "visto americano; us visa; ds-160; consulado; visto;",
   "exclude_patterns": "guerra; irã; rússia; china;",
-  "feeds": ""
+  "feeds": "",
+  "max_items": 20
 }

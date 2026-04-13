@@ -2,7 +2,8 @@
 
 1. Lê o arquivo de notícias do dia (ex: `artifacts/rss-fetcher/rss-artifact-<topic>-{YYYY-MM-DD}.json`).
 2. Filtra apenas itens publicados após a última execução (por tópico).
-3. Se houver menos que o mínimo (default: 3), finaliza sem rodar IA.
+3. (min_items) Se houver menos que o mínimo (default: 3), finaliza sem rodar IA.
+    > Se houver menos que o mínimo (padrão: 3) itens novos, encerra sem rodar IA — isso evita gastar tokens processando artigos individualmente e garante que a triagem só aconteça em lotes de pelo menos 3 notícias.
 4. Remove duplicados por URL real.
 5. Envia os itens novos para triagem via IA (Perplexity Sonar Small).
 6. Aprova apenas os itens com score >= min_score (default: 7).
