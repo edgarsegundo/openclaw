@@ -22,98 +22,49 @@ export const DEFAULT_FEEDS = [
     lang: "pt",
     category: "education",
   },
+
   {
     url: "https://www.correiodamanhacanada.com/feed/",
     name: "Correio da Manhã Canada",
     lang: "pt",
     category: "general",
   },
-  // {
-  //   url: "https://g1.globo.com/rss/g1/",
-  //   name: "G1 - Globo",
-  //   lang: "pt",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://feeds.folha.uol.com.br/folha/mundo/rss091.xml",
-  //   name: "Folha de S.Paulo - Mundo",
-  //   lang: "pt",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://www.uol.com.br/rss.xml",
-  //   name: "UOL Notícias",
-  //   lang: "pt",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml",
-  //   name: "Agência Brasil",
-  //   lang: "pt",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://tecnoblog.net/feed/",
-  //   name: "Tecnoblog",
-  //   lang: "pt",
-  //   category: "technology",
-  // },
-  // {
-  //   url: "https://www.infomoney.com.br/feed/",
-  //   name: "InfoMoney",
-  //   lang: "pt",
-  //   category: "finance",
-  // },
-  // {
-  //   url: "https://exame.com/feed/",
-  //   name: "Exame",
-  //   lang: "pt",
-  //   category: "business",
-  // },
-  // {
-  //   url: "https://olhardigital.com.br/feed/",
-  //   name: "Olhar Digital",
-  //   lang: "pt",
-  //   category: "technology",
-  // },
 
-  // ── English sources ──────────────────────────────────────────────────────
-  // {
-  //   url: "https://feeds.bbci.co.uk/news/rss.xml",
-  //   name: "BBC News",
-  //   lang: "en",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
-  //   name: "New York Times",
-  //   lang: "en",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://feeds.reuters.com/reuters/topNews",
-  //   name: "Reuters",
-  //   lang: "en",
-  //   category: "general",
-  // },
-  // {
-  //   url: "https://techcrunch.com/feed/",
-  //   name: "TechCrunch",
-  //   lang: "en",
-  //   category: "technology",
-  // },
-  // {
-  //   url: "https://www.theverge.com/rss/index.xml",
-  //   name: "The Verge",
-  //   lang: "en",
-  //   category: "technology",
-  // },
-  // {
-  //   url: "https://feeds.hnrss.org/frontpage",
-  //   name: "Hacker News",
-  //   lang: "en",
-  //   category: "technology",
-  // },
+  {
+    url: "https://g1.globo.com/rss/g1/",
+    name: "G1 - Globo",
+    lang: "pt",
+    category: "general",
+  },
+
+  {
+    url: "https://feeds.folha.uol.com.br/folha/mundo/rss091.xml",
+    name: "Folha de S.Paulo - Mundo",
+    lang: "pt",
+    category: "general",
+  },
+
+  {
+    url: "https://www.uol.com.br/rss.xml",
+    name: "UOL Notícias",
+    lang: "pt",
+    category: "general",
+  },
+
+  {
+    url: "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml",
+    name: "Agência Brasil",
+    lang: "pt",
+    category: "general",
+  },
+  
+  {
+    url: "https://exame.com/feed/",
+    name: "Exame",
+    lang: "pt",
+    category: "business",
+  },
+
   {
     url: "https://reportermaceio.com.br/feed/",
     name: "Reporter Maceió",
