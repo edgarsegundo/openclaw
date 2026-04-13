@@ -17,7 +17,20 @@ find "$RAIZ" \
 # Mostra lista encontrada
 cat /tmp/envs-encontrados.txt
 
-echo -e "\n# Linhas para carregar cada .env:\n" > "$ARQUIVO_SAIDA"
+
+# Comentário de aviso chamativo sobre caminhos absolutos
+echo '<!--' > "$ARQUIVO_SAIDA"
+echo '  ⚠️⚠️⚠️ ATENÇÃO! ⚠️⚠️⚠️' >> "$ARQUIVO_SAIDA"
+echo '' >> "$ARQUIVO_SAIDA"
+echo '  O caminho absoluto "/home/ubuntu/openclaw/edgar" pode mudar conforme o ambiente, usuário ou servidor.' >> "$ARQUIVO_SAIDA"
+echo '  Sempre verifique e ajuste este prefixo conforme o local onde o projeto está rodando!' >> "$ARQUIVO_SAIDA"
+echo '  NÃO confie cegamente neste caminho em scripts de produção ou automações portáveis.' >> "$ARQUIVO_SAIDA"
+echo '  Se migrar para outro servidor, usuário ou pasta, atualize todos os caminhos gerados aqui.' >> "$ARQUIVO_SAIDA"
+echo '' >> "$ARQUIVO_SAIDA"
+echo '  (Este aviso é automático. Consulte a documentação do seu ambiente antes de usar!)' >> "$ARQUIVO_SAIDA"
+echo '-->' >> "$ARQUIVO_SAIDA"
+
+echo -e "\n# Linhas para carregar cada .env:\n" >> "$ARQUIVO_SAIDA"
 echo '```bash' >> "$ARQUIVO_SAIDA"
 
 while IFS= read -r ENVFILE; do
@@ -40,6 +53,9 @@ while IFS= read -r ENVFILE; do
   
   echo '```' >> "$ARQUIVO_SAIDA"
   echo "" >> "$ARQUIVO_SAIDA"
+
 done < /tmp/envs-encontrados.txt
+
+sed -i '' 's|/Users/edgar/Repos/openclaw/edgar/|/home/ubuntu/openclaw/edgar/|g' "$ARQUIVO_SAIDA"
 
 echo "\nLinhas de loader e variáveis salvas em: $ARQUIVO_SAIDA"

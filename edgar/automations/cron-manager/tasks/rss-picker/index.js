@@ -189,7 +189,7 @@ export default async function (context) {
     // Monta mensagem para Discord com índice, link limpo e data formatada
     let msg = `Atenção: Apenas ${newItems.length} notícia(s) nova(s) encontrada(s) para o tópico "${topic}".\n`;
     newItems.forEach((item, idx) => {
-      msg += `\n${idx - 1}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
+      msg += `\n${idx}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
     });
     msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub 1)`;
     notifyDiscord(msg);
