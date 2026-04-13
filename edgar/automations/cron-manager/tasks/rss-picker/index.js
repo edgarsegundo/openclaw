@@ -1,8 +1,8 @@
 // Formata data para dd-mmm-aaaa hh:mm:ss
 function formatDate(dateStr) {
-  if (!dateStr) return "sem data";
+  if (!dateStr) {return "sem data";}
   const date = new Date(dateStr);
-  if (isNaN(date)) return dateStr;
+  if (isNaN(date)) {return dateStr;}
   const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = meses[date.getMonth()];
@@ -173,8 +173,8 @@ export default async function (context) {
 
   // ── 3. Filter: only items newer than last run ────────────────────────────
   const newItems = allItems.filter((item) => {
-    if (!lastRunAt) return true; // no previous run → all items are new
-    if (!item.published) return false; // no date → skip to be safe
+    if (!lastRunAt) {return true;} // no previous run → all items are new
+    if (!item.published) {return false;} // no date → skip to be safe
     return new Date(item.published) > lastRunAt;
   });
 
@@ -189,9 +189,9 @@ export default async function (context) {
     // Monta mensagem para Discord com índice, link limpo e data formatada
     let msg = `Atenção: Apenas ${newItems.length} notícia(s) nova(s) encontrada(s) para o tópico "${topic}".\n`;
     newItems.forEach((item, idx) => {
-      msg += `\n${idx}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
+      msg += `\n${idx - 1}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
     });
-    msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub-1)`;
+    msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub 1)`;
     notifyDiscord(msg);
   }
 
@@ -253,7 +253,7 @@ export default async function (context) {
   const seen = new Set();
   const deduplicated = newItems.filter((item) => {
     const url = extractRealUrl(item.link);
-    if (seen.has(url)) return false;
+    if (seen.has(url)) {return false;}
     seen.add(url);
     return true;
   });
@@ -362,7 +362,7 @@ export default async function (context) {
 
   for (const file of allFiles) {
     const match = file.match(/^approved-.+-(\d{4}-\d{2}-\d{2})\.json$/);
-    if (!match) continue;
+    if (!match) {continue;}
     const fileDate = new Date(match[1]);
     if (fileDate < cutoffDate) {
       fs.unlinkSync(path.join(pickerArtifactsDir, file));
@@ -416,8 +416,8 @@ function extractRealUrl(link) {
  */
 function sanitizeGoogleLink(link) {
   try {
-    if (typeof link !== 'string') return link;
-    if (!link.startsWith('https://www.google.com/url?')) return link;
+    if (typeof link !== 'string') {return link;}
+    if (!link.startsWith('https://www.google.com/url?')) {return link;}
     const urlObj = new URL(link);
     const realUrl = urlObj.searchParams.get('url');
     return realUrl ? decodeURIComponent(realUrl) : link;
