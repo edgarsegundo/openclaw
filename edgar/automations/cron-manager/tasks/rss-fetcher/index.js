@@ -2,9 +2,83 @@ import Parser from "rss-parser";
 import { DEFAULT_FEEDS, parseCustomFeeds } from "./feeds.js";
 import fs from "fs";
 import path from "path";
+import he from "he";
+
+// ── HTML utilities ────────────────────────────────────────────────────────────
 
 /**
- * rss-fetcher task
+ * Strips HTML tags and decodes HTML entities from a string.
+ * Uses `he` for robust entity decoding (covers &#8217;, &mdash;, etc.)
+ * then removes any remaining tags.
+ */
+function stripHtml(str) {
+  if (!str) return "";
+  return he
+    .decode(str)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ── Scoring utilities ─────────────────────────────────────────────────────────
+
+/**
+ * Checks if ALL words of a pattern appear in the text (order-independent).
+ * "visto americano" matches "novo visto para entrar nos EUA americano".
+ */
+function matchesAllWords(text, pattern) {
+  const words = pattern.split(/\s+/).filter(Boolean);
+  return words.every((word) => new RegExp(word, "i").test(text));
+}
+
+/**
+ * Returns a proximity bonus when all pattern words appear within
+ * a window of `windowSize` words in the text.
+ * Bonus = 1 if words are close, 0 otherwise.
+ */
+function proximityBonus(text, pattern, windowSize = 8) {
+  const patternWords = pattern.split(/\s+/).filter(Boolean);
+  if (patternWords.length < 2) return 0;
+
+  const textWords = text.split(/\s+/);
+
+  for (let i = 0; i < textWords.length; i++) {
+    const window = textWords.slice(i, i + windowSize).join(" ");
+    if (patternWords.every((w) => new RegExp(w, "i").test(window))) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Scores a text against a single pattern using:
+ *  +2  exact phrase match
+ *  +2  all words present (order-independent)
+ *  +1  proximity bonus (words within windowSize words of each other)
+ */
+function scorePattern(text, pattern) {
+  if (!text || !pattern) return 0;
+
+  const exactRegex = new RegExp(
+    pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    "i"
+  );
+
+  let score = 0;
+
+  if (exactRegex.test(text)) {
+    score += 2; // exact phrase
+  } else if (matchesAllWords(text, pattern)) {
+    score += 2; // all words present, any order
+    score += proximityBonus(text, pattern); // +1 if words are close
+  }
+
+  return score;
+}
+
+/**
+ * export default async function (context) — rss-fetcher task
  *
  * Fetches news from RSS feeds, filters by topic relevance,
  * and saves a raw_news.json artifact for downstream tasks
@@ -21,84 +95,9 @@ import path from "path";
  *   category         - filter default feeds by category: general, technology, finance, business (default: all)
  */
 export default async function (context) {
-  // ─── context properties ────────────────────────────────────────────────────
-  //   taskName     — string, name of this task
-  //   mode         — "manual" | "cron"
-  //   executionId  — unique UUID for this run (useful for dynamic artifact names)
-  //   inputs       — values declared in task.config.yaml inputs[]
-  //                  e.g. context.inputs.topic
-  //   env          — env vars declared in task.config.yaml env_vars{}
-  //                  e.g. context.env.MY_API_KEY
-  //   runPrompt    — async fn — only available when --template was selected (see below)
-  //                  not used in this task (pure RSS fetch, no AI call)
-  //   saveArtifact — fn(name, data) — writes JSON to artifacts/rss-fetcher/<n>.json
   const { taskName, mode, executionId, inputs, saveArtifact } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
-
-  // ── runPrompt is not called here ──────────────────────────────────────────
-  // This task is a pure RSS fetcher — no AI prompt is needed at this stage.
-  // runPrompt will be used in downstream tasks (e.g. feed-selector, article-writer)
-  // that consume the raw_news.json artifact produced here.
-  //
-  // When runPrompt IS used, it works like this:
-  //
-  //   runPrompt(extraVars?) — renders the prompt template, calls the AI,
-  //   validates against schema.js, and returns a result object.
-  //   Task inputs (e.g. inputs.topic) are auto-injected as {{topic}} in user.md.
-  //
-  //   const { artifact, citations, searchResults, usage } = await runPrompt();
-  //   const { artifact } = await runPrompt({ date_today: new Date().toISOString().slice(0, 10) });
-  //
-  // ── result fields ────────────────────────────────────────────────────────
-  //
-  //   result.artifact
-  //     The validated JSON object defined by schema.js.
-  //     Shape depends on your schema — this is the main AI output.
-  //
-  //   result.citations        (Perplexity/sonar only — [] for OpenAI)
-  //     string[] of source URLs the model consulted.
-  //     Index is 0-based here; citation markers in the text are 1-based:
-  //       [1] in text → citations[0]
-  //       [2] in text → citations[1]
-  //
-  //   result.searchResults    (Perplexity/sonar only — [] for OpenAI)
-  //     Rich metadata for each source, aligned 1:1 with citations[].
-  //     Each entry: { title, url, snippet, date, last_updated, source }
-  //     Use this when you want to show source cards (title + snippet)
-  //     instead of bare URLs.
-  //
-  //   result.usage            (Perplexity/sonar only — basic tokens for OpenAI)
-  //     Token counts + cost breakdown.
-  //     Key fields:
-  //       usage.prompt_tokens      — input tokens consumed
-  //       usage.completion_tokens  — output tokens generated
-  //       usage.cost.total_cost    — total cost in USD (Perplexity only)
-  //       usage.cost.search_queries_cost — cost of web searches (Perplexity only)
-  //
-  //   result.model    — model string used (e.g. "sonar-pro", "gpt-4o")
-  //   result.template — template name used for this call
-  //
-  // ── saveArtifact usage examples ──────────────────────────────────────────
-  //
-  // Add runtime metadata:
-  //   const enriched = { ...artifact, generated_at: new Date().toISOString() };
-  //   await saveArtifact("result", enriched);
-  //
-  // Dynamic filename from artifact field:
-  //   const slug = artifact.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60);
-  //   await saveArtifact(`article-${slug}`, artifact);
-  //
-  // Save multiple artifacts from one run:
-  //   await saveArtifact("summary", { title: artifact.title, tags: artifact.tags });
-  //   await saveArtifact("full", artifact);
-  //
-  // Save source metadata alongside the artifact (useful for Perplexity tasks):
-  //   await saveArtifact("result", artifact);
-  //   if (searchResults.length) await saveArtifact("sources", searchResults);
-  //
-  // Skip saving — just send to an external API:
-  //   await sendToExternalApi(artifact);
 
   const topic = (inputs.topic || "").trim().toLowerCase();
   const maxItems = Number(inputs.max_items) || 10;
@@ -139,13 +138,11 @@ export default async function (context) {
   } else {
     feedList = DEFAULT_FEEDS.filter((f) => {
       const langMatch = f.lang === language || f.lang === "unknown";
-      // If category is set, also filter by category; otherwise accept all
       const categoryMatch = category ? f.category === category : true;
       return langMatch && categoryMatch;
     });
 
     const categoryLabel = category ? `category '${category}', ` : "";
-
     console.log(
       `Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`
     );
@@ -167,9 +164,7 @@ export default async function (context) {
   const parser = new Parser({
     timeout: 10000,
     headers: { "User-Agent": "rss-fetcher-bot/1.0" },
-    requestOptions: {
-      agent: false,
-    },    
+    requestOptions: { agent: false },
   });
 
   console.log(`\nSearching for topic: "${inputs.topic}"`);
@@ -196,39 +191,24 @@ export default async function (context) {
 
       const relevant = items
         .map((item) => {
-          const title = (item.title || "").toLowerCase();
-
-          // contentSnippet, summary, and content can be noisy and often contain boilerplate or unrelated text.
-          // For relevance scoring, we focus on the title, which is more likely to reflect the main topic.
-          const body = [
-            // item.contentSnippet || "",
-            // item.summary || "", // summary is often refering other articles and adds noise, so we skip it for now
-            // item.content || "",
-          ]
-            .join(" ")
-            .toLowerCase();
+          // Improvement 1 & 2: strip HTML tags + decode entities before matching
+          const title = stripHtml(item.title || "").toLowerCase();
+          const body = ""; // reserved for future use
 
           let score = 0;
 
-          const topicRegexes = topicPatterns.map((pattern) => {
-            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            return new RegExp(escaped, "i");
-          });
-
-          const excludeRegexes = excludePatterns.map((pattern) => {
-            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            return new RegExp(escaped, "i");
-          });
-
-
-          for (const regex of topicRegexes) {
-            if (regex.test(title)) score += 2;
-            if (regex.test(body)) score += 1;
+          // Positive patterns — Improvements 3 & 4: word tokenization + proximity
+          for (const pattern of topicPatterns) {
+            score += scorePattern(title, pattern) * 2; // title weight x2
+            if (body) score += scorePattern(body, pattern);
           }
 
-          for (const regex of excludeRegexes) {
+          // Negative patterns — same logic, subtracts score
+          for (const pattern of excludePatterns) {
+            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(escaped, "i");
             if (regex.test(title)) score -= 2;
-            if (regex.test(body)) score -= 1;
+            if (body && regex.test(body)) score -= 1;
           }
 
           // Minimum relevance threshold
@@ -241,31 +221,26 @@ export default async function (context) {
           if (sinceCutoff) {
             const pubDate = item.isoDate || item.pubDate;
             if (!pubDate) return null;
-            
             const parsedDate = new Date(pubDate);
-
             if (isNaN(parsedDate.getTime())) return null;
             if (parsedDate < sinceCutoff) return null;
-            
           }
 
-          return { item, score };
+          return { item, score, cleanTitle: title };
         })
         .filter(Boolean)
         .sort((a, b) => b.score - a.score);
 
-
-
       console.log(`${items.length} items found, ${relevant.length} relevant.`);
 
-      for (const { item, score } of relevant) {
+      for (const { item, score, cleanTitle } of relevant) {
         if (collectedItems.length >= maxItems * 2) break;
 
         collectedItems.push({
-          title: item.title || "",
+          title: cleanTitle || stripHtml(item.title || ""), // always clean title
           link: item.link || "",
           published: item.isoDate || item.pubDate || null,
-          summary: item.contentSnippet || item.summary || "",
+          summary: stripHtml(item.contentSnippet || item.summary || ""),
           source: feed.name,
           source_url: feed.url,
           language: feed.lang,
@@ -276,38 +251,28 @@ export default async function (context) {
       }
     } catch (err) {
       console.log(`ERROR — ${err.message}`);
-      errors.push({
-        feed: feed.name,
-        url: feed.url,
-        error: err.message,
-      });
+      errors.push({ feed: feed.name, url: feed.url, error: err.message });
     }
   }
 
-  // ── 5. Remove duplicates ─────────────────────────────────────────────
+  // ── 5. Remove duplicates ──────────────────────────────────────────────────
   const unique = new Map();
-
   for (const item of collectedItems) {
     const key = item.link || item.title;
-
-    if (!unique.has(key)) {
-      unique.set(key, item);
-    }
+    if (!unique.has(key)) unique.set(key, item);
   }
 
   const finalItems = Array.from(unique.values()).slice(0, maxItems);
 
-  // ── 5. Sort by score first, then newest date ─────────────────────────────
+  // ── 6. Sort by score, then newest date ───────────────────────────────────
   finalItems.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-
     const da = a.published ? new Date(a.published) : 0;
     const db = b.published ? new Date(b.published) : 0;
-
     return db - da;
   });
 
-  // ── 6. Build artifact ─────────────────────────────────────────────────────
+  // ── 7. Build artifact ─────────────────────────────────────────────────────
   const artifact = {
     topic: inputs.topic,
     patterns: topicPatterns,
@@ -323,7 +288,7 @@ export default async function (context) {
     errors: errors.length > 0 ? errors : undefined,
   };
 
-  // ── 7. Print summary ──────────────────────────────────────────────────────
+  // ── 8. Print summary ──────────────────────────────────────────────────────
   console.log("\n─── Summary ─────────────────────────────────────────────");
   console.log(`Topic:          ${artifact.topic}`);
   console.log(`Language:       ${artifact.language}`);
@@ -343,15 +308,13 @@ export default async function (context) {
       const date = item.published
         ? new Date(item.published).toLocaleDateString("pt-BR")
         : "no date";
-
       console.log(`• [${date}] score=${item.score} ${item.title}`);
       console.log(`  ${item.source} — ${item.link}`);
     }
   }
 
-  // ── 8. Save artifact ──────────────────────────────────────────────────────
-  // Salva um arquivo por id+data: raw_news-<id>-YYYY-MM-DD.json
-  const today = new Date().toISOString().slice(0, 10); // "2026-04-08"
+  // ── 9. Save artifact ──────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
   const inputId = (inputs.id || "").trim();
   const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
   await saveArtifact(artifactName, artifact);
@@ -359,8 +322,7 @@ export default async function (context) {
   console.log(`\nArtifact saved: ${artifactName}.json`);
   console.log("Next step: run the article-writer task consuming this artifact.");
 
-  // ── 9. Cleanup: remove arquivos antigos (>7 dias) ─────────────────────────────
-
+  // ── 10. Cleanup: remove arquivos antigos (>7 dias) ───────────────────────
   const artifactsDir = path.resolve("artifacts/rss-fetcher");
   const keepDays = 7;
   const now = new Date();
