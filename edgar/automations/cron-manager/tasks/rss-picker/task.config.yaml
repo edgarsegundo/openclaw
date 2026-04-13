@@ -34,3 +34,15 @@ inputs:
     required: false
     default: 7
     help_tip: "Minimum relevance score (0-10) for an item to be approved. 7 = strict, 5 = permissive."
+
+  - name: force
+    type: boolean
+    required: false
+    default: false
+    help_tip: "Se true, processa mesmo com menos que min_items. Útil para execuções manuais."
+
+  - name: item_index
+    type: number
+    required: false
+    default: null
+    help_tip: "Se definido, processa apenas o item de índice correspondente na lista de novos itens, pula a IA e grava direto o arquivo aprovado. 0 = primeiro da lista."

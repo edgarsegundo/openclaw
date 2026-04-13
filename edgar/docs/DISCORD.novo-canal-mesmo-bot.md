@@ -88,6 +88,13 @@ Ou pela URL:
 discord.com/channels/SERVER_ID/CHANNEL_ID
 ```
 
+Ex:
+https://discord.com/channels/1474802637902971086/1493298260821938176
+
+SERVER_ID: 1474802637902971086
+CHANNEL_ID: 1493298260821938176
+
+
 ✅ último número = channel id
 
 ---

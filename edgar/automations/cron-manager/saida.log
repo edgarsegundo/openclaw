@@ -1,0 +1,16 @@
+◇ injecting env (2) from ../ai-client/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+◇ injecting env (0) from .env // tip: ⌘ override existing { override: true }
+◇ injecting env (1) from tasks/rss-picker/.env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+ℹ Inputs loaded from: tasks/rss-picker/inputs/inputs-visto-americano-force.json
+ℹ [prompt-runner] response_format mode: none
+  → Executing task: rss-picker
+Task: rss-picker | Mode: manual | ID: 8e41199f-5047-4896-a07b-a21f4b8c497e
+
+Looking for today's file: /Users/edgar/Repos/openclaw/edgar/automations/cron-manager/artifacts/rss-fetcher/rss-artifact-visto-americano-2026-04-13.json
+Topic: visto americano
+Topic slug: visto-americano
+Found 1 total item(s) in today's file.
+Last run for "visto-americano": 2026-04-13T18:35:58.929Z
+New items since last run: 0
+Nenhum item novo encontrado para processar.
+✔ Task "rss-picker" completed in 9ms

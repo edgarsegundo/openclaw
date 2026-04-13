@@ -167,6 +167,9 @@ export default async function (context) {
   const parser = new Parser({
     timeout: 10000,
     headers: { "User-Agent": "rss-fetcher-bot/1.0" },
+    requestOptions: {
+      agent: false,
+    },    
   });
 
   console.log(`\nSearching for topic: "${inputs.topic}"`);

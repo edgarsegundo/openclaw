@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import slugify from "slugify";
+import { notifyDiscord } from "../../lib/discord.js";
 
 /**
  * rss-picker task
@@ -165,8 +166,66 @@ export default async function (context) {
 
   console.log(`New items since last run: ${newItems.length}`);
 
-  // ── 4. Check minimum threshold ───────────────────────────────────────────
-  if (newItems.length < minItems) {
+
+  // ── 4. Notifica Discord se poucos itens (1 ou 2) ────────────────────────
+  const force = !!inputs.force;
+  const itemIndex = typeof inputs.item_index === "number" && !isNaN(inputs.item_index) ? inputs.item_index : null;
+
+  if (!force && itemIndex === null && newItems.length > 0 && newItems.length < minItems) {
+    // Monta mensagem para Discord com índice
+    let msg = `Atenção: Apenas ${newItems.length} notícia(s) nova(s) encontrada(s) para o tópico "${topic}".\n`;
+    newItems.forEach((item, idx) => {
+      msg += `\n${idx}. **${item.title}**\n   <${item.link}>\n   Data: ${item.published || "sem data"}\n   Score: ${item.score ?? "-"}`;
+    });
+    msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub-1)`;
+    notifyDiscord(msg);
+  }
+
+  if (itemIndex !== null) {
+    if (newItems.length === 0) {
+      console.log("Nenhum item novo encontrado para processar.");
+      return;
+    }
+    if (itemIndex < 0 || itemIndex >= newItems.length) {
+      console.log(`item_index (${itemIndex}) fora do intervalo. Só há ${newItems.length} item(ns) novo(s).`);
+      return;
+    }
+    const item = newItems[itemIndex];
+    // Monta o objeto aprovado conforme schema.js
+    const approved = {
+      topic,
+      topic_slug: topicSlug,
+      date: today,
+      evaluated_at: new Date().toISOString(),
+      total_approved: 1,
+      items: [
+        {
+          title: item.title,
+          link: item.link,
+          published: item.published || null,
+          source: item.source,
+          score: 10,
+          approved_at: new Date().toISOString(),
+        },
+      ],
+    };
+    // Salva arquivo aprovado
+    const dailyFilePath = path.resolve(`artifacts/rss-picker/approved-${topicSlug}-${today}.json`);
+    fs.writeFileSync(dailyFilePath, JSON.stringify(approved, null, 2), "utf-8");
+    console.log(`Arquivo aprovado criado com 1 item (item_index=${itemIndex}): approved-${topicSlug}-${today}.json`);
+    // Atualiza last_run.json
+    lastRunRegistry[topicSlug] = {
+      last_run_at: new Date().toISOString(),
+      items_evaluated: 1,
+      items_approved: 1,
+    };
+    fs.writeFileSync(lastRunPath, JSON.stringify(lastRunRegistry, null, 2), "utf-8");
+    console.log(`Updated last_run.json for topic "${topicSlug}".`);
+    return;
+  }
+
+  // ── 4b. Check minimum threshold ──────────────────────────────────────────
+  if (newItems.length < minItems && !force) {
     console.log(
       `Below minimum threshold (${newItems.length} < ${minItems}). ` +
       `Waiting for more items. Exiting.`
