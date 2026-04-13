@@ -10,3 +10,5 @@ node --inspect-brk cron-manager.js run rss-picker --template feed-selector-visto
 
 
 node --inspect-brk cron-manager.js run rss-picker --template feed-selector-visto-americano  --input-file tasks/rss-picker/inputs/inputs-visto-americano-force.json
+
+node cron-manager.js run rss-picker --template feed-selector-visto-americano  --input-file tasks/rss-picker/inputs/inputs-visto-americano-force.json

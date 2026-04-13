@@ -1,8 +1,9 @@
 
-require("dotenv").config();
-const { Client, GatewayIntentBits } = require("discord.js");
-const { dispatch } = require("./dispatcher");
-const bots = require("./bots.config");
+
+import "dotenv/config";
+import { Client, GatewayIntentBits } from "discord.js";
+import { dispatch } from "./dispatcher.js";
+import bots from "./bots.config.js";
 
 const clients = [];
 

@@ -1,6 +1,6 @@
-const fetch = require("node-fetch");
+import fetch from "node-fetch";
 
-module.exports = {
+export default {
   name: "/pub",
   description: "Publica artigo por índice",
 

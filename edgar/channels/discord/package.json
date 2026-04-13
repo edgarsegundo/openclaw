@@ -1,0 +1,5 @@
+{
+  "name": "discord-bot",
+  "type": "module",
+  "main": "index.js"
+}
