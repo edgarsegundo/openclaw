@@ -16,6 +16,18 @@
 
 export const DEFAULT_FEEDS = [
   // ── Portuguese / Brazilian sources ──────────────────────────────────────
+  {
+    url: "https://www.cnnbrasil.com.br/tudo-sobre/educacao/feed/",
+    name: "CNN Brasil - Educação",
+    lang: "pt",
+    category: "education",
+  },
+  {
+    url: "https://www.correiodamanhacanada.com/feed/",
+    name: "Correio da Manhã Canada",
+    lang: "pt",
+    category: "general",
+  },
   // {
   //   url: "https://g1.globo.com/rss/g1/",
   //   name: "G1 - Globo",
@@ -122,7 +134,19 @@ export const DEFAULT_FEEDS = [
     lang: "pt",
     category: "general",
   },
+  {
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/14805574443330081222",
+    name: "Google Alerts - \"Visto Canadá\"",
+    lang: "pt",
+    category: "general",
+  },
 
+  {
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/5047037072991100066",
+    name: "Google Alerts - \"Visto Canadense\"",
+    lang: "pt",
+    category: "general",
+  },
 
 ];
 
