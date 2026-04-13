@@ -10,7 +10,7 @@ cd "$BASE" || exit 1
 trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
-[ -f '/home/ubuntu/openclaw/edgar/channels/discord/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/channels/discord/.env' | xargs)
+[ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' | xargs)
 
 # Executa rss-fetcher
 echo "[1/2] Rodando rss-fetcher..."
