@@ -1,3 +1,17 @@
+// Formata data para dd-mmm-aaaa hh:mm:ss
+function formatDate(dateStr) {
+  if (!dateStr) return "sem data";
+  const date = new Date(dateStr);
+  if (isNaN(date)) return dateStr;
+  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = meses[date.getMonth()];
+  const yyyy = date.getFullYear();
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
+}
 import fs from "fs";
 import path from "path";
 import slugify from "slugify";
@@ -172,10 +186,10 @@ export default async function (context) {
   const itemIndex = typeof inputs.item_index === "number" && !isNaN(inputs.item_index) ? inputs.item_index : null;
 
   if (!force && itemIndex === null && newItems.length > 0 && newItems.length < minItems) {
-    // Monta mensagem para Discord com índice
+    // Monta mensagem para Discord com índice, link limpo e data formatada
     let msg = `Atenção: Apenas ${newItems.length} notícia(s) nova(s) encontrada(s) para o tópico "${topic}".\n`;
     newItems.forEach((item, idx) => {
-      msg += `\n${idx}. **${item.title}**\n   <${item.link}>\n   Data: ${item.published || "sem data"}\n   Score: ${item.score ?? "-"}`;
+      msg += `\n${idx}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
     });
     msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub-1)`;
     notifyDiscord(msg);

@@ -17,7 +17,7 @@ export async function notifyDiscord(message) {
     });
 
     if (res.ok) {
-      logger.debug("Discord notification sent.");
+      logger.info("Discord notification sent.");
     } else {
       logger.error(`Discord notification failed: ${res.status} ${res.statusText}`);
     }

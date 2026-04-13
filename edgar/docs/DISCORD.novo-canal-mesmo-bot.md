@@ -19,6 +19,8 @@ Novo produto = novo bot
 
 ## 1) Criar o canal
 
+> Também criei esse [tutorial em google docs](https://docs.google.com/document/d/1ce5j9FMNh9e8s50-wSctkJcElCKeaRJm0iYhLkpPd0I/edit?tab=t.0)
+
 Servidor → **Text Channels → +**
 
 Nome:
