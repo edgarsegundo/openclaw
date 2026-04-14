@@ -43,9 +43,43 @@ export default async function (context) {
   //   saveArtifact — fn(name, data) — writes JSON to artifacts/rss-picker/<n>.json
   const { taskName, mode, executionId, inputs, runPrompt, saveArtifact } = context;
   const itemIndex = inputs.item_index ?? null;
-  const force = !!inputs.force;
+  const action = inputs.action ?? null;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
+
+  // Bloco de deleção de pendente (adicione aqui)
+  if (action === "del" && itemIndex !== null) {
+    const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
+    if (!fs.existsSync(pendingPath)) {
+      console.log("Nenhuma lista pendente de aprovação encontrada.");
+      return;
+    }
+    let pendingItems = JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
+    const idx = Number(itemIndex) - 1;
+    if (idx < 0 || idx >= pendingItems.length) {
+      console.log(`del (${itemIndex}) fora do intervalo. Só há ${pendingItems.length} item(ns) pendente(s).`);
+      return;
+    }
+    const removed = pendingItems.splice(idx, 1)[0];
+    if (pendingItems.length === 0) {
+      fs.unlinkSync(pendingPath);
+      // Atualiza o last_run.json para a data do item deletado
+      if (removed && removed.published) {
+        lastRunRegistry[topicSlug] = {
+          last_run_at: removed.published,
+          items_evaluated: 0,
+          items_approved: 0,
+        };
+        fs.writeFileSync(lastRunPath, JSON.stringify(lastRunRegistry, null, 2), "utf-8");
+        console.log(`last_run.json atualizado para ${removed.published}`);
+      }
+      console.log("Lista de pendentes ficou vazia, arquivo removido.");
+    } else {
+      fs.writeFileSync(pendingPath, JSON.stringify(pendingItems, null, 2), "utf-8");
+      console.log(`Item removido. ${pendingItems.length} item(ns) restante(s) na lista de pendentes.`);
+    }
+    return;
+  }
 
   // ── runPrompt(extraVars?) ─────────────────────────────────────────────────
   // Renders the prompt template, calls the AI, validates against schema.js,
@@ -226,7 +260,10 @@ export default async function (context) {
   }
 
   // ── 4b. Check minimum threshold ──────────────────────────────────────────
-  if (newItems.length < minItems && !force) {
+  if (
+    newItems.length < minItems &&
+    (action !== "approve" && action !== "del")
+  ) {
     if (newItems.length > 0) {
       let msg = `🆕 Novos itens encontrados hoje para o tópico "${topic}":\n`;
       newItems.forEach((item, idx) => {

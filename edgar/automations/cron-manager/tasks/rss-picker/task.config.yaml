@@ -35,11 +35,11 @@ inputs:
     default: 7
     help_tip: "Minimum relevance score (0-10) for an item to be approved. 7 = strict, 5 = permissive."
 
-  - name: force
-    type: boolean
+  - name: action
+    type: string
     required: false
-    default: false
-    help_tip: "Se true, processa mesmo com menos que min_items. Útil para execuções manuais."
+    default: "approve"
+    help_tip: "Ação a ser realizada: 'approve' para aprovar ou 'del' para deletar."
 
   - name: item_index
     type: number
