@@ -1,17 +1,3 @@
-// Formata data para dd-mmm-aaaa hh:mm:ss
-function formatDate(dateStr) {
-  if (!dateStr) {return "sem data";}
-  const date = new Date(dateStr);
-  if (isNaN(date)) {return dateStr;}
-  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-  const dd = String(date.getDate()).padStart(2, "0");
-  const mm = meses[date.getMonth()];
-  const yyyy = date.getFullYear();
-  const hh = String(date.getHours()).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
-  return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
-}
 import fs from "fs";
 import path from "path";
 import slugify from "slugify";
@@ -180,31 +166,28 @@ export default async function (context) {
 
   console.log(`New items since last run: ${newItems.length}`);
 
-
-  // ── 4. Notifica Discord se poucos itens (1 ou 2) ────────────────────────
-  const force = !!inputs.force;
-  const itemIndex = typeof inputs.item_index === "number" && !isNaN(inputs.item_index) ? inputs.item_index : null;
-
-  if (!force && itemIndex === null && newItems.length > 0 && newItems.length < minItems) {
-    // Monta mensagem para Discord com índice, link limpo e data formatada
-    let msg = `Atenção: Apenas ${newItems.length} notícia(s) nova(s) encontrada(s) para o tópico "${topic}".\n`;
-    newItems.forEach((item, idx) => {
-      msg += `\n${idx}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n\n   Data: ${formatDate(item.published)}\n   Score: ${item.score ?? "-"}`;
-    });
-    msg += `\n\nSe quiser publicar algum, basta responder com /pub-<índice> (ex: /pub 1)`;
-    notifyDiscord(msg);
-  }
+  // Notifica Discord SOMENTE se não atingir o mínimo e abortar (IA não vai rodar)
 
   if (itemIndex !== null) {
-    if (newItems.length === 0) {
-      console.log("Nenhum item novo encontrado para processar.");
+    // Aprovação manual: sempre usa a lista travada
+    const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
+    if (!fs.existsSync(pendingPath)) {
+      console.log("Nenhuma lista pendente de aprovação encontrada.");
       return;
     }
-    if (itemIndex < 0 || itemIndex >= newItems.length) {
-      console.log(`item_index (${itemIndex}) fora do intervalo. Só há ${newItems.length} item(ns) novo(s).`);
+    const pendingItems = JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
+    // Índice 1-based para o usuário
+    const userIndex = itemIndex;
+    const idx = userIndex - 1;
+    if (pendingItems.length === 0) {
+      console.log("Nenhum item pendente encontrado para processar.");
       return;
     }
-    const item = newItems[itemIndex];
+    if (idx < 0 || idx >= pendingItems.length) {
+      console.log(`item_index (${userIndex}) fora do intervalo. Só há ${pendingItems.length} item(ns) pendente(s).`);
+      return;
+    }
+    const item = pendingItems[idx];
     // Monta o objeto aprovado conforme schema.js
     const approved = {
       topic,
@@ -226,7 +209,7 @@ export default async function (context) {
     // Salva arquivo aprovado
     const dailyFilePath = path.resolve(`artifacts/rss-picker/approved-${topicSlug}-${today}.json`);
     fs.writeFileSync(dailyFilePath, JSON.stringify(approved, null, 2), "utf-8");
-    console.log(`Arquivo aprovado criado com 1 item (item_index=${itemIndex}): approved-${topicSlug}-${today}.json`);
+    console.log(`Arquivo aprovado criado com 1 item (item_index=${userIndex}): approved-${topicSlug}-${today}.json`);
     // Atualiza last_run.json
     lastRunRegistry[topicSlug] = {
       last_run_at: new Date().toISOString(),
@@ -234,12 +217,24 @@ export default async function (context) {
       items_approved: 1,
     };
     fs.writeFileSync(lastRunPath, JSON.stringify(lastRunRegistry, null, 2), "utf-8");
+    // Após aprovar, apaga a lista de pendências
+    fs.unlinkSync(pendingPath);
     console.log(`Updated last_run.json for topic "${topicSlug}".`);
     return;
   }
 
   // ── 4b. Check minimum threshold ──────────────────────────────────────────
   if (newItems.length < minItems && !force) {
+    if (newItems.length > 0) {
+      let msg = `🆕 Novos itens encontrados hoje para o tópico "${topic}":\n`;
+      newItems.forEach((item, idx) => {
+        msg += `\n${idx + 1}. **${item.title}**\n   <${sanitizeGoogleLink(item.link)}>\n   Data: ${formatDate(item.published)}`;
+      });
+      notifyDiscord(msg);
+      // Salva a lista de novos itens para aprovação manual
+      const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
+      fs.writeFileSync(pendingPath, JSON.stringify(newItems, null, 2), "utf-8");
+    }
     console.log(
       `Below minimum threshold (${newItems.length} < ${minItems}). ` +
       `Waiting for more items. Exiting.`
@@ -286,6 +281,11 @@ export default async function (context) {
     items_json: JSON.stringify(itemsForAI, null, 2),
     total_items: itemsForAI.length,
   });
+  // Após rodar a IA, apaga a lista de pendências (se existir)
+  const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
+  if (fs.existsSync(pendingPath)) {
+    fs.unlinkSync(pendingPath);
+  }
 
   // ── 8. Print triage results ──────────────────────────────────────────────
   const approvedItems = artifact.results.filter((r) => r.score >= minScore);
@@ -439,4 +439,19 @@ function stripHtmlTags(str = "") {
     .replace(/&gt;/g, ">")
     .replace(/&#39;/g, "'")
     .trim();
+}
+
+// Formata data para dd-mmm-aaaa hh:mm:ss
+function formatDate(dateStr) {
+  if (!dateStr) {return "sem data";}
+  const date = new Date(dateStr);
+  if (isNaN(date)) {return dateStr;}
+  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = meses[date.getMonth()];
+  const yyyy = date.getFullYear();
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
 }
