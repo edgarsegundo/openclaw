@@ -228,14 +228,26 @@ export default async function (context) {
   // ── 4b. Check minimum threshold ──────────────────────────────────────────
   if (newItems.length < minItems && !force) {
     if (newItems.length > 0) {
-      let msg = `🆕 Novos itens encontrados hoje para o tópico "${topic}":\n`;
-      newItems.forEach((item, idx) => {
-        msg += `\n${idx + 1}. **${item.title}**\n   <${sanitizeGoogleLink(item.link)}>\n   Data: ${formatDate(item.published)}`;
-      });
-      notifyDiscord(msg);
-      // Salva a lista de novos itens para aprovação manual
       const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
-      fs.writeFileSync(pendingPath, JSON.stringify(newItems, null, 2), "utf-8");
+      let lastPending = [];
+      if (fs.existsSync(pendingPath)) {
+        try {
+          lastPending = JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
+        } catch (e) {
+          lastPending = [];
+        }
+      }
+      const isDifferent = newItems.length > lastPending.length || JSON.stringify(newItems) !== JSON.stringify(lastPending);
+      if (isDifferent) {
+        let msg = `🆕 Novos itens hoje para o tópico "${topic}"\n (como publicar: /pub <índice>):\n`;
+        newItems.forEach((item, idx) => {
+          msg += `\n${idx + 1}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n   Data: ${formatDate(item.published)}`;
+        });
+        notifyDiscord(msg);
+        fs.writeFileSync(pendingPath, JSON.stringify(newItems, null, 2), "utf-8");
+      } else {
+        console.log("Lista de pendentes não mudou, não notifica novamente.");
+      }
     }
     console.log(
       `Below minimum threshold (${newItems.length} < ${minItems}). ` +
