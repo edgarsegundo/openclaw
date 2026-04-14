@@ -42,6 +42,8 @@ export default async function (context) {
   //   runPrompt    — async fn — renders template, calls AI, validates via schema.js
   //   saveArtifact — fn(name, data) — writes JSON to artifacts/rss-picker/<n>.json
   const { taskName, mode, executionId, inputs, runPrompt, saveArtifact } = context;
+  const itemIndex = inputs.item_index ?? null;
+  const force = !!inputs.force;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
