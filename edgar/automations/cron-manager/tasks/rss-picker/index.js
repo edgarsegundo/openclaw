@@ -260,6 +260,10 @@ export default async function (context) {
   }
 
   // ── 4b. Check minimum threshold ──────────────────────────────────────────
+
+  console.log(`Minimum items required to run AI triage: ${minItems}`);
+  console.log(`Action: ${action || "undefined"}`);
+
   if (
     newItems.length < minItems &&
     (action !== "approve" && action !== "del")
