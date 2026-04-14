@@ -4,3 +4,4 @@ app.log
 cron.log
 **/visa-crawler-*.log
 !user.md
+notificacoes_seguros.db
