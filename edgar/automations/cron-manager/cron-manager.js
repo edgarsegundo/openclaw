@@ -17,9 +17,7 @@ import {
 } from "./lib/prompt-loader.js";
 
 // ── Paths ────────────────────────────────────────────────────────────────────
-
-const BIN_DIR = path.dirname(new URL(import.meta.url).pathname);
-const ROOT = path.join(BIN_DIR, "..");
+const ROOT = path.dirname(new URL(import.meta.url).pathname);
 const TASKS_DIR = path.join(ROOT, "tasks");
 const TEMPLATES_DIR = path.join(ROOT, "templates");
 const ARTIFACTS_DIR = path.join(ROOT, "artifacts");

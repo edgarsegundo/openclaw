@@ -16,6 +16,7 @@
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/check-nubank-emails/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/check-nubank-emails/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/hello-world/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/hello-world/.env' | xargs)
+[ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/oferecer-seguro/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/oferecer-seguro/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/visa-crawler/.env' | xargs)
@@ -58,6 +59,12 @@ YOUR_CHANNEL_ID
 ```
 DEBUG_MODE
 GREETING_PREFIX
+```
+
+## /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/oferecer-seguro/.env
+
+```
+DISCORD_WEBHOOK_URL
 ```
 
 ## /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env
