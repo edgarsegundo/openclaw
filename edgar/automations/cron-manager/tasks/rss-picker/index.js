@@ -315,6 +315,9 @@ export default async function (context) {
   //   topic       — human-readable topic name from the raw_news artifact
   //   items_json  — serialized list of items for the AI to evaluate
   //   total_items — count of items, injected as {{total_items}} in user.md
+  
+  console.log("🤖 It's about to run the AI with the following variables:");
+
   const { artifact, usage } = await runPrompt({
     topic,
     items_json: JSON.stringify(itemsForAI, null, 2),
