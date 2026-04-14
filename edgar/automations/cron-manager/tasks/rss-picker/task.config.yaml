@@ -38,7 +38,7 @@ inputs:
   - name: action
     type: string
     required: false
-    default: "approve"
+    default: ""
     help_tip: "Ação a ser realizada: 'approve' para aprovar ou 'del' para deletar."
 
   - name: item_index
