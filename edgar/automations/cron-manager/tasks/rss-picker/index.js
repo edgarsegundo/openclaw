@@ -68,7 +68,7 @@ export default async function (context) {
 
   // ── 3. Process manual command (/pub N or /del N) ─────────────────────────
   if (action !== null && itemIndex !== null) {
-    const fetcherIndex = Number(itemIndex) - 1; // convert 1-based → 0-based
+    const fetcherIndex = Number(itemIndex); // convert 1-based → 0-based
 
     if (fetcherIndex < 0 || fetcherIndex >= allItems.length) {
       console.log(
@@ -435,7 +435,7 @@ function formatDate(dateStr) {
  * Ensures the block never exceeds safe limits.
  */
 function buildItemBlock(item) {
-  const displayIndex = item.fetcherIndex + 1;
+  const displayIndex = item.fetcherIndex;
 
   const safeTitle = truncate(stripHtmlTags(item.title), 300);
   const safeLink = truncate(sanitizeGoogleLink(item.link), 500);
