@@ -95,10 +95,14 @@ export default async function (context) {
     console.log(`Article URL: ${articleUrl}`);
 
     // Run both indexing actions independently
-    const [pingResult, apiResult] = await Promise.all([
-      pingSitemap(json.sitemap_url),
+    const [apiResult] = await Promise.all([
+      // pingSitemap(json.sitemap_url),
       submitToIndexingApi(articleUrl),
     ]);
+
+    // if (!pingResult) pingResult = { ok: false, error: "pingSitemap returned undefined" };
+    if (!apiResult) apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
+
 
     // Notify Discord with result
     await notifyIndexingResult(slug, pingResult, apiResult);
