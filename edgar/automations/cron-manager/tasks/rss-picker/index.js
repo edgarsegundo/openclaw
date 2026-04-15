@@ -140,15 +140,8 @@ export default async function (context) {
   if (unresolvedItems.length < minItems) {
     if (unresolvedItems.length > 0) {
       // Notify Discord with the list of pending items
-      let msg = `🆕 Itens pendentes para o tópico "${topic}":\n> /pub <N> ou /del <N>\n`;
-      for (const item of unresolvedItems) {
-        const displayIndex = item.fetcherIndex + 1; // 1-based for the user
-        msg += `\n${displayIndex}. **${stripHtmlTags(item.title)}**\n`;
-        msg += `   <${sanitizeGoogleLink(item.link)}>\n`;
-        msg += `   Data: ${formatDate(item.published)}`;
-      }
-      notifyDiscord(msg);
-      console.log(`Discord notified with ${unresolvedItems.length} pending item(s).`);
+      const sentCount = sendInChunks(unresolvedItems, topic);
+      console.log(`Discord notified with ${unresolvedItems.length} items in ${sentCount} message(s).`);
     } else {
       console.log("No unresolved items. Nothing to do.");
     }
@@ -278,6 +271,8 @@ export default async function (context) {
 }
 
 // ── Status file helpers ───────────────────────────────────────────────────────
+
+const DISCORD_MSG_MAX_LENGTH = 1999;
 
 /**
  * Load today's status file.
@@ -433,4 +428,66 @@ function formatDate(dateStr) {
   const min = String(date.getMinutes()).padStart(2, "0");
   const ss = String(date.getSeconds()).padStart(2, "0");
   return `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
+}
+
+/**
+ * Build a formatted text block for a single unresolved item.
+ * Ensures the block never exceeds safe limits.
+ */
+function buildItemBlock(item) {
+  const displayIndex = item.fetcherIndex + 1;
+
+  const safeTitle = truncate(stripHtmlTags(item.title), 300);
+  const safeLink = truncate(sanitizeGoogleLink(item.link), 500);
+
+  return [
+    `\n${displayIndex}. **${safeTitle}**`,
+    `   <${safeLink}>`,
+    `   Data: ${formatDate(item.published)}`
+  ].join("\n");
+}
+
+/**
+ * Send a list of unresolved items to Discord, splitting into multiple messages
+ * if the content exceeds the 2000 character limit.
+ */
+function sendInChunks(unresolvedItems, topic) {
+  let sentMessages = 0;
+  const safeTopic = truncate(topic, 100);
+  const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> /pub <N> ou /del <N>\n`;
+  const continuationHeader = `🔁 Continuando...\n`;
+
+  let currentMsg = firstHeader;
+
+  for (const item of unresolvedItems) {
+    const itemBlock = buildItemBlock(item);
+
+    // If adding the next item exceeds Discord's limit, send current message
+    if ((currentMsg + itemBlock).length > DISCORD_MSG_MAX_LENGTH) {
+      notifyDiscord(currentMsg);
+
+      sentMessages++;
+
+      // Start a new message with continuation header
+      currentMsg = continuationHeader;
+    }
+
+    currentMsg += itemBlock;
+  }
+
+  // Send any remaining content
+  if (currentMsg.trim().length > 0) {
+    notifyDiscord(currentMsg);
+    sentMessages++;
+  }
+
+  return sentMessages;
+}
+
+/**
+ * Truncate a string to a maximum length, adding ellipsis if needed.
+ */
+function truncate(text, max = 100) {
+  if (typeof text !== "string") { return text; }
+  return text.length > max ? text.slice(0, max) + "..." : text;
 }
