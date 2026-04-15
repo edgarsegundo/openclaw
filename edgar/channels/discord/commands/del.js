@@ -2,15 +2,18 @@ import path from "path";
 import { exec } from "child_process";
 import { createTempInputFile } from "./common.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 export default {
   name: "/del",
   description: "Remove artigo pendente por índice",
 
   async execute({ message, args, botName }) {
     const index = args[0];
-    if (index !== "0" && index !== "1") {
-      return message.reply("❌ Índice inválido. Use /del 0 ou /del 1");
-    }
+    if (!Number.isInteger(Number(args[0]))) {
+      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /del 1");
+    }    
     try {
       const inputFile = createTempInputFile(Number(index), "del");
       const cmd =

@@ -269,9 +269,9 @@ export default async function (context) {
     (action !== "approve" && action !== "del")
   ) {
     if (newItems.length > 0) {
-      let msg = `🆕 Novos itens encontrados hoje para o tópico "${topic}":\n`;
+      let msg = `🆕 Novos itens encontrados hoje para o tópico "${topic}":\n\\> pub|del <idx> \n`;
       newItems.forEach((item, idx) => {
-        msg += `\n${idx + 1}. **${item.title}**\n   <${sanitizeGoogleLink(item.link)}>\n   Data: ${formatDate(item.published)}`;
+        msg += `\n${idx + 1}. **${item.title}**\n\n   <${sanitizeGoogleLink(item.link)}>\n   Data: ${formatDate(item.published)}`;
       });
       notifyDiscord(msg);
       // Salva a lista de novos itens para aprovação manual
