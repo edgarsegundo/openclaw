@@ -7,7 +7,7 @@
 Criar um serviço em Node.js que:
 
 * Escuta mensagens de **múltiplos bots** do Discord (cada um com seu token)
-* Interpreta comandos digitados pelo usuário (ex: `/pub 1`)
+* Interpreta comandos digitados pelo usuário (ex: `/apr 1`)
 * Dispara ações no backend (API, scripts, automações)
 * Suporta múltiplos comandos, múltiplos canais e múltiplos bots
 * Centraliza a lógica de comandos e facilita manutenção/escalabilidade
@@ -29,7 +29,7 @@ Usuário digita mensagem no Discord
 ↓
 Um dos bots recebe evento (messageCreate)
 ↓
-Dispatcher identifica comando (/pub)
+Dispatcher identifica comando (/apr)
 ↓
 Handler executa lógica (com contexto do bot)
 ↓
@@ -47,7 +47,7 @@ Sistema dispara ações (API, jobs, etc)
     dispatcher.js
     bots.config.js
     /commands
-      pub.js
+      apr.js
 ```
 
 ---
@@ -203,26 +203,26 @@ module.exports = { dispatch };
 
 ---
 
-### 📄 `commands/pub.js` — Comando exemplo
+### 📄 `commands/apr.js` — Comando exemplo
 
 ```js
 const fetch = require("node-fetch");
 
 module.exports = {
-  name: "/pub",
+  name: "/apr",
   description: "Publica artigo por índice",
 
   async execute({ message, args, botName }) {
     const index = args[0];
 
     if (!index) {
-      return message.reply("❌ Informe o índice. Ex: /pub 1");
+      return message.reply("❌ Informe o índice. Ex: /apr 1");
     }
 
     try {
       console.log(JSON.stringify({
         bot: botName,
-        event: "pub_command",
+        event: "apr_command",
         index,
       }));
 
@@ -230,7 +230,7 @@ module.exports = {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      await fetch(`${process.env.API_URL}/pub`, {
+      await fetch(`${process.env.API_URL}/apr`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -247,7 +247,7 @@ module.exports = {
       await message.reply(`✅ Publicando artigo ${index}`);
     } catch (err) {
       console.error(err);
-      await message.reply("❌ Erro ao publicar");
+      await message.reply("❌ Erro ao aprovar");
     }
   },
 };
@@ -319,7 +319,7 @@ Cada comando pode:
 ### Publicação
 
 ```text
-/pub 1
+/apr 1
 ```
 
 ---

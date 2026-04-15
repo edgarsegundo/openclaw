@@ -39,7 +39,7 @@ inputs:
     type: string
     required: false
     default: ""
-    help_tip: "Ação a ser realizada: 'pub' para publicar ou 'del' para deletar."
+    help_tip: "Ação a ser realizada: 'apr' para publicar ou 'del' para deletar."
 
   - name: item_index
     type: number

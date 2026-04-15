@@ -7,28 +7,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default {
-  name: "/pub",
-  description: "Publica artigo por índice",
+  name: "/apr",
+  description: "Aprova artigo por índice",
 
   async execute({ message, args, botName }) {
     const index = args[0];
     if (!Number.isInteger(Number(args[0]))) {
-      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /pub 1");
-    }
-
+      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /apr 1");
+    }    
     try {
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/publish-article/inputs/inputs-visto-americano.json"
+        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
-      inputObj.action = "pub";
+      inputObj.action = "apr";
       inputObj.item_index = Number(index);
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
-        `node cron-manager.js run publish-article --template skip --input-file ${inputFile}`;
+        `node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file ${inputFile}`;
       const cwd = path.resolve(
         __dirname,
         "../../../automations/cron-manager"
@@ -46,10 +45,10 @@ export default {
         });
       });
 
-      await message.reply(`✅ Publicando artigo ${index}`);
+      await message.reply(`✅ Aprovando artigo ${index}`);
     } catch (err) {
       console.error(err);
-      await message.reply("❌ Erro ao publicar o artigo. Verifique os logs para mais detalhes.");
+      await message.reply("❌ Erro ao aprovar o artigo. Verifique os logs para mais detalhes.");
     }
   },
 };

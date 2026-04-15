@@ -13,5 +13,7 @@
       "label": "Fast Vistos",
       "sitemap_url": "https://fastvistos.com.br/sitemap-index.xml"
     }
-  ]
+  ],
+  "action": "pub",
+  "item_index": 0
 }

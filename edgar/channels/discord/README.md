@@ -22,7 +22,7 @@ node index.js
 
 - `index.js`: Entrada principal
 - `dispatcher.js`: Roteador de comandos
-- `commands/`: Comandos individuais (exemplo: `pub.js`)
+- `commands/`: Comandos individuais (exemplo: `apr.js`)
 
 ## Adicionando comandos
 

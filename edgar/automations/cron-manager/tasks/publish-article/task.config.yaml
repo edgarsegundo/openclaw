@@ -63,6 +63,12 @@ inputs:
     type: string
     required: true
     help_tip: Caminho para um arquivo JSON com a lista de destinos (array de objetos { business_id, blog_topic_slug })
+  - name: action
+    type: string
+    required: false
+    default: ""
+    help_tip: "Ação a ser realizada: 'pub' para publicar"
+
   # Examples:
   # - name: topic
   #   type: string

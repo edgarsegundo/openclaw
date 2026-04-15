@@ -21,7 +21,7 @@ Automatizar a publicação de artigos gerados periodicamente, enviando-os para u
   - `slug` → `slug`
   - `published` → data/hora de publicação (se existir, senão usar data do arquivo)
 6. **Determinar business_id/blog_topic_slug** conforme regra de alternância (exemplo: round-robin, config, etc).
-  - A task manterá um arquivo de estado (ex: `publish-article.last.json`) para persistir qual foi o último `business_id`/`blog_topic_slug` que recebeu publicação, garantindo alternância correta mesmo entre execuções diferentes.
+  - A task manterá um arquivo de estado (ex: `publish-article.roundrobin.json`) para persistir qual foi o último `business_id`/`blog_topic_slug` que recebeu publicação, garantindo alternância correta mesmo entre execuções diferentes.
   - Haverá um input obrigatório `destinations` (array de objetos), onde cada objeto contém `business_id` e `blog_topic_slug`. Exemplo de input:
 
 ```json

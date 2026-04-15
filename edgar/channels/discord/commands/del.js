@@ -16,7 +16,16 @@ export default {
       return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /del 1");
     }
     try {
-      const inputFile = createTempInputFile(Number(index), "del");
+      const inputPath = path.resolve(
+        __dirname,
+        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
+      );
+
+      let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
+      inputObj.action = "del";
+      inputObj.item_index = Number(index);
+
+      const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
         `node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file ${inputFile}`;
       const cwd = path.resolve(

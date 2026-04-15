@@ -10,7 +10,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  * resolved (approved or deleted — by human or AI), and decides between two paths:
  *
  *   AI path    — unresolved items >= min_items → sends to Perplexity Sonar for triage
- *   Human path — unresolved items < min_items  → notifies Discord and waits for /pub or /del
+ *   Human path — unresolved items < min_items  → notifies Discord and waits for /apr or /del
  *
  * State is tracked exclusively via a daily status file per topic:
  *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json
@@ -21,7 +21,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  *   blog_context   — description of your blog and audience (optional)
  *   min_items      — minimum unresolved items required to trigger AI triage (default: 3)
  *   min_score      — minimum relevance score 0-10 to publish an item (default: 7)
- *   action         — "pub" or "del" (manual command from Discord)
+ *   action         — "apr" or "del" (manual command from Discord)
  *   item_index     — 1-based index of the item in the fetcher array (manual command)
  *
  * Daily files:
@@ -66,7 +66,7 @@ export default async function (context) {
   // ── 2. Load today's status file ──────────────────────────────────────────
   let { statusData, resolvedSet } = loadStatus(topicSlug, today);
 
-  // ── 3. Process manual command (/pub N or /del N) ─────────────────────────
+  // ── 3. Process manual command (/apr N or /del N) ─────────────────────────
   if (action !== null && itemIndex !== null) {
     const fetcherIndex = Number(itemIndex); // convert 1-based → 0-based
 
@@ -87,9 +87,9 @@ export default async function (context) {
 
     const item = allItems[fetcherIndex];
 
-    if (action === "pub") {
+    if (action === "apr") {
       // Approve manually — bypass AI
-      console.log(`\n/pub received for item ${itemIndex}: "${item.title}"`);
+      console.log(`\n/apr received for item ${itemIndex}: "${item.title}"`);
 
       // Append to today's approved file
       appendToApproved(topicSlug, today, [
@@ -122,7 +122,7 @@ export default async function (context) {
       return;
     }
 
-    console.log(`Unknown action "${action}". Valid actions: pub, del.`);
+    console.log(`Unknown action "${action}". Valid actions: apr, del.`);
     return;
   }
 
@@ -453,7 +453,7 @@ function sendInChunks(unresolvedItems, topic) {
   let sentMessages = 0;
 
   const safeTopic = truncate(topic, 100);
-  const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> /pub <N> ou /del <N>\n`;
+  const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> /apr <N> ou /del <N>\n`;
   const continuationHeader = `🔁 Continuando...\n`;
 
   let currentMsg = firstHeader;
