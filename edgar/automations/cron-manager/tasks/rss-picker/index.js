@@ -20,7 +20,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  *                    e.g. "artifacts/rss-fetcher/rss-artifact-visto-americano-{date}.json"
  *   blog_context   — description of your blog and audience (optional)
  *   min_items      — minimum unresolved items required to trigger AI triage (default: 3)
- *   min_score      — minimum relevance score 0-10 to approve an item (default: 7)
+ *   min_score      — minimum relevance score 0-10 to publish an item (default: 7)
  *   action         — "pub" or "del" (manual command from Discord)
  *   item_index     — 1-based index of the item in the fetcher array (manual command)
  *

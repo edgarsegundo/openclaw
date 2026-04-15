@@ -16,7 +16,7 @@ export default {
       return message.reply("❌ Índice inválido. Use /pub 0 ou /pub 1");
     }
     try {
-      const inputFile = createTempInputFile(Number(index), "approve");
+      const inputFile = createTempInputFile(Number(index), "pub");
       const cmd =
         `node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file ${inputFile}`;
       const cwd = path.resolve(
