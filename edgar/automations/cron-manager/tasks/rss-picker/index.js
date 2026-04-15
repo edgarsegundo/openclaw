@@ -441,7 +441,7 @@ function buildItemBlock(item) {
   const safeLink = truncate(sanitizeGoogleLink(item.link), 500);
 
   return [
-    `\n${displayIndex}. **${safeTitle}**`,
+    `\n[${displayIndex}] **${safeTitle}**`,
     `   <${safeLink}>`,
     `   Data: ${formatDate(item.published)}`
   ].join("\n");
