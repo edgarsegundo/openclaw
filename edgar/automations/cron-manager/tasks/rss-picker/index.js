@@ -453,6 +453,7 @@ function buildItemBlock(item) {
  */
 function sendInChunks(unresolvedItems, topic) {
   let sentMessages = 0;
+
   const safeTopic = truncate(topic, 100);
   const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> /pub <N> ou /del <N>\n`;
   const continuationHeader = `🔁 Continuando...\n`;
@@ -462,21 +463,20 @@ function sendInChunks(unresolvedItems, topic) {
   for (const item of unresolvedItems) {
     const itemBlock = buildItemBlock(item);
 
-    // If adding the next item exceeds Discord's limit, send current message
+    // 🔥 DECIDE ANTES de adicionar
     if ((currentMsg + itemBlock).length > DISCORD_MSG_MAX_LENGTH) {
       notifyDiscord(currentMsg);
-
       sentMessages++;
 
-      // Start a new message with continuation header
-      currentMsg = continuationHeader;
+      // começa novo chunk já com o item
+      currentMsg = continuationHeader + itemBlock;
+    } else {
+      currentMsg += itemBlock;
     }
-
-    currentMsg += itemBlock;
   }
 
-  // Send any remaining content
-  if (currentMsg.trim().length > 0) {
+  // envia o restante
+  if (currentMsg.trim()) {
     notifyDiscord(currentMsg);
     sentMessages++;
   }
