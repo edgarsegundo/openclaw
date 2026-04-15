@@ -118,6 +118,20 @@ Every paragraph must directly contribute to the main title topic.
 
 ---
 
+### Structure (light requirement)
+
+Use subheadings when they improve clarity and flow.
+
+Rules:
+
+* Include 2 to 3 subheadings (H2: ##) when the article length and complexity justify it
+* For shorter news-style articles, use at least 2 subheadings whenever possible
+* Subheadings must reflect key aspects of the factual core
+* Keep them concise, specific, and journalistic
+* Avoid generic labels like "Conclusion" or "Overview"
+
+---
+
 ## Visual insertion
 
 Insert 2 to 3 placeholders exactly as:
@@ -148,6 +162,12 @@ Before finalizing:
 * discard source explanation order
 * avoid sentence resemblance
 * ensure the article reads as independently written journalism
+
+---
+
+### Structure validation
+
+If the article has more than 4 paragraphs, it should include at least 2 subheadings.
 
 ---
 
