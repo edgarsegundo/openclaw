@@ -47,40 +47,6 @@ export default async function (context) {
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
-  // Bloco de deleção de pendente (adicione aqui)
-  if (action === "del" && itemIndex !== null) {
-    const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
-    if (!fs.existsSync(pendingPath)) {
-      console.log("Nenhuma lista pendente de aprovação encontrada.");
-      return;
-    }
-    let pendingItems = JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
-    const idx = Number(itemIndex) - 1;
-    if (idx < 0 || idx >= pendingItems.length) {
-      console.log(`del (${itemIndex}) fora do intervalo. Só há ${pendingItems.length} item(ns) pendente(s).`);
-      return;
-    }
-    const removed = pendingItems.splice(idx, 1)[0];
-    if (pendingItems.length === 0) {
-      fs.unlinkSync(pendingPath);
-      // Atualiza o last_run.json para a data do item deletado
-      if (removed && removed.published) {
-        lastRunRegistry[topicSlug] = {
-          last_run_at: removed.published,
-          items_evaluated: 0,
-          items_approved: 0,
-        };
-        fs.writeFileSync(lastRunPath, JSON.stringify(lastRunRegistry, null, 2), "utf-8");
-        console.log(`last_run.json atualizado para ${removed.published}`);
-      }
-      console.log("Lista de pendentes ficou vazia, arquivo removido.");
-    } else {
-      fs.writeFileSync(pendingPath, JSON.stringify(pendingItems, null, 2), "utf-8");
-      console.log(`Item removido. ${pendingItems.length} item(ns) restante(s) na lista de pendentes.`);
-    }
-    return;
-  }
-
   // ── runPrompt(extraVars?) ─────────────────────────────────────────────────
   // Renders the prompt template, calls the AI, validates against schema.js,
   // and returns a result object. The template is selected via --template or
@@ -168,6 +134,40 @@ export default async function (context) {
   console.log(`Topic: ${topic}`);
   console.log(`Topic slug: ${topicSlug}`);
   console.log(`Found ${allItems.length} total item(s) in today's file.`);
+
+  // Bloco de deleção de pendente (adicione aqui)
+  if (action === "del" && itemIndex !== null) {
+    const pendingPath = path.resolve(`artifacts/rss-picker/pending-approval-${topicSlug}.json`);
+    if (!fs.existsSync(pendingPath)) {
+      console.log("Nenhuma lista pendente de aprovação encontrada.");
+      return;
+    }
+    let pendingItems = JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
+    const idx = Number(itemIndex) - 1;
+    if (idx < 0 || idx >= pendingItems.length) {
+      console.log(`del (${itemIndex}) fora do intervalo. Só há ${pendingItems.length} item(ns) pendente(s).`);
+      return;
+    }
+    const removed = pendingItems.splice(idx, 1)[0];
+    if (pendingItems.length === 0) {
+      fs.unlinkSync(pendingPath);
+      // Atualiza o last_run.json para a data do item deletado
+      if (removed && removed.published) {
+        lastRunRegistry[topicSlug] = {
+          last_run_at: removed.published,
+          items_evaluated: 0,
+          items_approved: 0,
+        };
+        fs.writeFileSync(lastRunPath, JSON.stringify(lastRunRegistry, null, 2), "utf-8");
+        console.log(`last_run.json atualizado para ${removed.published}`);
+      }
+      console.log("Lista de pendentes ficou vazia, arquivo removido.");
+    } else {
+      fs.writeFileSync(pendingPath, JSON.stringify(pendingItems, null, 2), "utf-8");
+      console.log(`Item removido. ${pendingItems.length} item(ns) restante(s) na lista de pendentes.`);
+    }
+    return;
+  }
 
   // ── 2. Load last_run.json and get last execution timestamp for this topic ─
   // last_run.json is a registry keyed by topic_slug so multiple topics
