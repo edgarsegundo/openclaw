@@ -1,5 +1,6 @@
 import path from "path";
 import { exec } from "child_process";
+import { fileURLToPath } from "url";
 import { createTempInputFile } from "./common.js";
 
 const __filename = fileURLToPath(import.meta.url);
