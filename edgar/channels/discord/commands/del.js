@@ -14,7 +14,7 @@ export default {
     const index = args[0];
     if (!Number.isInteger(Number(args[0]))) {
       return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /del 1");
-    }    
+    }
     try {
       const inputFile = createTempInputFile(Number(index), "del");
       const cmd =
