@@ -4,7 +4,7 @@ name: news
 description: Write an original blog article from a news title and reference link using web research
 
 provider: perplexity
-model: sonar-pro
+model: sonar
 
 system_prompt_file: system.md
 user_prompt_file: user.md
