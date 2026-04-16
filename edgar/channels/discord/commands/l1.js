@@ -12,6 +12,7 @@ export default {
   description: "Lista artigos por índice",
 
   async execute({ message, args, botName }) {
+    await message.reply(`✅ Listando artigos`);
     try {
       const inputPath = path.resolve(
         __dirname,
@@ -40,8 +41,6 @@ export default {
           }
         });
       });
-
-      await message.reply(`✅ Listando artigos`);
     } catch (err) {
       console.error(err);
       await message.reply("❌ Erro ao listar os artigos. Verifique os logs para mais detalhes.");
