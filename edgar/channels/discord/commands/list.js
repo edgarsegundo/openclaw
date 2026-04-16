@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default {
-  name: "list",
+  name: ".list",
   description: "Lista artigos por índice",
 
   async execute({ message, args, botName }) {
