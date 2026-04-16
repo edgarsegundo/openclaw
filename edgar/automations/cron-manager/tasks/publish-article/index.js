@@ -11,35 +11,42 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *
  * Operates in two parts:
  *
- *   Part 1 (automatic, cron) — unchanged original flow:
+ *   Part 1 (automatic, cron):
  *     Picks the oldest unpublished article, POSTs it to the blog API,
- *     moves files to published/, then sends a Discord list of today's
- *     published articles so the user can trigger Part 2.
+ *     moves files to published/, registers the article in today's status file,
+ *     then sends a Discord list of ALL today's articles with their status.
+ *     Discord is only notified when Part 1 actually succeeds — silent otherwise.
  *
  *   Part 2 (manual, Discord command /pub N):
- *     Detects action=pub + item_index=N, finds the article at index N
- *     in today's published/ files, runs sitemap ping + Google Indexing API,
- *     and notifies Discord with the result.
+ *     Detects action=pub + item_index=N, looks up the article at index N
+ *     in today's status file, runs execute-publish-script + Google Indexing API,
+ *     updates status to "published", and notifies Discord with the result.
+ *
+ * Status file (per articles_dir, per day):
+ *   {articles_dir}/status-<YYYY-MM-DD>.json
+ *   Tracks every article that passed through Part 1 today, with sequential
+ *   0-based indices that are permanent for the day.
  *
  * Inputs:
  *   articles_dir  — path to folder containing generated article *.json/*.md files (required)
- *   destinations  — array of { business_id, blog_topic_slug } objects (required)
- *   sitemap_url   — full sitemap URL for Google ping (required for Part 2)
+ *   destinations  — array of { business_id, blog_topic_slug, sitemap_url, site_id } (required)
  *   action        — "pub" (manual Discord command, triggers Part 2)
- *   item_index    — 0-based index of the article in today's published/ list
+ *   item_index    — 0-based index from today's status file (for /pub N command)
  *
  * Env vars:
  *   MYSITESAPP_API_KEY / x-api-key         — API key for the blog endpoint
  *   GOOGLE_APPLICATION_CREDENTIALS         — path to Google Service Account JSON
  *
- * State file:
- *   {articles_dir}/publish-article.roundrobin.json — persists round-robin index (Part 1 only)
+ * State files:
+ *   {articles_dir}/publish-article.roundrobin.json — round-robin index (Part 1 only)
+ *   {articles_dir}/status-<YYYY-MM-DD>.json        — daily article status registry
  *
  * Endpoint:
  *   POST http://localhost:3900/blog-article
+ *   POST http://localhost:3900/execute-publish-script
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, env } = context;
+  const { taskName, mode, executionId, inputs } = context;
   const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
@@ -54,208 +61,284 @@ export default async function (context) {
     throw new Error("Missing required input: destinations (must be a non-empty array)");
   }
 
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const publishedDir = path.join(articlesDir, "published");
   await fs.mkdir(publishedDir, { recursive: true });
 
-  // ── Part 2: manual indexing command ─────────────────────────────────────
-  // Runs when user sends /pub N via Discord.
-  // Does NOT execute Part 1.
+  // ── Command: list ─────────────────────────────────────────────
+  if (action === "list") {
+    console.log(`\n/list command received`);
+
+    const statusData = await loadStatus(articlesDir, today);
+
+    if (!statusData.articles.length) {
+      const { notifyDiscord } = await import("../../lib/discord.js");
+      notifyDiscord("📭 Nenhum artigo encontrado hoje.");
+      return;
+    }
+
+    await sendFullListToDiscord(statusData, articlesDir);
+
+    console.log("✅ List sent to Discord!");
+    return;
+  }
+
+  // ── Part 2: manual indexing command (/pub N) ─────────────────────────────
   if (action === "pub" && itemIndex !== null) {
     console.log(`\n/pub command received. item_index=${itemIndex}`);
 
-    const todayFiles = await getTodayPublishedFiles(publishedDir);
-
-    if (todayFiles.length === 0) {
-      console.log("No published articles found for today. Exiting.");
-      return;
-    }
-
+    const statusData = await loadStatus(articlesDir, today);
     const idx = Number(itemIndex);
+    const entry = statusData.articles.find((a) => a.index === idx);
 
-    if (idx < 0 || idx >= todayFiles.length) {
-      console.log(
-        `item_index (${idx}) out of range. ` +
-        `Today has ${todayFiles.length} published article(s) (valid range: 0–${todayFiles.length - 1}).`
-      );
+    if (!entry) {
+      console.log(`No article found with index ${idx} in today's status. Exiting.`);
       return;
     }
 
-    const targetFile = todayFiles[idx];
-    const slug = articleSlug(targetFile.name);
+    console.log(`\nRunning Part 2 for: ${entry.slug}`);
 
-    console.log(`\nRunning Part 2 for: ${slug}`);
+    // Read the article JSON from published/ to get site_id and sitemap_url
+    const json = await readJson(path.join(publishedDir, `${entry.slug}.json`));
+    if (!json) {
+      console.error(`Could not read article JSON for slug: ${entry.slug}. Exiting.`);
+      return;
+    }
 
-    // Read the article JSON to get the canonical URL slug
-    const json = await readJson(path.join(publishedDir, targetFile.name));
-    const articleSlugField = json?.slug ?? slug;
-
-    // Build the full article URL — derive domain from sitemap URL
-    const domain = new URL(json.sitemap_url).origin;
-    const articleUrl = `${domain}/${articleSlugField}`;
+    const articleSlugField = json.slug ?? entry.slug;
+    const domain = json.sitemap_url ? new URL(json.sitemap_url).origin : null;
+    const articleUrl = domain ? `${domain}/${articleSlugField}` : null;
 
     console.log(`Article URL: ${articleUrl}`);
 
-    const payload = { site_id: json.site_id };
-    console.log(`\nPosting: "${payload.site_id}" to execute-publish-script`);
-    const success = await postPublish(payload, apiKey);
-    if (!success) {
-      console.error("POST failed. Article cannot be indexed.");
+    // Execute publish script
+    const publishPayload = { site_id: json.site_id };
+    console.log(`Posting site_id="${json.site_id}" to execute-publish-script`);
+    const publishSuccess = await postPublish(publishPayload, apiKey);
+
+    if (!publishSuccess) {
+      console.error("POST to execute-publish-script failed.");
+      await notifyIndexingResult(entry.slug, { ok: false, error: "execute-publish-script failed" });
       return;
     }
+
     console.log("Publish script executed successfully!");
 
-    // Run indexing action
-    let apiResult = await submitToIndexingApi(articleUrl);
-    if (!apiResult) apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
+    // Submit to Google Indexing API
+    let apiResult = articleUrl
+      ? await submitToIndexingApi(articleUrl)
+      : { ok: false, error: "articleUrl could not be derived (missing sitemap_url in JSON)" };
 
-    // Notify Discord with result (apenas Indexing API)
-    await notifyIndexingResult(slug, apiResult);
+    if (!apiResult) {
+      apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
+    }
+
+    // Update status to published
+    const updatedStatus = markAsPublished(statusData, idx);
+    await saveStatus(articlesDir, today, updatedStatus);
+
+    // Notify Discord
+    await notifyIndexingResult(entry.slug, apiResult);
 
     console.log("\n✅ Part 2 done!");
     return;
   }
 
   // ── Part 1: original publish flow ────────────────────────────────────────
-  // Unchanged from original. Runs automatically via cron.
 
   // ── 1. Find oldest unpublished JSON article ───────────────────────────────
   const allFiles = await fs.readdir(articlesDir);
   const jsonFiles = allFiles.filter(
-    (f) => f.endsWith(".json") && f !== "publish-article.roundrobin.json"
+    (f) => f.endsWith(".json") &&
+      f !== "publish-article.roundrobin.json" &&
+      !f.startsWith("status-")
   );
 
   if (jsonFiles.length === 0) {
-    console.log("No .json articles found. Nothing to publish.");
-  } else {
-    const oldest = await findOldest(articlesDir, jsonFiles);
-    const slug = oldest.replace(/\.json$/, "");
-
-    console.log(`\nSelected article: ${slug}`);
-
-    // ── 2. Load JSON and Markdown ─────────────────────────────────────────
-    const jsonPath = path.join(articlesDir, `${slug}.json`);
-    const mdPath = path.join(articlesDir, `${slug}.md`);
-
-    const json = await readJson(jsonPath);
-    if (!json) {
-      console.error(`Failed to parse JSON: ${jsonPath}. Skipping.`);
-      return;
-    }
-
-    const contentMd = (await readFileSafe(mdPath)) ?? json.markdownText ?? "";
-
-    // ── 3. Validate required fields ───────────────────────────────────────
-    const missingFields = ["title", "seoMetaDescription", "slug"].filter((f) => !json[f]);
-    if (missingFields.length > 0) {
-      console.error(`Missing required fields in JSON: ${missingFields.join(", ")}. Skipping.`);
-      return;
-    }
-
-    // ── 4. Resolve destination via round-robin ────────────────────────────
-    const statePath = path.join(articlesDir, "publish-article.roundrobin.json");
-    const lastIdx = await readLastIdx(statePath);
-    const nextIdx = (lastIdx + 1) % destinations.length;
-    const destination = destinations[nextIdx];
-
-    const sanitizedBusinessId = typeof destination.business_id === "string"
-      ? destination.business_id.replace(/-/g, "")
-      : destination.business_id;
-
-    console.log(
-      `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`
-    );
-
-    await fs.writeFile(statePath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
-
-    // ── 5. Build and send payload ─────────────────────────────────────────
-    const payload = {
-      id: randomUUID(),
-      business_id: sanitizedBusinessId,
-      blog_topic_slug: destination.blog_topic_slug,
-      title: json.title,
-      seo_description: json.seoMetaDescription,
-      content_md: contentMd,
-      faq_json: json.faq_json ?? [],
-      type: "public",
-      slug: json.slug ?? slug,
-      published: json.published ?? new Date().toISOString(),
-    };
-    console.log(`\nPosting: "${payload.title}"`);
-    console.log(`Using API key: ${apiKey ? "****" + apiKey.slice(-4) : "(none)"}`);
-    const success = await postArticle(payload, apiKey);
-    if (!success) {
-      console.error("POST failed. Article will not be moved to published/.");
-      return;
-    }
-
-    console.log("Saved successfully!");
-
-    // ── 6. Move files to published/ ───────────────────────────────────────
-    const today = new Date().toISOString().slice(0, 10);
-    await fs.rename(jsonPath, path.join(publishedDir, `${slug}-${today}.json`));
-
-    if (await fileExists(mdPath)) {
-      // Adiciona o sitemap_url ao JSON e salva antes de mover
-      const sitemapUrl = destinations[nextIdx]?.sitemap_url ?? null;
-      if (sitemapUrl) {
-        json.sitemap_url = sitemapUrl;
-        json.site_id = destinations[nextIdx]?.site_id ?? null;
-        try {
-          await fs.writeFile(jsonPath, JSON.stringify(json, null, 2), "utf-8");
-        } catch (err) {
-          console.error(`Erro ao salvar sitemap_url no JSON do artigo (${jsonPath}):`, err);
-        }
-      }
-
-      await fs.rename(mdPath, path.join(publishedDir, `${slug}-${today}.md`));
-    }
-
-    console.log(`Moved to published/${slug}-${today}.[json|md]`);
-
-    // ── 7. Clean up published files older than 7 days ─────────────────────
-    await cleanOldFiles(publishedDir, 7);
+    // No new articles — exit silently, no Discord notification
+    console.log("No .json articles found. Nothing to publish. Exiting silently.");
+    return;
   }
 
-  // ── 8. Send Discord list of today's published articles ───────────────────
-  // Always runs after Part 1, whether or not an article was published today.
-  const todayFiles = await getTodayPublishedFiles(publishedDir);
+  const oldest = await findOldest(articlesDir, jsonFiles);
+  const slug = oldest.replace(/\.json$/, "");
 
-  if (todayFiles.length === 0) {
-    console.log("No published articles for today. Skipping Discord notification.");
-  } else {
-    await sendPublishedList(todayFiles, articlesDir);
+  console.log(`\nSelected article: ${slug}`);
+
+  // ── 2. Load JSON and Markdown ─────────────────────────────────────────────
+  const jsonPath = path.join(articlesDir, `${slug}.json`);
+  const mdPath = path.join(articlesDir, `${slug}.md`);
+
+  const json = await readJson(jsonPath);
+  if (!json) {
+    console.error(`Failed to parse JSON: ${jsonPath}. Skipping.`);
+    return;
   }
+
+  const contentMd = (await readFileSafe(mdPath)) ?? json.markdownText ?? "";
+
+  // ── 3. Validate required fields ───────────────────────────────────────────
+  const missingFields = ["title", "seoMetaDescription", "slug"].filter((f) => !json[f]);
+  if (missingFields.length > 0) {
+    console.error(`Missing required fields in JSON: ${missingFields.join(", ")}. Skipping.`);
+    return;
+  }
+
+  // ── 4. Resolve destination via round-robin ────────────────────────────────
+  const roundRobinPath = path.join(articlesDir, "publish-article.roundrobin.json");
+  const lastIdx = await readLastIdx(roundRobinPath);
+  const nextIdx = (lastIdx + 1) % destinations.length;
+  const destination = destinations[nextIdx];
+
+  const sanitizedBusinessId = typeof destination.business_id === "string"
+    ? destination.business_id.replace(/-/g, "")
+    : destination.business_id;
+
+  console.log(
+    `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`
+  );
+
+  await fs.writeFile(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
+
+  // ── 5. Build and POST article payload ─────────────────────────────────────
+  const payload = {
+    id: randomUUID(),
+    business_id: sanitizedBusinessId,
+    blog_topic_slug: destination.blog_topic_slug,
+    title: json.title,
+    seo_description: json.seoMetaDescription,
+    content_md: contentMd,
+    faq_json: json.faq_json ?? [],
+    type: "public",
+    slug: json.slug ?? slug,
+    published: json.published ?? new Date().toISOString(),
+  };
+
+  console.log(`\nPosting: "${payload.title}"`);
+  console.log(`Using API key: ${apiKey ? "****" + apiKey.slice(-4) : "(none)"}`);
+
+  const success = await postArticle(payload, apiKey);
+  if (!success) {
+    // Part 1 failed — no Discord notification
+    console.error("POST failed. Article will not be moved to published/.");
+    return;
+  }
+
+  console.log("Saved successfully!");
+
+  // ── 6. Enrich JSON with destination metadata and move to published/ ───────
+  const sitemapUrl = destination.sitemap_url ?? null;
+  const siteId = destination.site_id ?? null;
+
+  if (sitemapUrl) json.sitemap_url = sitemapUrl;
+  if (siteId) json.site_id = siteId;
+
+  // Write enriched JSON back before moving
+  await fs.writeFile(jsonPath, JSON.stringify(json, null, 2), "utf-8");
+
+  const publishedJsonPath = path.join(publishedDir, `${slug}-${today}.json`);
+  const publishedMdPath = path.join(publishedDir, `${slug}-${today}.md`);
+
+  await fs.rename(jsonPath, publishedJsonPath);
+
+  if (await fileExists(mdPath)) {
+    await fs.rename(mdPath, publishedMdPath);
+  }
+
+  console.log(`Moved to published/${slug}-${today}.[json|md]`);
+
+  // ── 7. Register article in today's status file ────────────────────────────
+  const statusData = await loadStatus(articlesDir, today);
+  const newSlug = `${slug}-${today}`;
+  const newIndex = statusData.articles.length; // next sequential index
+  const newEntry = {
+    index: newIndex,
+    slug: newSlug,
+    status: "saved",
+    saved_at: new Date().toISOString(),
+    published_at: null,
+  };
+
+  statusData.articles.push(newEntry);
+  await saveStatus(articlesDir, today, statusData);
+  console.log(`Registered in status as index ${newIndex}: ${newSlug}`);
+
+  // ── 8. Send Discord notification ──────────────────────────────────────────
+  // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
+  // The article just saved is highlighted as 🆕.
+  await sendPublishedList(statusData, articlesDir, newIndex);
+
+  // ── 9. Clean up old files ─────────────────────────────────────────────────
+  await cleanOldFiles(publishedDir, 7);
+  // Also clean up old status files in articles_dir
+  await cleanOldStatusFiles(articlesDir, 7);
 
   console.log("\n✅ Done!");
+}
+
+// ── Status file helpers ───────────────────────────────────────────────────────
+
+/**
+ * Load today's status file. Returns a fresh structure if it doesn't exist yet.
+ */
+async function loadStatus(articlesDir, today) {
+  const statusPath = path.join(articlesDir, `status-${today}.json`);
+  try {
+    const raw = await fs.readFile(statusPath, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return { date: today, articles: [] };
+  }
+}
+
+/**
+ * Persist the status object to disk.
+ */
+async function saveStatus(articlesDir, today, statusData) {
+  const statusPath = path.join(articlesDir, `status-${today}.json`);
+  await fs.writeFile(statusPath, JSON.stringify(statusData, null, 2), "utf-8");
+}
+
+/**
+ * Return a new statusData with the article at `index` marked as published.
+ */
+function markAsPublished(statusData, index) {
+  return {
+    ...statusData,
+    articles: statusData.articles.map((a) =>
+      a.index === index
+        ? { ...a, status: "published", published_at: new Date().toISOString() }
+        : a
+    ),
+  };
 }
 
 // ── Discord notification helpers ──────────────────────────────────────────────
 
 const DISCORD_MSG_MAX_LENGTH = 1999;
-const NEW_FILE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
- * Send the list of today's published articles to Discord.
- * Files moved in the last 10 minutes are marked as 🆕.
- * Splits into multiple messages if needed.
+ * Send today's full article list to Discord.
+ * Sorted newest-first (descending index) so the new article appears at the top.
+ * The article with index === newIndex is highlighted with 🆕.
  */
-async function sendPublishedList(todayFiles, articlesDir) {
+async function sendPublishedList(statusData, articlesDir, newIndex) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
-  const now = Date.now();
+  const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📰 Artigos gravados hoje — "${topicLabel}":\n> /pub <N> para publicar e indexar no Google\n`;
+  const header = `📰 Artigos do dia — "${topicLabel}":\n> /pub <N> para publicar e indexar no Google\n`;
   const continuation = `🔁 Continuando...\n`;
 
   let currentMsg = header;
   let sentMessages = 0;
 
-  for (let i = 0; i < todayFiles.length; i++) {
-    const file = todayFiles[i];
-    const isNew = (now - file.mtimeMs) < NEW_FILE_WINDOW_MS;
+  for (const article of sorted) {
+    const isNew = article.index === newIndex;
+    const statusLabel = article.status === "published" ? "(published ✅)" : "(saved)";
     const prefix = isNew ? "🆕" : "   ";
-    const line = `\n${prefix} [${i}] ${articleSlug(file.name)}`;
+    const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       notifyDiscord(currentMsg);
@@ -272,12 +355,12 @@ async function sendPublishedList(todayFiles, articlesDir) {
   }
 
   console.log(
-    `Discord notified with ${todayFiles.length} article(s) in ${sentMessages} message(s).`
+    `Discord notified with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`
   );
 }
 
 /**
- * Notify Discord with the result of the Part 2 indexing actions (apenas Indexing API).
+ * Notify Discord with the result of the Part 2 indexing action.
  */
 async function notifyIndexingResult(slug, apiResult) {
   const { notifyDiscord } = await import("../../lib/discord.js");
@@ -289,53 +372,13 @@ async function notifyIndexingResult(slug, apiResult) {
 
   msg += `\n   Indexing API: ${apiIcon}`;
   if (!apiResult.ok && apiResult.error) {
-    msg += `\n   Erro Indexing API: ${apiResult.error}`;
+    msg += `\n   Erro: ${apiResult.error}`;
   }
 
   notifyDiscord(msg);
 }
 
 // ── File helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Returns today's .json files from published/, sorted by mtime ASC.
- * Each entry: { name, mtimeMs }
- */
-async function getTodayPublishedFiles(publishedDir) {
-  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  let files;
-
-  try {
-    files = await fs.readdir(publishedDir);
-  } catch {
-    return [];
-  }
-
-  const jsonFiles = files.filter((f) => f.endsWith(".json"));
-  const results = [];
-
-  for (const name of jsonFiles) {
-    try {
-      const stat = await fs.stat(path.join(publishedDir, name));
-      // Filter by file date in the filename (slug-YYYY-MM-DD.json)
-      if (name.includes(todayStr)) {
-        results.push({ name, mtimeMs: stat.mtimeMs });
-      }
-    } catch {
-      // skip unreadable files
-    }
-  }
-
-  return results.sort((a, b) => a.mtimeMs - b.mtimeMs);
-}
-
-/**
- * Extract a clean slug from a published filename.
- * "my-article-2025-04-15.json" → "my-article-2025-04-15"
- */
-function articleSlug(filename) {
-  return filename.replace(/\.json$/, "");
-}
 
 /**
  * Returns the filename of the oldest file (by mtime) in the given list.
@@ -367,7 +410,7 @@ async function readJson(filePath) {
 }
 
 /**
- * Reads a file safely. Returns null if file does not exist or cannot be read.
+ * Reads a file safely. Returns null if the file does not exist or cannot be read.
  */
 async function readFileSafe(filePath) {
   try {
@@ -432,7 +475,7 @@ async function postArticle(payload, apiKey) {
 }
 
 /**
- * Executes the publish.sh script on the vps
+ * Executes the publish script on the VPS.
  * Returns true on success, false on failure.
  */
 async function postPublish(payload, apiKey) {
@@ -461,13 +504,18 @@ async function postPublish(payload, apiKey) {
 }
 
 /**
- * Deletes files in the given directory that are older than `days` days.
+ * Deletes files in the given directory older than `days` days (by mtime).
  */
 async function cleanOldFiles(dir, days) {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-  const files = await fs.readdir(dir);
-  let removed = 0;
+  let files;
+  try {
+    files = await fs.readdir(dir);
+  } catch {
+    return;
+  }
 
+  let removed = 0;
   for (const file of files) {
     const filePath = path.join(dir, file);
     try {
@@ -485,4 +533,70 @@ async function cleanOldFiles(dir, days) {
   if (removed === 0) {
     console.log("No old files to clean up.");
   }
+}
+
+/**
+ * Deletes status-<YYYY-MM-DD>.json files in articles_dir older than `days` days.
+ */
+async function cleanOldStatusFiles(articlesDir, days) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  let files;
+  try {
+    files = await fs.readdir(articlesDir);
+  } catch {
+    return;
+  }
+
+  for (const file of files) {
+    const match = file.match(/^status-(\d{4}-\d{2}-\d{2})\.json$/);
+    if (!match) continue;
+    const fileDate = new Date(match[1]);
+    if (fileDate.getTime() < cutoff) {
+      try {
+        await fs.unlink(path.join(articlesDir, file));
+        console.log(`Cleaned up status file: ${file}`);
+      } catch {
+        // skip
+      }
+    }
+  }
+}
+
+async function sendFullListToDiscord(statusData, articlesDir) {
+  const { notifyDiscord } = await import("../../lib/discord.js");
+
+  const topicLabel = path.basename(articlesDir);
+
+  // Ordena do mais recente para o mais antigo
+  const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
+
+  const header = `📋 Lista de artigos — "${topicLabel}":\n> /pub <N> para publicar\n`;
+  const continuation = `🔁 Continuação da lista:\n`;
+
+  let currentMsg = header;
+  let sentMessages = 0;
+
+  for (const article of sorted) {
+    const statusIcon = article.status === "published" ? "✅" : "💾";
+
+    const line = `\n[${article.index}] ${article.slug} ${statusIcon}`;
+
+    // Se estourar limite do Discord
+    if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
+      notifyDiscord(currentMsg);
+      sentMessages++;
+      currentMsg = continuation + line;
+    } else {
+      currentMsg += line;
+    }
+  }
+
+  if (currentMsg.trim()) {
+    notifyDiscord(currentMsg);
+      sentMessages++;
+  }
+
+  console.log(
+    `Discord list sent with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`
+  );
 }
