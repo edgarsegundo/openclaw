@@ -78,7 +78,7 @@ export default async function (context) {
     return;
   }
 
-  // ── 3. Process manual command (/apr N or /del N) ─────────────────────────
+  // ── 3. Process manual command (.apr N or .del N) ─────────────────────────
   if (action !== null && itemIndex !== null) {
     const fetcherIndex = Number(itemIndex); // convert 1-based → 0-based
 
@@ -101,7 +101,7 @@ export default async function (context) {
 
     if (action === "apr") {
       // Approve manually — bypass AI
-      console.log(`\n/apr received for item ${itemIndex}: "${item.title}"`);
+      console.log(`\n.apr received for item ${itemIndex}: "${item.title}"`);
 
       // Append to today's approved file
       appendToApproved(topicSlug, today, [
@@ -125,7 +125,7 @@ export default async function (context) {
 
     if (action === "del") {
       // Delete manually — just mark in status, do not touch approved file
-      console.log(`\n/del received for item ${itemIndex}: "${item.title}"`);
+      console.log(`\n.del received for item ${itemIndex}: "${item.title}"`);
 
       statusData = addToStatus(statusData, fetcherIndex, "deleted");
       saveStatus(topicSlug, today, statusData);
@@ -476,7 +476,7 @@ async function sendInChunks(items, topic) {
   let sentMessages = 0;
 
   const safeTopic = truncate(topic, 100);
-  const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> /apr <N> ou /del <N>\n`;
+  const firstHeader = `🆕 Itens pendentes para o tópico "${safeTopic}":\n> .apr <N> ou .del <N>\n`;
   const continuationHeader = `🔁 Continuando...\n`;
 
   let currentMsg = firstHeader;
@@ -516,7 +516,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
 
   const header =
     `📋 Lista completa — "${safeTopic}":\n` +
-    `> /apr <N> | /del <N>\n`;
+    `> .apr <N> | .del <N>\n`;
 
   const continuation = `🔁 Continuação da lista:\n`;
 

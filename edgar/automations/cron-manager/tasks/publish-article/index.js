@@ -17,7 +17,7 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *     then sends a Discord list of ALL today's articles with their status.
  *     Discord is only notified when Part 1 actually succeeds — silent otherwise.
  *
- *   Part 2 (manual, Discord command /pub N):
+ *   Part 2 (manual, Discord command .pub N):
  *     Detects action=pub + item_index=N, looks up the article at index N
  *     in today's status file, runs execute-publish-script + Google Indexing API,
  *     updates status to "published", and notifies Discord with the result.
@@ -31,7 +31,7 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *   articles_dir  — path to folder containing generated article *.json/*.md files (required)
  *   destinations  — array of { business_id, blog_topic_slug, sitemap_url, site_id } (required)
  *   action        — "pub" (manual Discord command, triggers Part 2)
- *   item_index    — 0-based index from today's status file (for /pub N command)
+ *   item_index    — 0-based index from today's status file (for .pub N command)
  *
  * Env vars:
  *   MYSITESAPP_API_KEY / x-api-key         — API key for the blog endpoint
@@ -83,9 +83,9 @@ export default async function (context) {
     return;
   }
 
-  // ── Part 2: manual indexing command (/pub N) ─────────────────────────────
+  // ── Part 2: manual indexing command (.pub N) ─────────────────────────────
   if (action === "pub" && itemIndex !== null) {
-    console.log(`\n/pub command received. item_index=${itemIndex}`);
+    console.log(`\n.pub command received. item_index=${itemIndex}`);
 
     const statusData = await loadStatus(articlesDir, today);
     const idx = Number(itemIndex);
@@ -329,7 +329,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
   const topicLabel = path.basename(articlesDir);
   const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📰 Artigos do dia — "${topicLabel}":\n> /pub <N> para publicar e indexar no Google\n`;
+  const header = `📰 Artigos do dia — "${topicLabel}":\n> .pub <N> para publicar e indexar no Google\n`;
   const continuation = `🔁 Continuando...\n`;
 
   let currentMsg = header;
@@ -578,7 +578,7 @@ async function sendFullListToDiscord(statusData, articlesDir) {
   // Ordena do mais recente para o mais antigo
   const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📋 Lista de artigos — "${topicLabel}":\n> /pub <N> para publicar\n`;
+  const header = `📋 Lista de artigos — "${topicLabel}":\n> .pub <N> para publicar\n`;
   const continuation = `🔁 Continuação da lista:\n`;
 
   let currentMsg = header;

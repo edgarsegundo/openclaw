@@ -6,7 +6,7 @@ A task `rss-picker` lê o arquivo diário gerado pelo `rss-fetcher`, filtra iten
 resolvidos, e decide entre dois caminhos:
 
 - **Caminho IA**: atingiu `min_items` não-resolvidos → envia para triagem via Perplexity Sonar
-- **Caminho humano**: não atingiu `min_items` → notifica Discord com a lista de pendentes e aguarda comando manual (`/apr` ou `/del`)
+- **Caminho humano**: não atingiu `min_items` → notifica Discord com a lista de pendentes e aguarda comando manual (`.apr` ou `.del`)
 
 O arquivo `status-<topicSlug>-<YYYY-MM-DD>.json` é a fonte de verdade para saber quais
 itens já foram resolvidos (por humano ou por IA). Ele é consultado em múltiplos pontos
@@ -83,7 +83,7 @@ artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json
 
 Executado **antes** de qualquer outra lógica quando ambos estão definidos.
 
-#### `/apr <N>` — aprovar manualmente
+#### `.apr <N>` — aprovar manualmente
 
 1. Converter `item_index` (1-based) para `fetcherIndex` (0-based).
 2. Validar que `fetcherIndex` está dentro dos limites de `allItems`.
@@ -95,7 +95,7 @@ Executado **antes** de qualquer outra lógica quando ambos estão definidos.
 6. Gravar/atualizar o arquivo status adicionando `{ fetcher_index, action: "approved", resolved_at }`.
 7. Logar resultado e encerrar.
 
-#### `/del <N>` — deletar manualmente
+#### `.del <N>` — deletar manualmente
 
 1. Converter `item_index` (1-based) para `fetcherIndex` (0-based).
 2. Validar que `fetcherIndex` está dentro dos limites de `allItems`.
@@ -122,7 +122,7 @@ if (unresolvedItems.length < minItems)
   - Formato da mensagem:
     ```
     🆕 Itens pendentes para o tópico "<topic>":
-    > /apr <N> ou /del <N>
+    > .apr <N> ou .del <N>
 
     1. **Título do item**
        <link>
@@ -225,8 +225,8 @@ START
   ├─ Carregar status do dia → resolvedSet
   │
   ├─ action + item_index definidos?
-  │     ├─ /apr N → gravar approved + status → END
-  │     └─ /del N → gravar status → END
+  │     ├─ .apr N → gravar approved + status → END
+  │     └─ .del N → gravar status → END
   │
   ├─ Filtrar unresolvedItems (excluir resolvedSet)
   │

@@ -10,7 +10,7 @@ A task `publish-article` opera em **duas partes**:
   escolhido pelo usuário via Discord.
 
 As duas partes são independentes e separadas no tempo. A part 1 roda via cron
-automaticamente. A parte 2 roda quando o usuário envia `/pub N` via Discord.
+automaticamente. A parte 2 roda quando o usuário envia `.pub N` via Discord.
 
 ---
 
@@ -77,7 +77,7 @@ published/*.json
 ### Formato da mensagem
 ```
 📰 Artigos publicados hoje — "visto-americano":
-> /pub <N> para indexar no Google
+> .pub <N> para indexar no Google
 
 🆕 [0] como-tirar-visto-americano-2025-04-15
 🆕 [1] visto-americano-para-estudantes-2025-04-15

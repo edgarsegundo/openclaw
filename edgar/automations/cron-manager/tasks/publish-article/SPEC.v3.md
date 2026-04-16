@@ -45,7 +45,7 @@ pelo `cleanOldFiles` junto com os arquivos de `published/` após 7 dias.
 - `slug` é o nome do arquivo sem extensão (ex: `meu-artigo-2025-04-16`).
 - `status` começa como `"saved"` (Parte 1) e avança para `"published"` (Parte 2).
 - `published_at` é `null` até a Parte 2 ser executada com sucesso.
-- O índice de um artigo é sempre o mesmo, independente de quantas vezes `/pub N` for executado.
+- O índice de um artigo é sempre o mesmo, independente de quantas vezes `.pub N` for executado.
 
 ---
 
@@ -64,7 +64,7 @@ pelo `cleanOldFiles` junto com os arquivos de `published/` após 7 dias.
    - Envia lista Discord com todos os artigos do dia (ver formato abaixo).
 6. `cleanOldFiles` roda no `published/` e também no `articles_dir` (para limpar status antigos).
 
-### Execução com comando `/pub N` (`action=pub`, `item_index=N`)
+### Execução com comando `.pub N` (`action=pub`, `item_index=N`)
 
 1. Não executa a Parte 1.
 2. Carrega o status do dia.
@@ -84,7 +84,7 @@ Artigos recém adicionados nessa execução são destacados com 🆕.
 
 ```
 📰 Artigos do dia — "visto-americano":
-> /pub <N> para publicar e indexar no Google
+> .pub <N> para publicar e indexar no Google
 
 🆕 [2] como-tirar-visto-americano-2025-04-16 (saved)
     [1] visto-americano-estudantes-2025-04-16 (published ✅)
@@ -94,7 +94,7 @@ Artigos recém adicionados nessa execução são destacados com 🆕.
 Regras:
 - Ordenação: mais recentes primeiro (índice decrescente) para o novo aparecer no topo.
 - 🆕 = artigo adicionado ao status nessa execução (recém saído da Parte 1).
-- `(saved)` = Parte 1 concluída, aguardando `/pub N`.
+- `(saved)` = Parte 1 concluída, aguardando `.pub N`.
 - `(published ✅)` = Parte 2 concluída.
 - Se ultrapassar 2000 caracteres: `sendInChunks` com header de continuação.
 
