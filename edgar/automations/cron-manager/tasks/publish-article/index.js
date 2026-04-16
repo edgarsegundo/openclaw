@@ -118,7 +118,8 @@ export default async function (context) {
 
     if (!publishSuccess) {
       console.error("POST to execute-publish-script failed.");
-      await notifyIndexingResult(entry.slug, { ok: false, error: "execute-publish-script failed" });
+      const { notifyDiscord } = await import("../../lib/discord.js");
+      notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`);
       return;
     }
 
