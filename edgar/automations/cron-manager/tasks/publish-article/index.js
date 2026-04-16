@@ -482,6 +482,10 @@ async function postArticle(payload, apiKey) {
 async function postPublish(payload, apiKey) {
   try {
     const { default: fetch } = await import("node-fetch");
+    const { AbortController } = await import("abort-controller");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 300_000); // 5 minutos
+
     const res = await fetch("http://localhost:3900/execute-publish-script", {
       method: "POST",
       headers: {
@@ -489,7 +493,10 @@ async function postPublish(payload, apiKey) {
         "x-api-key": apiKey,
       },
       body: JSON.stringify(payload),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!res.ok) {
       const body = await res.text();

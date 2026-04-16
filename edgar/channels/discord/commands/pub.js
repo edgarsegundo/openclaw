@@ -35,6 +35,8 @@ export default {
         "../../../automations/cron-manager"
       );      
 
+      await message.reply(`⏳ Publicando artigo ${index}...`);
+
       await new Promise((resolve, reject) => {
         exec(cmd, { cwd }, (error, stdout, stderr) => {
           if (error) {
@@ -52,5 +54,8 @@ export default {
       console.error(err);
       await message.reply("❌ Erro ao publicar o artigo. Verifique os logs para mais detalhes.");
     }
+
+
+    
   },
 };
