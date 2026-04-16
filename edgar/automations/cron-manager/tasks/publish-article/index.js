@@ -4,7 +4,7 @@ dotenv.config();
 import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import { pingSitemap, submitToIndexingApi } from "./google-indexing.js";
+import { submitToIndexingApi } from "./google-indexing.js";
 
 /**
  * publish-article task
@@ -40,6 +40,7 @@ import { pingSitemap, submitToIndexingApi } from "./google-indexing.js";
  */
 export default async function (context) {
   const { taskName, mode, executionId, inputs, env } = context;
+  const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -94,18 +95,21 @@ export default async function (context) {
 
     console.log(`Article URL: ${articleUrl}`);
 
-    // Run both indexing actions independently
-    const [apiResult] = await Promise.all([
-      // pingSitemap(json.sitemap_url),
-      submitToIndexingApi(articleUrl),
-    ]);
+    const payload = { site_id: json.site_id };
+    console.log(`\nPosting: "${payload.site_id}" to execute-publish-script`);
+    const success = await postPublish(payload, apiKey);
+    if (!success) {
+      console.error("POST failed. Article cannot be indexed.");
+      return;
+    }
+    console.log("Publish script executed successfully!");
 
-    // if (!pingResult) pingResult = { ok: false, error: "pingSitemap returned undefined" };
+    // Run indexing action
+    let apiResult = await submitToIndexingApi(articleUrl);
     if (!apiResult) apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
 
-
-    // Notify Discord with result
-    await notifyIndexingResult(slug, pingResult, apiResult);
+    // Notify Discord with result (apenas Indexing API)
+    await notifyIndexingResult(slug, apiResult);
 
     console.log("\n✅ Part 2 done!");
     return;
@@ -176,20 +180,15 @@ export default async function (context) {
       slug: json.slug ?? slug,
       published: json.published ?? new Date().toISOString(),
     };
-
     console.log(`\nPosting: "${payload.title}"`);
-
-    const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
     console.log(`Using API key: ${apiKey ? "****" + apiKey.slice(-4) : "(none)"}`);
-
     const success = await postArticle(payload, apiKey);
-
     if (!success) {
       console.error("POST failed. Article will not be moved to published/.");
       return;
     }
 
-    console.log("Published successfully!");
+    console.log("Saved successfully!");
 
     // ── 6. Move files to published/ ───────────────────────────────────────
     const today = new Date().toISOString().slice(0, 10);
@@ -200,6 +199,7 @@ export default async function (context) {
       const sitemapUrl = destinations[nextIdx]?.sitemap_url ?? null;
       if (sitemapUrl) {
         json.sitemap_url = sitemapUrl;
+        json.site_id = destinations[nextIdx]?.site_id ?? null;
         try {
           await fs.writeFile(jsonPath, JSON.stringify(json, null, 2), "utf-8");
         } catch (err) {
@@ -277,25 +277,17 @@ async function sendPublishedList(todayFiles, articlesDir) {
 }
 
 /**
- * Notify Discord with the result of the Part 2 indexing actions.
+ * Notify Discord with the result of the Part 2 indexing actions (apenas Indexing API).
  */
-async function notifyIndexingResult(slug, pingResult, apiResult) {
+async function notifyIndexingResult(slug, apiResult) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
-  const pingIcon = pingResult.ok ? "✅" : "❌";
   const apiIcon = apiResult.ok ? "✅" : "❌";
-  const allOk = pingResult.ok && apiResult.ok;
-
-  let msg = allOk
+  let msg = apiResult.ok
     ? `✅ Indexação concluída para: ${slug}`
     : `⚠️ Indexação com erros para: ${slug}`;
 
-  msg += `\n   Sitemap pingado: ${pingIcon}`;
   msg += `\n   Indexing API: ${apiIcon}`;
-
-  if (!pingResult.ok && pingResult.error) {
-    msg += `\n   Erro sitemap: ${pingResult.error}`;
-  }
   if (!apiResult.ok && apiResult.error) {
     msg += `\n   Erro Indexing API: ${apiResult.error}`;
   }
@@ -418,6 +410,35 @@ async function postArticle(payload, apiKey) {
   try {
     const { default: fetch } = await import("node-fetch");
     const res = await fetch("http://localhost:3900/blog-article", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`POST failed: ${res.status} ${body}`);
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error(`POST error: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Executes the publish.sh script on the vps
+ * Returns true on success, false on failure.
+ */
+async function postPublish(payload, apiKey) {
+  try {
+    const { default: fetch } = await import("node-fetch");
+    const res = await fetch("http://localhost:3900/execute-publish-script", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

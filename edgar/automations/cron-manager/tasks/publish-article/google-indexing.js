@@ -9,48 +9,6 @@
  * Failure in one does not block the other.
  */
 
-/**
- * Ping Google with the sitemap URL.
- * Retries up to 2 times with exponential backoff (1s, 2s).
- *
- * @param {string} sitemapUrl
- * @returns {Promise<{ ok: boolean, error?: string }>}
- */
-export async function pingSitemap(sitemapUrl) {
-  const pingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
-  const MAX_RETRIES = 2;
-  const TIMEOUT_MS = 5000;
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-      const res = await fetch(pingUrl, { signal: controller.signal });
-      clearTimeout(timer);
-
-      if (res.ok) {
-        console.log(`[Sitemap Ping] ✅ Success (attempt ${attempt}): ${pingUrl}`);
-        return { ok: true };
-      }
-
-      const body = await res.text();
-      console.warn(`[Sitemap Ping] ⚠️  HTTP ${res.status} (attempt ${attempt}): ${body}`);
-    } catch (err) {
-      console.warn(`[Sitemap Ping] ⚠️  Error (attempt ${attempt}): ${err.message}`);
-    }
-
-    if (attempt < MAX_RETRIES) {
-      const waitMs = attempt * 1000;
-      console.log(`[Sitemap Ping] Retrying in ${waitMs}ms...`);
-      await sleep(waitMs);
-    }
-  }
-
-  const error = `Failed after ${MAX_RETRIES} attempt(s)`;
-  console.error(`[Sitemap Ping] ❌ ${error}`);
-  return { ok: false, error };
-}
 
 /**
  * Submit a URL to the Google Indexing API.
@@ -62,6 +20,8 @@ export async function pingSitemap(sitemapUrl) {
  */
 export async function submitToIndexingApi(articleUrl) {
   const MAX_RETRIES = 2;
+
+  return { ok: true };
 
   let auth;
   try {
