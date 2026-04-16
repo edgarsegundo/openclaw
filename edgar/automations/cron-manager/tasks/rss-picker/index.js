@@ -10,7 +10,8 @@ import { notifyDiscord } from "../../lib/discord.js";
  * resolved (approved or deleted — by human or AI), and decides between two paths:
  *
  *   AI path    — unresolved items >= min_items → sends to Perplexity Sonar for triage
- *   Human path — unresolved items < min_items  → notifies Discord and waits for /apr or /del
+ *   Human path — unresolved items < min_items  → notifies Discord only with NEW items
+ *                                                 (items not yet sent in a previous run)
  *
  * State is tracked exclusively via a daily status file per topic:
  *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json
@@ -25,7 +26,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  *   item_index     — 1-based index of the item in the fetcher array (manual command)
  *
  * Daily files:
- *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json   — resolved items registry
+ *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json   — resolved + sent items registry
  *   artifacts/rss-picker/approved-<topicSlug>-<YYYY-MM-DD>.json — approved items for article-writer
  *   Both are deleted automatically after 7 days.
  */
@@ -64,7 +65,7 @@ export default async function (context) {
   console.log(`Found ${allItems.length} total item(s) in today's fetcher file.`);
 
   // ── 2. Load today's status file ──────────────────────────────────────────
-  let { statusData, resolvedSet } = loadStatus(topicSlug, today);
+  let { statusData, resolvedSet, sentSet } = loadStatus(topicSlug, today);
 
 
   // ── Command: list ─────────────────────────────────────────────
@@ -149,12 +150,23 @@ export default async function (context) {
   console.log(`Minimum items required to run AI triage: ${minItems}`);
 
   if (unresolvedItems.length < minItems) {
-    if (unresolvedItems.length > 0) {
-      // Notify Discord with the list of pending items
-      const sentCount = sendInChunks(unresolvedItems, topic);
-      console.log(`Discord notified with ${unresolvedItems.length} items in ${sentCount} message(s).`);
+    // Only send items that have not been sent to Discord in a previous run
+    const newItems = unresolvedItems.filter(
+      (item) => !sentSet.has(item.fetcherIndex)
+    );
+
+    if (newItems.length > 0) {
+      const sentCount = await sendInChunks(newItems, topic);
+      console.log(`Discord notified with ${newItems.length} new item(s) in ${sentCount} message(s).`);
+
+      // Persist the newly-sent indices so they are never re-sent
+      for (const item of newItems) {
+        sentSet.add(item.fetcherIndex);
+      }
+      statusData = { ...statusData, sent: Array.from(sentSet) };
+      saveStatus(topicSlug, today, statusData);
     } else {
-      console.log("No unresolved items. Nothing to do.");
+      console.log("No new items to notify. Nothing to do.");
     }
 
     console.log(
@@ -287,8 +299,9 @@ const DISCORD_MSG_MAX_LENGTH = 1999;
 
 /**
  * Load today's status file.
- * Returns { statusData, resolvedSet } where resolvedSet is a Set<number> of
- * fetcher_index values that have already been resolved.
+ * Returns { statusData, resolvedSet, sentSet } where:
+ *   resolvedSet — Set<number> of fetcher_index values already resolved (approved/deleted)
+ *   sentSet     — Set<number> of fetcher_index values already sent to Discord
  */
 function loadStatus(topicSlug, today) {
   const statusPath = path.resolve(
@@ -301,15 +314,18 @@ function loadStatus(topicSlug, today) {
         topic_slug: topicSlug,
         date: today,
         resolved: [],
+        sent: [],
       },
       resolvedSet: new Set(),
+      sentSet: new Set(),
     };
   }
 
   const statusData = JSON.parse(fs.readFileSync(statusPath, "utf-8"));
   const resolvedSet = new Set((statusData.resolved || []).map((r) => r.fetcher_index));
+  const sentSet = new Set(statusData.sent || []);
 
-  return { statusData, resolvedSet };
+  return { statusData, resolvedSet, sentSet };
 }
 
 /**
@@ -443,24 +459,20 @@ function formatDate(dateStr) {
 
 /**
  * Build a formatted text block for a single unresolved item.
- * Ensures the block never exceeds safe limits.
  */
 function buildItemBlock(item) {
   const displayIndex = item.fetcherIndex;
-
   const safeTitle = truncate(stripHtmlTags(item.title), 300);
   const safeLink = truncate(sanitizeGoogleLink(item.link), 500);
-
-  return [
-    `\n**[${displayIndex}] ${safeTitle}** (${formatDate(item.published)}) - [Link](<${safeLink}>)\n`
-  ].join("\n");
+  return `\n**[${displayIndex}] ${safeTitle}** (${formatDate(item.published)}) - [Link](<${safeLink}>)\n`;
 }
 
 /**
- * Send a list of unresolved items to Discord, splitting into multiple messages
+ * Send a list of items to Discord, splitting into multiple messages
  * if the content exceeds the 2000 character limit.
+ * Only receives items that are genuinely new (not yet sent).
  */
-function sendInChunks(unresolvedItems, topic) {
+async function sendInChunks(items, topic) {
   let sentMessages = 0;
 
   const safeTopic = truncate(topic, 100);
@@ -469,24 +481,20 @@ function sendInChunks(unresolvedItems, topic) {
 
   let currentMsg = firstHeader;
 
-  for (const item of unresolvedItems) {
+  for (const item of items) {
     const itemBlock = buildItemBlock(item);
 
-    // 🔥 DECIDE ANTES de adicionar
     if ((currentMsg + itemBlock).length > DISCORD_MSG_MAX_LENGTH) {
-      notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg);
       sentMessages++;
-
-      // começa novo chunk já com o item
       currentMsg = continuationHeader + itemBlock;
     } else {
       currentMsg += itemBlock;
     }
   }
 
-  // envia o restante
   if (currentMsg.trim()) {
-    notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg);
     sentMessages++;
   }
 
@@ -534,7 +542,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
     const line = `\n${icon} [${i}] ${title}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -543,7 +551,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
   }
 
   if (currentMsg.trim()) {
-    notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg);
     sentMessages++;
   }
 

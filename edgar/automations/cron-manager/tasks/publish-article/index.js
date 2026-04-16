@@ -73,7 +73,7 @@ export default async function (context) {
 
     if (!statusData.articles.length) {
       const { notifyDiscord } = await import("../../lib/discord.js");
-      notifyDiscord("📭 Nenhum artigo encontrado hoje.");
+      await notifyDiscord("📭 Nenhum artigo encontrado hoje.");
       return;
     }
 
@@ -119,7 +119,7 @@ export default async function (context) {
     if (!publishSuccess) {
       console.error("POST to execute-publish-script failed.");
       const { notifyDiscord } = await import("../../lib/discord.js");
-      notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`);
+      await notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`);
       return;
     }
 
@@ -342,7 +342,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
     const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -351,7 +351,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
   }
 
   if (currentMsg.trim()) {
-    notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg);
     sentMessages++;
   }
 
@@ -368,7 +368,7 @@ async function notifyIndexingResult(slug, apiResult) {
 
   const apiIcon = apiResult.ok ? "✅" : "❌";
   let msg = apiResult.ok
-    ? `✅ Indexação concluída para: ${slug}`
+    ? `✅ Indexação e publicação concluída para: ${slug}`
     : `⚠️ Indexação com erros para: ${slug}`;
 
   msg += `\n   Indexing API: ${apiIcon}`;
@@ -376,7 +376,7 @@ async function notifyIndexingResult(slug, apiResult) {
     msg += `\n   Erro: ${apiResult.error}`;
   }
 
-  notifyDiscord(msg);
+  await notifyDiscord(msg);
 }
 
 // ── File helpers ──────────────────────────────────────────────────────────────
@@ -584,7 +584,7 @@ async function sendFullListToDiscord(statusData, articlesDir) {
 
     // Se estourar limite do Discord
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -593,7 +593,7 @@ async function sendFullListToDiscord(statusData, articlesDir) {
   }
 
   if (currentMsg.trim()) {
-    notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg);
       sentMessages++;
   }
 

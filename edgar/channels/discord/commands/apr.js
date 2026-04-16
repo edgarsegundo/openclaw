@@ -14,7 +14,7 @@ export default {
   async execute({ message, args, botName }) {
     const index = args[0];
     if (!Number.isInteger(Number(args[0]))) {
-      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: /apr 1");
+      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: .apr 1");
     }    
     try {
       const inputPath = path.resolve(
