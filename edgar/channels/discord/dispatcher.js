@@ -4,7 +4,7 @@ import path from "path";
 
 
 const commands = {};
-const prefix = process.env.COMMAND_PREFIX || "/";
+const prefix = process.env.COMMAND_PREFIX || ".";
 
 // auto-load de comandos
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
