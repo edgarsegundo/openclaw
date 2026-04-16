@@ -8,22 +8,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default {
-  name: ".list",
+  name: ".l1",
   description: "Lista artigos por índice",
 
   async execute({ message, args, botName }) {
     try {
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/publish-article/inputs/inputs-visto-americano.json"
+        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
-      inputObj.action = "list";
+      inputObj.action = "l1";
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
-        `node cron-manager.js run publish-article --template skip --input-file ${inputFile}`;
+        `node cron-manager.js run rss-picker --template skip --input-file ${inputFile}`;
       const cwd = path.resolve(
         __dirname,
         "../../../automations/cron-manager"

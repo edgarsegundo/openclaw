@@ -66,6 +66,17 @@ export default async function (context) {
   // ── 2. Load today's status file ──────────────────────────────────────────
   let { statusData, resolvedSet } = loadStatus(topicSlug, today);
 
+
+  // ── Command: list ─────────────────────────────────────────────
+  if (action === "l1") {
+    console.log(`\n/list command received (rss-picker)`);
+
+    const sent = await sendFullRssList(allItems, resolvedSet, statusData, topic);
+
+    console.log(`✅ RSS list sent (${sent} message(s))`);
+    return;
+  }
+
   // ── 3. Process manual command (/apr N or /del N) ─────────────────────────
   if (action !== null && itemIndex !== null) {
     const fetcherIndex = Number(itemIndex); // convert 1-based → 0-based
@@ -488,4 +499,53 @@ function sendInChunks(unresolvedItems, topic) {
 function truncate(text, max = 100) {
   if (typeof text !== "string") { return text; }
   return text.length > max ? text.slice(0, max) + "..." : text;
+}
+
+async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
+  let sentMessages = 0;
+
+  const safeTopic = truncate(topic, 100);
+
+  const header =
+    `📋 Lista completa — "${safeTopic}":\n` +
+    `> /apr <N> | /del <N>\n`;
+
+  const continuation = `🔁 Continuação da lista:\n`;
+
+  let currentMsg = header;
+
+  // cria mapa rápido de status
+  const statusMap = new Map();
+  for (const r of statusData.resolved || []) {
+    statusMap.set(r.fetcher_index, r.action);
+  }
+
+  // percorre TODOS os itens (ordem original)
+  for (let i = 0; i < allItems.length; i++) {
+    const item = allItems[i];
+
+    const action = statusMap.get(i);
+
+    let icon = "🆕";
+    if (action === "approved") icon = "✅";
+    if (action === "deleted") icon = "🗑️";
+
+    const title = truncate(stripHtmlTags(item.title), 120);
+    const line = `\n${icon} [${i}] ${title}`;
+
+    if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
+      notifyDiscord(currentMsg);
+      sentMessages++;
+      currentMsg = continuation + line;
+    } else {
+      currentMsg += line;
+    }
+  }
+
+  if (currentMsg.trim()) {
+    notifyDiscord(currentMsg);
+    sentMessages++;
+  }
+
+  return sentMessages;
 }

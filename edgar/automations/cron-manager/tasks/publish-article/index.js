@@ -66,7 +66,7 @@ export default async function (context) {
   await fs.mkdir(publishedDir, { recursive: true });
 
   // ── Command: list ─────────────────────────────────────────────
-  if (action === "list") {
+  if (action === "l2") {
     console.log(`\n/list command received`);
 
     const statusData = await loadStatus(articlesDir, today);
