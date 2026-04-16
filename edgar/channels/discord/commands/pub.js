@@ -17,6 +17,7 @@ export default {
       return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: .pub 1");
     }
 
+    await message.reply(`⏳ Publicando artigo ${index}...`);
     try {
       const inputPath = path.resolve(
         __dirname,
@@ -35,8 +36,6 @@ export default {
         "../../../automations/cron-manager"
       );      
 
-      await message.reply(`⏳ Publicando artigo ${index}...`);
-
       await new Promise((resolve, reject) => {
         exec(cmd, { cwd }, (error, stdout, stderr) => {
           if (error) {
@@ -49,13 +48,10 @@ export default {
         });
       });
 
-      await message.reply(`✅ Publicando artigo ${index}`);
+      await message.reply(`✅ Artigo ${index} publicado com sucesso!`);
     } catch (err) {
       console.error(err);
       await message.reply("❌ Erro ao publicar o artigo. Verifique os logs para mais detalhes.");
     }
-
-
-    
   },
 };
