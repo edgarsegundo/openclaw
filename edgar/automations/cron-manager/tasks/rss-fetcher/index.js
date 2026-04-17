@@ -3,6 +3,7 @@ import { DEFAULT_FEEDS, parseCustomFeeds } from "./feeds.js";
 import fs from "fs";
 import path from "path";
 import he from "he";
+import crypto from "crypto";
 
 // ── HTML utilities ────────────────────────────────────────────────────────────
 
@@ -18,6 +19,93 @@ function stripHtml(str) {
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// ── Hash utilities ────────────────────────────────────────────────────────────
+
+/** Normalizes a string for fingerprinting. */
+function normalize(str) {
+  if (!str) return "";
+  return str.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+/** Returns an MD5 hex digest of a string. */
+function md5(str) {
+  return crypto.createHash("md5").update(str).digest("hex");
+}
+
+/**
+ * Generates the two fingerprint keys for an item.
+ * url_key  — based on item.link  (only when link is non-empty)
+ * title_key — based on item.title (always generated)
+ */
+function fingerprintKeys(item) {
+  const titleKey = "title:" + md5(normalize(item.title || ""));
+  const urlKey =
+    item.link ? "url:" + md5(normalize(item.link)) : null;
+  return { titleKey, urlKey };
+}
+
+// ── Seen-hashes persistence ───────────────────────────────────────────────────
+
+const SEEN_HASHES_FILENAME = "seen_hashes.json";
+
+/**
+ * Loads the seen-hashes map from disk, purges entries older than keepDays,
+ * and returns the resulting object.
+ * Returns an empty object if the file does not exist.
+ */
+function loadSeenHashes(artifactsDir, keepDays) {
+  const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+  let hashes = {};
+
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    hashes = JSON.parse(raw);
+  } catch {
+    // File does not exist yet — start fresh
+    return {};
+  }
+
+  // Purge entries older than keepDays (primary cleanup mechanism)
+  const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10); // "YYYY-MM-DD"
+
+  let purged = 0;
+  for (const [key, date] of Object.entries(hashes)) {
+    if (date < cutoff) {
+      delete hashes[key];
+      purged++;
+    }
+  }
+
+  if (purged > 0) {
+    console.log(`[seen_hashes] Purged ${purged} expired entries (older than ${keepDays} days).`);
+  }
+
+  return hashes;
+}
+
+/**
+ * Persists the seen-hashes map back to disk.
+ */
+function saveSeenHashes(artifactsDir, hashes) {
+  const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+  fs.writeFileSync(filePath, JSON.stringify(hashes, null, 2), "utf8");
+}
+
+/**
+ * Adds the fingerprints of all items in `finalItems` to the hashes map
+ * using today's date as the seen_at value.
+ */
+function appendToSeenHashes(hashes, finalItems) {
+  const today = new Date().toISOString().slice(0, 10);
+  for (const item of finalItems) {
+    const { titleKey, urlKey } = fingerprintKeys(item);
+    if (urlKey) hashes[urlKey] = today;
+    hashes[titleKey] = today;
+  }
 }
 
 // ── Scoring utilities ─────────────────────────────────────────────────────────
@@ -81,6 +169,7 @@ function scorePattern(text, pattern) {
  * export default async function (context) — rss-fetcher task
  *
  * Fetches news from RSS feeds, filters by topic relevance,
+ * deduplicates against a persistent cross-execution history,
  * and saves a raw_news.json artifact for downstream tasks
  * (e.g. an article writer task) to consume.
  *
@@ -176,10 +265,18 @@ export default async function (context) {
 
   console.log(`Max items to collect: ${maxItems}\n`);
 
+  // ── 4. Load seen-hashes history ───────────────────────────────────────────
+  const artifactsDir = path.resolve("artifacts/rss-fetcher");
+  const keepDays = 7;
+
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  const seenHashes = loadSeenHashes(artifactsDir, keepDays);
+  console.log(`[seen_hashes] Loaded ${Object.keys(seenHashes).length} known fingerprints.\n`);
+
   const collectedItems = [];
   const errors = [];
 
-  // ── 4. Fetch feeds ────────────────────────────────────────────────────────
+  // ── 5. Fetch feeds ────────────────────────────────────────────────────────
   for (const feed of feedList) {
     if (collectedItems.length >= maxItems * 2) break;
 
@@ -191,19 +288,19 @@ export default async function (context) {
 
       const relevant = items
         .map((item) => {
-          // Improvement 1 & 2: strip HTML tags + decode entities before matching
+          // Strip HTML tags + decode entities before matching
           const title = stripHtml(item.title || "").toLowerCase();
           const body = ""; // reserved for future use
 
           let score = 0;
 
-          // Positive patterns — Improvements 3 & 4: word tokenization + proximity
+          // Positive patterns
           for (const pattern of topicPatterns) {
             score += scorePattern(title, pattern) * 2; // title weight x2
             if (body) score += scorePattern(body, pattern);
           }
 
-          // Negative patterns — same logic, subtracts score
+          // Negative patterns
           for (const pattern of excludePatterns) {
             const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             const regex = new RegExp(escaped, "i");
@@ -224,6 +321,21 @@ export default async function (context) {
             const parsedDate = new Date(pubDate);
             if (isNaN(parsedDate.getTime())) return null;
             if (parsedDate < sinceCutoff) return null;
+          }
+
+          // ── Cross-execution deduplication ─────────────────────────────
+          const { titleKey, urlKey } = fingerprintKeys({
+            title: item.title,
+            link: item.link,
+          });
+
+          const isDuplicate =
+            seenHashes[titleKey] !== undefined ||
+            (urlKey && seenHashes[urlKey] !== undefined);
+
+          if (isDuplicate) {
+            console.log(`  [skip][dup] score=${score} "${item.title?.slice(0, 80)}"`);
+            return null;
           }
 
           return { item, score, cleanTitle: title };
@@ -255,7 +367,7 @@ export default async function (context) {
     }
   }
 
-  // ── 5. Remove duplicates ──────────────────────────────────────────────────
+  // ── 6. Remove intra-execution duplicates ──────────────────────────────────
   const unique = new Map();
   for (const item of collectedItems) {
     const key = item.link || item.title;
@@ -264,7 +376,7 @@ export default async function (context) {
 
   const finalItems = Array.from(unique.values()).slice(0, maxItems);
 
-  // ── 6. Sort by score, then newest date ───────────────────────────────────
+  // ── 7. Sort by score, then newest date ───────────────────────────────────
   finalItems.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     const da = a.published ? new Date(a.published) : 0;
@@ -272,7 +384,7 @@ export default async function (context) {
     return db - da;
   });
 
-  // ── 7. Build artifact ─────────────────────────────────────────────────────
+  // ── 8. Build artifact ─────────────────────────────────────────────────────
   const artifact = {
     topic: inputs.topic,
     patterns: topicPatterns,
@@ -288,7 +400,7 @@ export default async function (context) {
     errors: errors.length > 0 ? errors : undefined,
   };
 
-  // ── 8. Print summary ──────────────────────────────────────────────────────
+  // ── 9. Print summary ──────────────────────────────────────────────────────
   console.log("\n─── Summary ─────────────────────────────────────────────");
   console.log(`Topic:          ${artifact.topic}`);
   console.log(`Language:       ${artifact.language}`);
@@ -313,7 +425,7 @@ export default async function (context) {
     }
   }
 
-  // ── 9. Save artifact ──────────────────────────────────────────────────────
+  // ── 10. Save artifact ─────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
   const inputId = (inputs.id || "").trim();
   const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
@@ -322,11 +434,15 @@ export default async function (context) {
   console.log(`\nArtifact saved: ${artifactName}.json`);
   console.log("Next step: run the article-writer task consuming this artifact.");
 
-  // ── 10. Cleanup: remove arquivos antigos (>7 dias) ───────────────────────
-  const artifactsDir = path.resolve("artifacts/rss-fetcher");
-  const keepDays = 7;
+  // ── 11. Update seen-hashes with this execution's items ───────────────────
+  appendToSeenHashes(seenHashes, finalItems);
+  saveSeenHashes(artifactsDir, seenHashes);
+  console.log(`[seen_hashes] Updated with ${finalItems.length} new fingerprint(s).`);
+
+  // ── 12. Cleanup ───────────────────────────────────────────────────────────
   const now = new Date();
 
+  // 12a. Delete old raw_news-YYYY-MM-DD.json files by date in filename
   try {
     const files = fs.readdirSync(artifactsDir);
     for (const file of files) {
@@ -342,5 +458,21 @@ export default async function (context) {
     }
   } catch (err) {
     console.warn("[cleanup] Failed to delete old artifacts:", err.message);
+  }
+
+  // 12b. Delete seen_hashes.json if its birthtime is older than keepDays
+  // (secondary / last-resort mechanism — primary cleanup is entry-level purge in loadSeenHashes)
+  try {
+    const seenHashesPath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+    if (fs.existsSync(seenHashesPath)) {
+      const stat = fs.statSync(seenHashesPath);
+      const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
+      if (ageInDays > keepDays) {
+        fs.unlinkSync(seenHashesPath);
+        console.log(`[cleanup] Deleted ${SEEN_HASHES_FILENAME} (created > ${keepDays} days ago).`);
+      }
+    }
+  } catch (err) {
+    console.warn("[cleanup] Failed to check/delete seen_hashes.json:", err.message);
   }
 }
