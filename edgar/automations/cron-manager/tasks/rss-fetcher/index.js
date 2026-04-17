@@ -334,7 +334,7 @@ export default async function (context) {
             (urlKey && seenHashes[urlKey] !== undefined);
 
           if (isDuplicate) {
-            console.log(`  [skip][dup] score=${score} "${item.title?.slice(0, 80)}"`);
+            console.log(`  [skip][dup] score=${score} url="${item.link}" "${item.title?.slice(0, 80)}"`);
             return null;
           }
 
