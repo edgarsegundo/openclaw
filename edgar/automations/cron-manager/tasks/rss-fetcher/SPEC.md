@@ -116,7 +116,7 @@ for (const [key, date] of Object.entries(seenHashes)) {
 }
 ```
 
-### 7b. Limpeza do arquivo físico por created date
+### 7b. Limpeza do arquivo físico por created dat (COMENTADO)
 O arquivo `seen_hashes.json` **não tem data no nome**, por isso o mecanismo de limpeza por regex de nome existente não o cobre.
 Um segundo mecanismo é adicionado na etapa de cleanup, usando `fs.stat` para verificar `birthtime`:
 
@@ -128,6 +128,15 @@ if (ageInDays > keepDays) {
   console.log("Deleted old seen_hashes.json (created > 7 days ago)");
 }
 ```
+
+> **Nota:** O mecanismo de deleção física do arquivo `seen_hashes.json` por idade (`birthtime`) foi removido.
+> 
+> **Motivo:** A limpeza interna (rolling window, item 7a) já garante que o arquivo nunca cresce indefinidamente, pois entradas mais velhas que `keepDays` são removidas automaticamente ao carregar o histórico.
+> 
+> Se o mecanismo removido fosse executado, ele apagaria todo o arquivo de histórico, fazendo com que, temporariamente, artigos já vistos nos últimos dias voltassem a aparecer como novos (duplicatas), até que o histórico fosse reconstruído nas execuções seguintes.
+> 
+> Portanto, manter apenas a limpeza interna é suficiente e mais seguro para evitar perda abrupta da memória de deduplicação.
+
 
 > **Nota**: `birthtime` pode ser igual a `mtime` em alguns sistemas Linux que não preservam `ctime` como data de criação. Essa é uma salvaguarda de último recurso — a limpeza interna de entradas (7a) é o mecanismo primário.
 

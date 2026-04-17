@@ -460,19 +460,28 @@ export default async function (context) {
     console.warn("[cleanup] Failed to delete old artifacts:", err.message);
   }
 
-  // 12b. Delete seen_hashes.json if its birthtime is older than keepDays
-  // (secondary / last-resort mechanism — primary cleanup is entry-level purge in loadSeenHashes)
-  try {
-    const seenHashesPath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
-    if (fs.existsSync(seenHashesPath)) {
-      const stat = fs.statSync(seenHashesPath);
-      const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
-      if (ageInDays > keepDays) {
-        fs.unlinkSync(seenHashesPath);
-        console.log(`[cleanup] Deleted ${SEEN_HASHES_FILENAME} (created > ${keepDays} days ago).`);
-      }
-    }
-  } catch (err) {
-    console.warn("[cleanup] Failed to check/delete seen_hashes.json:", err.message);
-  }
+  // Removido o mecanismo de deleção física do seen_hashes.json por idade (birthtime).
+  // Motivo: a limpeza interna (rolling window) já garante que o arquivo nunca cresce indefinidamente,
+  // pois entradas mais velhas que keepDays são removidas ao carregar o histórico.
+  // Assim, não há risco de acúmulo ou crescimento descontrolado do arquivo, e o histórico de deduplicação
+  // não é perdido abruptamente. A limpeza dos artefatos antigos (raw_news-YYYY-MM-DD.json) permanece ativa.
+  //
+  // Observação: se o mecanismo removido fosse executado, ele apagaria todo o arquivo de histórico.
+  // Isso faria com que, temporariamente, artigos já vistos nos últimos dias voltassem a aparecer como novos
+  // (duplicatas), até que o histórico fosse reconstruído nas execuções seguintes.  
+  //
+  // try {
+  //   const seenHashesPath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+  //   if (fs.existsSync(seenHashesPath)) {
+  //     const stat = fs.statSync(seenHashesPath);
+  //     const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
+  //     if (ageInDays > keepDays) {
+  //       fs.unlinkSync(seenHashesPath);
+  //       console.log(`[cleanup] Deleted ${SEEN_HASHES_FILENAME} (created > ${keepDays} days ago).`);
+  //     }
+  //   }
+  // } catch (err) {
+  //   console.warn("[cleanup] Failed to check/delete seen_hashes.json:", err.message);
+  // }
+
 }
