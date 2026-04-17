@@ -48,7 +48,7 @@ export default {
         });
       });
 
-      await message.reply(`✅ Artigo ${index} publicado com sucesso!`);
+      console.log(`✅ Artigo ${index} publicado com sucesso.`);
     } catch (err) {
       console.error(err);
       await message.reply("❌ Erro ao publicar o artigo. Verifique os logs para mais detalhes.");
