@@ -478,11 +478,10 @@ async function postArticle(payload, apiKey) {
 /**
  * Executes the publish script on the VPS.
  * Returns true on success, false on failure.
+ * Node.js 18+ (Node 22): usa fetch global e AbortController nativo.
  */
 async function postPublish(payload, apiKey) {
   try {
-    const { default: fetch } = await import("node-fetch");
-    const { AbortController } = await import("abort-controller");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300_000); // 5 minutos
 
@@ -506,7 +505,11 @@ async function postPublish(payload, apiKey) {
 
     return true;
   } catch (err) {
-    console.error(`POST error: ${err.message}`);
+    if (err.name === "AbortError") {
+      console.error("POST error: Timeout (request aborted)");
+    } else {
+      console.error(`POST error: ${err.message}`);
+    }
     return false;
   }
 }
