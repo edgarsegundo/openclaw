@@ -3,14 +3,11 @@ import { DEFAULT_FEEDS, parseCustomFeeds } from "./feeds.js";
 import fs from "fs";
 import path from "path";
 import he from "he";
-import crypto from "crypto";
 
 // ── HTML utilities ────────────────────────────────────────────────────────────
 
 /**
  * Strips HTML tags and decodes HTML entities from a string.
- * Uses `he` for robust entity decoding (covers &#8217;, &mdash;, etc.)
- * then removes any remaining tags.
  */
 function stripHtml(str) {
   if (!str) return "";
@@ -21,39 +18,143 @@ function stripHtml(str) {
     .trim();
 }
 
-// ── Hash utilities ────────────────────────────────────────────────────────────
+// ── Metaphone PT-BR ───────────────────────────────────────────────────────────
+// Ported 1:1 from metaphone_pt.py (Python → JavaScript)
 
-/** Normalizes a string for fingerprinting. */
-function normalize(str) {
-  if (!str) return "";
-  return str.toLowerCase().trim().replace(/\s+/g, " ");
-}
+const METAPHONE_VALID = new Set(["D","R","T","F","J","K","L","X","V","B","N","M"]);
 
-/** Returns an MD5 hex digest of a string. */
-function md5(str) {
-  return crypto.createHash("md5").update(str).digest("hex");
+/**
+ * Removes diacritics and uppercases — equivalent to Python's
+ * unicodedata.normalize('NFD') + filter(category != 'Mn') + upper().
+ */
+function normalizeAndUpper(word) {
+  return word
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
 }
 
 /**
- * Generates the two fingerprint keys for an item.
- * url_key  — based on item.link  (only when link is non-empty)
- * title_key — based on item.title (always generated)
+ * Returns the metaphone code for a single PT-BR word.
+ * Faithful port of metaphone_ptbr_simple() from metaphone_pt.py.
  */
-function fingerprintKeys(item) {
-  const titleKey = "title:" + md5(normalize(item.title || ""));
-  const urlKey =
-    item.link ? "url:" + md5(normalize(item.link)) : null;
-  return { titleKey, urlKey };
+function metaphonePtBr(word) {
+  word = normalizeAndUpper(word);
+  const length = word.length;
+  const output = [];
+
+  for (let i = 0; i < length; i++) {
+    const c    = word[i];
+    const next = i + 1 < length ? word[i + 1] : "";
+    const prev = i > 0          ? word[i - 1] : "";
+
+    if ("AEIOUYH".includes(c)) {
+      continue;
+    } else if (c === "C") {
+      if (next === "H")            output.push("X");
+      else if ("EI".includes(next)) output.push("S");
+      else if ("AOU".includes(next)) output.push("K");
+    } else if (c === "G") {
+      output.push(next === "E" ? "J" : "G");
+    } else if (c === "P") {
+      output.push(next === "H" ? "F" : "P");
+    } else if (c === "Q") {
+      output.push(next === "U" ? "K" : "Q");
+    } else if (c === "S") {
+      if (i > 0 && i + 1 < length && "AEIOU".includes(next) && "AEIOU".includes(prev)) {
+        output.push("Z");
+      } else if (next === "S") {
+        continue; // SS collapses
+      } else if (next === "H") {
+        output.push("X");
+      } else {
+        output.push("S");
+      }
+    } else if (c === "Z") {
+      output.push(i === length - 1 ? "S" : "Z");
+    } else if (c === "Ç") {
+      output.push("S");
+    } else if (c === "W") {
+      output.push("V");
+    } else if (METAPHONE_VALID.has(c)) {
+      output.push(c);
+    }
+    // unknown characters are skipped
+  }
+
+  return output.join("");
 }
+
+// ── Stop words PT-BR ──────────────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+  "a","ao","aos","as","com","da","das","de","do","dos","e","em","é",
+  "na","nas","no","nos","o","os","ou","para","pela","pelas","pelo",
+  "pelos","por","que","se","um","uma","uns","umas","à","às",
+  "mais","mas","já","até","após","sobre","entre","contra","sem",
+  "sua","seu","suas","seus","isso","este","esta","esse","essa",
+  "esses","estas","estes","essas","foi","são","está","ser",
+  "ter","tem","têm","havia","como","quando","onde","quem","qual",
+  "quais","novo","nova","novos","novas","grande","grandes",
+]);
+
+// ── Title fingerprint pipeline ────────────────────────────────────────────────
+
+/**
+ * Removes the trailing source label after the last occurrence of
+ * ` - `, ` | `, ` / ` or ` · ` anchored to end-of-string.
+ * Example: "EUA endurecem vistos - Exame" → "EUA endurecem vistos"
+ */
+function removeFonteSuffix(str) {
+  return str.replace(/\s+[-|/·]\s+[^-|/·]+$/, "").trim();
+}
+
+/**
+ * Full pipeline:
+ *   removeFonteSuffix → normalize → tokenize → remove stop words
+ *   → metaphone → sort → join("-")
+ *
+ * Returns a stable, human-readable fingerprint string.
+ * Example: "eua endurecem vistos america latina" → "AMRK-LTNK-NTR-ST-VS"
+ */
+function titleFingerprint(title) {
+  const clean = removeFonteSuffix(
+    title.toLowerCase().trim().replace(/\s+/g, " ")
+  );
+
+  const tokens = clean
+    .split(/\s+/)
+    .map(w => w.replace(/[^a-záàãâéêíóôõúüçñ]/gi, ""))
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w))
+    .map(metaphonePtBr)
+    .filter(Boolean);
+
+  return tokens.sort().join("-");
+}
+
+/**
+ * Jaccard similarity between two fingerprint strings (token sets).
+ */
+function jaccardSimilarity(fpA, fpB) {
+  if (!fpA || !fpB) return 0;
+  const setA = new Set(fpA.split("-"));
+  const setB = new Set(fpB.split("-"));
+  const intersection = [...setA].filter(t => setB.has(t)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+}
+
+/** Items are considered duplicates when Jaccard similarity >= this value. */
+const JACCARD_THRESHOLD = 0.7;
 
 // ── Seen-hashes persistence ───────────────────────────────────────────────────
 
 const SEEN_HASHES_FILENAME = "seen_hashes.json";
 
 /**
- * Loads the seen-hashes map from disk, purges entries older than keepDays,
- * and returns the resulting object.
- * Returns an empty object if the file does not exist.
+ * Loads the seen-fingerprints map from disk, purges entries older than keepDays.
+ * Keys: title fingerprints (metaphone tokens joined by "-").
+ * Values: "YYYY-MM-DD" of first sighting.
  */
 function loadSeenHashes(artifactsDir, keepDays) {
   const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
@@ -63,21 +164,16 @@ function loadSeenHashes(artifactsDir, keepDays) {
     const raw = fs.readFileSync(filePath, "utf8");
     hashes = JSON.parse(raw);
   } catch {
-    // File does not exist yet — start fresh
     return {};
   }
 
-  // Purge entries older than keepDays (primary cleanup mechanism)
   const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000)
     .toISOString()
-    .slice(0, 10); // "YYYY-MM-DD"
+    .slice(0, 10);
 
   let purged = 0;
   for (const [key, date] of Object.entries(hashes)) {
-    if (date < cutoff) {
-      delete hashes[key];
-      purged++;
-    }
+    if (date < cutoff) { delete hashes[key]; purged++; }
   }
 
   if (purged > 0) {
@@ -87,81 +183,66 @@ function loadSeenHashes(artifactsDir, keepDays) {
   return hashes;
 }
 
-/**
- * Persists the seen-hashes map back to disk.
- */
 function saveSeenHashes(artifactsDir, hashes) {
   const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
   fs.writeFileSync(filePath, JSON.stringify(hashes, null, 2), "utf8");
 }
 
 /**
- * Adds the fingerprints of all items in `finalItems` to the hashes map
- * using today's date as the seen_at value.
+ * Checks whether a fingerprint matches any entry in seenHashes.
+ * Returns the matched key if duplicate, null otherwise.
+ * Strategy: exact match O(1) first, then Jaccard O(n) fallback.
+ */
+function findDuplicateInHistory(fp, seenHashes) {
+  if (seenHashes[fp] !== undefined) return fp;
+  for (const key of Object.keys(seenHashes)) {
+    if (jaccardSimilarity(fp, key) >= JACCARD_THRESHOLD) return key;
+  }
+  return null;
+}
+
+/**
+ * Appends fingerprints of all finalItems to the hashes map with today's date.
  */
 function appendToSeenHashes(hashes, finalItems) {
   const today = new Date().toISOString().slice(0, 10);
   for (const item of finalItems) {
-    const { titleKey, urlKey } = fingerprintKeys(item);
-    if (urlKey) hashes[urlKey] = today;
-    hashes[titleKey] = today;
+    const fp = titleFingerprint(item.title);
+    if (fp) hashes[fp] = today;
   }
 }
 
 // ── Scoring utilities ─────────────────────────────────────────────────────────
 
-/**
- * Checks if ALL words of a pattern appear in the text (order-independent).
- * "visto americano" matches "novo visto para entrar nos EUA americano".
- */
 function matchesAllWords(text, pattern) {
   const words = pattern.split(/\s+/).filter(Boolean);
   return words.every((word) => new RegExp(word, "i").test(text));
 }
 
-/**
- * Returns a proximity bonus when all pattern words appear within
- * a window of `windowSize` words in the text.
- * Bonus = 1 if words are close, 0 otherwise.
- */
 function proximityBonus(text, pattern, windowSize = 8) {
   const patternWords = pattern.split(/\s+/).filter(Boolean);
   if (patternWords.length < 2) return 0;
-
   const textWords = text.split(/\s+/);
-
   for (let i = 0; i < textWords.length; i++) {
     const window = textWords.slice(i, i + windowSize).join(" ");
-    if (patternWords.every((w) => new RegExp(w, "i").test(window))) {
-      return 1;
-    }
+    if (patternWords.every((w) => new RegExp(w, "i").test(window))) return 1;
   }
   return 0;
 }
 
-/**
- * Scores a text against a single pattern using:
- *  +2  exact phrase match
- *  +2  all words present (order-independent)
- *  +1  proximity bonus (words within windowSize words of each other)
- */
 function scorePattern(text, pattern) {
   if (!text || !pattern) return 0;
-
   const exactRegex = new RegExp(
     pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
     "i"
   );
-
   let score = 0;
-
   if (exactRegex.test(text)) {
-    score += 2; // exact phrase
+    score += 2;
   } else if (matchesAllWords(text, pattern)) {
-    score += 2; // all words present, any order
-    score += proximityBonus(text, pattern); // +1 if words are close
+    score += 2;
+    score += proximityBonus(text, pattern);
   }
-
   return score;
 }
 
@@ -170,8 +251,7 @@ function scorePattern(text, pattern) {
  *
  * Fetches news from RSS feeds, filters by topic relevance,
  * deduplicates against a persistent cross-execution history,
- * and saves a raw_news.json artifact for downstream tasks
- * (e.g. an article writer task) to consume.
+ * and saves a raw_news.json artifact for downstream tasks.
  *
  * Inputs:
  *   topic            - keyword/topic to filter articles (required)
@@ -195,7 +275,6 @@ export default async function (context) {
   const sinceHours = Number(inputs.since_hours) || 0;
   const category = (inputs.category || "").trim().toLowerCase();
 
-  // Positive patterns (manual overrides topic matching)
   const customPatterns = (inputs.patterns || "")
     .split(";")
     .map((p) => p.trim().toLowerCase())
@@ -212,7 +291,6 @@ export default async function (context) {
     throw new Error("You must provide topic or patterns.");
   }
 
-  // Negative patterns (noise reduction)
   const excludePatterns = (inputs.exclude_patterns || "")
     .split(";")
     .map((p) => p.trim().toLowerCase())
@@ -230,23 +308,16 @@ export default async function (context) {
       const categoryMatch = category ? f.category === category : true;
       return langMatch && categoryMatch;
     });
-
     const categoryLabel = category ? `category '${category}', ` : "";
-    console.log(
-      `Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`
-    );
+    console.log(`Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`);
   }
 
   // ── 2. Compute date cutoff ────────────────────────────────────────────────
   const sinceCutoff =
-    sinceHours > 0
-      ? new Date(Date.now() - sinceHours * 60 * 60 * 1000)
-      : null;
+    sinceHours > 0 ? new Date(Date.now() - sinceHours * 60 * 60 * 1000) : null;
 
   if (sinceCutoff) {
-    console.log(
-      `Only including items published after: ${sinceCutoff.toISOString()} (last ${sinceHours}h)`
-    );
+    console.log(`Only including items published after: ${sinceCutoff.toISOString()} (last ${sinceHours}h)`);
   }
 
   // ── 3. RSS parser ─────────────────────────────────────────────────────────
@@ -258,11 +329,7 @@ export default async function (context) {
 
   console.log(`\nSearching for topic: "${inputs.topic}"`);
   console.log(`Patterns: ${topicPatterns.join(", ")}`);
-
-  if (excludePatterns.length > 0) {
-    console.log(`Exclude patterns: ${excludePatterns.join(", ")}`);
-  }
-
+  if (excludePatterns.length > 0) console.log(`Exclude patterns: ${excludePatterns.join(", ")}`);
   console.log(`Max items to collect: ${maxItems}\n`);
 
   // ── 4. Load seen-hashes history ───────────────────────────────────────────
@@ -288,19 +355,16 @@ export default async function (context) {
 
       const relevant = items
         .map((item) => {
-          // Strip HTML tags + decode entities before matching
           const title = stripHtml(item.title || "").toLowerCase();
           const body = ""; // reserved for future use
 
           let score = 0;
 
-          // Positive patterns
           for (const pattern of topicPatterns) {
-            score += scorePattern(title, pattern) * 2; // title weight x2
+            score += scorePattern(title, pattern) * 2;
             if (body) score += scorePattern(body, pattern);
           }
 
-          // Negative patterns
           for (const pattern of excludePatterns) {
             const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
             const regex = new RegExp(escaped, "i");
@@ -308,13 +372,11 @@ export default async function (context) {
             if (body && regex.test(body)) score -= 1;
           }
 
-          // Minimum relevance threshold
           if (score < 2) {
             console.log(`  [skip] score=${score} "${item.title?.slice(0, 80)}"`);
             return null;
           }
 
-          // Date filtering
           if (sinceCutoff) {
             const pubDate = item.isoDate || item.pubDate;
             if (!pubDate) return null;
@@ -323,33 +385,29 @@ export default async function (context) {
             if (parsedDate < sinceCutoff) return null;
           }
 
-          // ── Cross-execution deduplication ─────────────────────────────
-          const { titleKey, urlKey } = fingerprintKeys({
-            title: item.title,
-            link: item.link,
-          });
+          // ── Cross-execution deduplication ──────────────────────────────
+          const fp = titleFingerprint(title);
+          const matchedKey = findDuplicateInHistory(fp, seenHashes);
 
-          const isDuplicate =
-            seenHashes[titleKey] !== undefined ||
-            (urlKey && seenHashes[urlKey] !== undefined);
-
-          if (isDuplicate) {
-            console.log(`  [skip][dup] score=${score} "${item.title?.slice(0, 80)}"`);
+          if (matchedKey) {
+            const isExact = matchedKey === fp;
+            const simLabel = isExact ? "exact" : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
+            console.log(`  [skip][dup:${simLabel}] score=${score} "${item.title?.slice(0, 80)}"`);
             return null;
           }
 
-          return { item, score, cleanTitle: title };
+          return { item, score, cleanTitle: title, fp };
         })
         .filter(Boolean)
         .sort((a, b) => b.score - a.score);
 
       console.log(`${items.length} items found, ${relevant.length} relevant.`);
 
-      for (const { item, score, cleanTitle } of relevant) {
+      for (const { item, score, cleanTitle, fp } of relevant) {
         if (collectedItems.length >= maxItems * 2) break;
 
         collectedItems.push({
-          title: cleanTitle || stripHtml(item.title || ""), // always clean title
+          title: cleanTitle || stripHtml(item.title || ""),
           link: item.link || "",
           published: item.isoDate || item.pubDate || null,
           summary: stripHtml(item.contentSnippet || item.summary || ""),
@@ -358,6 +416,7 @@ export default async function (context) {
           language: feed.lang,
           category: feed.category,
           score,
+          _fp: fp, // internal — removed before saving
           fetched_at_item: new Date().toISOString(),
         });
       }
@@ -367,14 +426,26 @@ export default async function (context) {
     }
   }
 
-  // ── 6. Remove intra-execution duplicates ──────────────────────────────────
-  const unique = new Map();
+  // ── 6. Remove intra-execution duplicates (title fingerprint + Jaccard) ────
+  const uniqueItems = [];
+  const seenFps = [];
+
   for (const item of collectedItems) {
-    const key = item.link || item.title;
-    if (!unique.has(key)) unique.set(key, item);
+    const isDup = seenFps.some(existingFp =>
+      existingFp === item._fp ||
+      jaccardSimilarity(item._fp, existingFp) >= JACCARD_THRESHOLD
+    );
+
+    if (!isDup) {
+      seenFps.push(item._fp);
+      uniqueItems.push(item);
+    }
   }
 
-  const finalItems = Array.from(unique.values()).slice(0, maxItems);
+  // Strip internal _fp field and apply max_items cap
+  const finalItems = uniqueItems
+    .slice(0, maxItems)
+    .map(({ _fp, ...rest }) => rest);
 
   // ── 7. Sort by score, then newest date ───────────────────────────────────
   finalItems.sort((a, b) => {
@@ -412,9 +483,7 @@ export default async function (context) {
   console.log("─────────────────────────────────────────────────────────\n");
 
   if (finalItems.length === 0) {
-    console.warn(
-      "No items found for this topic. Try broader patterns, fewer exclusions, a larger since_hours window, or more feeds."
-    );
+    console.warn("No items found for this topic. Try broader patterns, fewer exclusions, a larger since_hours window, or more feeds.");
   } else {
     for (const item of finalItems) {
       const date = item.published
@@ -425,7 +494,7 @@ export default async function (context) {
     }
   }
 
-  // ── 10. Save artifact (only if there are new items) ──────────────────────
+  // ── 10. Save artifact (only if there are new items) ───────────────────────
   const today = new Date().toISOString().slice(0, 10);
   const inputId = (inputs.id || "").trim();
   const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
@@ -446,7 +515,7 @@ export default async function (context) {
   // ── 12. Cleanup ───────────────────────────────────────────────────────────
   const now = new Date();
 
-  // 12a. Delete old raw_news-YYYY-MM-DD.json files by date in filename
+  // 12a. Delete old dated artifact files by date in filename
   try {
     const files = fs.readdirSync(artifactsDir);
     for (const file of files) {
@@ -464,8 +533,8 @@ export default async function (context) {
     console.warn("[cleanup] Failed to delete old artifacts:", err.message);
   }
 
-  // 12b. Delete seen_hashes.json if its birthtime is older than keepDays
-  // (secondary / last-resort mechanism — primary cleanup is entry-level purge in loadSeenHashes)
+  // 12b. Delete seen_hashes.json if birthtime > keepDays
+  // (secondary mechanism — primary is entry-level purge in loadSeenHashes)
   try {
     const seenHashesPath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
     if (fs.existsSync(seenHashesPath)) {
