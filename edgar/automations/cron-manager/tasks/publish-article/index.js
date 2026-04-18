@@ -316,7 +316,7 @@ function markAsPublished(statusData, index) {
 
 // ── Discord notification helpers ──────────────────────────────────────────────
 
-const DISCORD_MSG_MAX_LENGTH = 1999;
+const DISCORD_MSG_MAX_LENGTH = 1800;
 
 /**
  * Send today's full article list to Discord.

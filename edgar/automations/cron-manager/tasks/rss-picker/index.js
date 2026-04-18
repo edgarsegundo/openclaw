@@ -295,7 +295,7 @@ export default async function (context) {
 
 // ── Status file helpers ───────────────────────────────────────────────────────
 
-const DISCORD_MSG_MAX_LENGTH = 1999;
+const DISCORD_MSG_MAX_LENGTH = 1800;
 
 /**
  * Load today's status file.
