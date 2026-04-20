@@ -28,7 +28,7 @@ export default {
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
-        `node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file ${inputFile}`;
+        `node cron-manager.js run rss-picker --template feed-selector-news-related --input-file ${inputFile}`;
       const cwd = path.resolve(
         __dirname,
         "../../../automations/cron-manager"

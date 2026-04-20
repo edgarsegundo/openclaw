@@ -1,7 +1,7 @@
 schema_version: 1
 
 # ── Identity ──────────────────────────────────────────────────────────────────
-name: feed-selector-visto-americano
+name: feed-selector-news-related
 description: "Evaluate news items from RSS feeds and select those relevant enough to become blog articles"
 
 # ── AI provider ───────────────────────────────────────────────────────────────

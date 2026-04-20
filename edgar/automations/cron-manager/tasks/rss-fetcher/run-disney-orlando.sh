@@ -17,7 +17,7 @@ echo "[1/2] Rodando rss-fetcher for Disney Orlando..."
 node cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/inputs-disney-orlando.json
 
 # echo "[2/2] Rodando rss-picker for Disney Orlando..."
-# node cron-manager.js run rss-picker --template feed-selector-disney-orlando --input-file tasks/rss-picker/inputs/inputs-disney-orlando.json
+node cron-manager.js run rss-picker --template feed-selector-news-related --input-file tasks/rss-picker/inputs/inputs-disney-orlando.json
 
 echo "Sequência finalizada com sucesso."
 
