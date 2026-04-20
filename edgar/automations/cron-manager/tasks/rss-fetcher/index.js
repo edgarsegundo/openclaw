@@ -149,15 +149,18 @@ const JACCARD_THRESHOLD = 0.7;
 
 // ── Seen-hashes persistence ───────────────────────────────────────────────────
 
-const SEEN_HASHES_FILENAME = "seen_hashes.json";
+// seen_hashes.json agora é específico por inputId (ou padrão)
+function getSeenHashesFilename(inputId) {
+  return inputId ? `seen_hashes-${inputId}.json` : "seen_hashes.json";
+}
 
 /**
  * Loads the seen-fingerprints map from disk, purges entries older than keepDays.
  * Keys: title fingerprints (metaphone tokens joined by "-").
  * Values: "YYYY-MM-DD" of first sighting.
  */
-function loadSeenHashes(artifactsDir, keepDays) {
-  const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+function loadSeenHashes(artifactsDir, keepDays, inputId) {
+  const filePath = path.join(artifactsDir, getSeenHashesFilename(inputId));
   let hashes = {};
 
   try {
@@ -183,8 +186,8 @@ function loadSeenHashes(artifactsDir, keepDays) {
   return hashes;
 }
 
-function saveSeenHashes(artifactsDir, hashes) {
-  const filePath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+function saveSeenHashes(artifactsDir, hashes, inputId) {
+  const filePath = path.join(artifactsDir, getSeenHashesFilename(inputId));
   fs.writeFileSync(filePath, JSON.stringify(hashes, null, 2), "utf8");
 }
 
@@ -350,7 +353,7 @@ export default async function (context) {
   const keepDays = 7;
 
   fs.mkdirSync(artifactsDir, { recursive: true });
-  const seenHashes = loadSeenHashes(artifactsDir, keepDays);
+  const seenHashes = loadSeenHashes(artifactsDir, keepDays, inputId);
   console.log(`[seen_hashes] Loaded ${Object.keys(seenHashes).length} known fingerprints.\n`);
 
   const collectedItems = [];
@@ -522,7 +525,7 @@ export default async function (context) {
 
   // ── 11. Update seen-hashes with this execution's items ───────────────────
   appendToSeenHashes(seenHashes, finalItems);
-  saveSeenHashes(artifactsDir, seenHashes);
+  saveSeenHashes(artifactsDir, seenHashes, inputId);
   console.log(`[seen_hashes] Updated with ${finalItems.length} new fingerprint(s).`);
 
   // ── 12. Cleanup ───────────────────────────────────────────────────────────
@@ -549,7 +552,7 @@ export default async function (context) {
   // 12b. Delete seen_hashes.json if birthtime > keepDays
   // (secondary mechanism — primary is entry-level purge in loadSeenHashes)
   try {
-    const seenHashesPath = path.join(artifactsDir, SEEN_HASHES_FILENAME);
+    const seenHashesPath = path.join(artifactsDir, getSeenHashesFilename(inputId));
     if (fs.existsSync(seenHashesPath)) {
       const stat = fs.statSync(seenHashesPath);
       const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
