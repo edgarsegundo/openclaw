@@ -3,7 +3,7 @@
 set -e
 
 BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
-LOCK_FILE="/tmp/rss-fetcher.lock"
+LOCK_FILE="/tmp/rss-fetcher-visto-americano.lock"
 cd "$BASE" || exit 1
 
 # Garante que o lock seja removido ao sair (mesmo em caso de erro)
@@ -37,7 +37,7 @@ echo "Sequência finalizada com sucesso."
 #    Use >> para acumular ou > para sobrescrever o log:
 #    
 #    Exemplo: rodar a cada 30 minutos:
-#    */30 * * * * flock -n /tmp/rss-fetcher.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
+#    */30 * * * * flock -n /tmp/rss-fetcher-visto-americano.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
 #
 #    Exemplo: rodar a cada 10 minutos (para notícias quentes):
 #    */10 * * * * flock -n /tmp/rss-fetcher.lock timeout 8m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
