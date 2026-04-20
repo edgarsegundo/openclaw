@@ -1,0 +1,9 @@
+{
+  "id": "rss-artifact-disney-orlando",
+  "topic": "disney orlando",
+  "patterns": "disney orlando; disney world; disney parks; disney news; disney updates;",
+  "exclude_patterns": "guerra; irã; rússia; china;",
+  "feeds": "",
+  "max_items": 100,
+  "feeds_js_file": "feeds-disney-orlando.js"
+}
