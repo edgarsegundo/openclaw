@@ -14,7 +14,7 @@ trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
 # Executa rss-fetcher
 echo "[1/2] Rodando rss-fetcher..."
-node cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/rss-inputs-visto-americano.json
+node cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/inputs-visto-americano.json
 
 echo "[2/2] Rodando rss-picker..."
 node cron-manager.js run rss-picker --template feed-selector-visto-americano --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
@@ -28,7 +28,7 @@ echo "Sequência finalizada com sucesso."
 #    mesmo em caso de erro. Nenhuma limpeza manual é necessária.
 #
 # 1. Torne o script executável:
-#    chmod +x /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh
+#    chmod +x /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh
 #
 # 2. Edite o crontab:
 #    crontab -e
@@ -37,10 +37,10 @@ echo "Sequência finalizada com sucesso."
 #    Use >> para acumular ou > para sobrescrever o log:
 #    
 #    Exemplo: rodar a cada 30 minutos:
-#    */30 * * * * flock -n /tmp/rss-fetcher.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
+#    */30 * * * * flock -n /tmp/rss-fetcher.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
 #
 #    Exemplo: rodar a cada 10 minutos (para notícias quentes):
-#    */10 * * * * flock -n /tmp/rss-fetcher.lock timeout 8m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
+#    */10 * * * * flock -n /tmp/rss-fetcher.lock timeout 8m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1
 #
 # 4. Para rotacionar o log automaticamente (recomendado se usar >>):
 #    1. Crie um arquivo /etc/logrotate.d/rss-fetcher-visto com o conteúdo:
@@ -66,6 +66,6 @@ echo "Sequência finalizada com sucesso."
 # https://app.uptimerobot.com/billing/pricing
 #
 # Exemplo com heartbeat:
-# */30 * * * * flock -n /tmp/rss-fetcher.lock sh -c 'timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-sequencial-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1 && curl -fsS https://your-healthchecks-url'
+# */30 * * * * flock -n /tmp/rss-fetcher.lock sh -c 'timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh > /tmp/rss-fetcher-visto-americano.log 2>&1 && curl -fsS https://your-healthchecks-url'
 #
 # ============================================================================

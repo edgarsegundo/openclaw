@@ -4,6 +4,6 @@
   "patterns": "visto americano; us visa; ds-160; consulado; visto;",
   "exclude_patterns": "guerra; irã; rússia; china;",
   "feeds": "",
-  "max_items": 20,
+  "max_items": 100,
   "feeds_js_file": "feeds-visto-americano.js"
 }

@@ -1,5 +1,5 @@
 import Parser from "rss-parser";
-import { DEFAULT_FEEDS, parseCustomFeeds } from "./feeds.js";
+// Importação dinâmica do módulo de feeds será feita dentro da função principal
 import fs from "fs";
 import path from "path";
 import he from "he";
@@ -268,12 +268,25 @@ export default async function (context) {
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
+
   const topic = (inputs.topic || "").trim().toLowerCase();
   const maxItems = Number(inputs.max_items) || 10;
   const language = (inputs.language || "pt").trim().toLowerCase();
   const customFeedsRaw = (inputs.feeds || "").trim();
   const sinceHours = Number(inputs.since_hours) || 0;
   const category = (inputs.category || "").trim().toLowerCase();
+  const feedJsFile = (inputs.feeds_js_file || "").trim() || "feeds.js";
+
+  // Importação dinâmica do módulo de feeds
+  let DEFAULT_FEEDS, parseCustomFeeds;
+  try {
+    // Caminho relativo ao arquivo atual
+    const feedsModule = await import(`./${feedJsFile}`);
+    DEFAULT_FEEDS = feedsModule.DEFAULT_FEEDS;
+    parseCustomFeeds = feedsModule.parseCustomFeeds;
+  } catch (err) {
+    throw new Error(`Não foi possível importar o módulo de feeds '${feedJsFile}': ${err.message}`);
+  }
 
   const customPatterns = (inputs.patterns || "")
     .split(";")
