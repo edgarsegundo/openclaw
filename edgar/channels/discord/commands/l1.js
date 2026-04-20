@@ -14,17 +14,16 @@ export default {
   async execute({ message, args, botName }) {
     await message.reply(`✅ Listando artigos`);
     try {
-      let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
-      inputObj.action = "l1";
-      inputObj.botName = botName;
 
-
+      console.log(`Executing .l1 with botName: ${botName}`);
       const inputPath = path.resolve(
         __dirname,
         "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
       );
 
-      console.log(`Executing .l1 with input:`, inputObj);
+      let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
+      inputObj.action = "l1";
+      inputObj.botName = botName;
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
