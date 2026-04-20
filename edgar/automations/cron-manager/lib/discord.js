@@ -4,9 +4,9 @@ const SEPARATOR = "━━━━━━━━━━━━━━━━━━━━�
 
 let queue = Promise.resolve();
 
-export function notifyDiscord(message) {
+export function notifyDiscord(message, webhookUrl) {
   queue = queue
-    .then(() => send(message))
+    .then(() => send(message, webhookUrl))
     .catch(err => {
       logger.error("Queue error:", err);
       throw err; // mantém propagação para quem usa await
@@ -15,9 +15,7 @@ export function notifyDiscord(message) {
   return queue;
 }
 
-async function send(message, retries = 3) {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-
+async function send(message, webhookUrl, retries = 3) {
   if (!webhookUrl) {
     logger.warn("DISCORD_WEBHOOK_URL not set, skipping notification");
     return;
@@ -55,7 +53,7 @@ async function send(message, retries = 3) {
       await new Promise(r => setTimeout(r, wait));
 
       if (retries > 0) {
-        return send(message, retries - 1);
+        return send(message, webhookUrl, retries - 1);
       }
 
       throw new Error("Rate limit retries exhausted");
@@ -76,7 +74,7 @@ async function send(message, retries = 3) {
       // 🔁 backoff progressivo com jitter
       const backoff = (1000 * (4 - retries)) + Math.random() * 300;
       await new Promise(r => setTimeout(r, backoff));
-      return send(message, retries - 1);
+      return send(message, webhookUrl, retries - 1);
     }
 
     // ❗ falha explícita

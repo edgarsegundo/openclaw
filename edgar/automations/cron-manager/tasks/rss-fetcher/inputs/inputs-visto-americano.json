@@ -5,5 +5,6 @@
   "exclude_patterns": "guerra; irã; rússia; china;",
   "feeds": "",
   "max_items": 100,
-  "feeds_js_file": "feeds-visto-americano.js"
+  "feeds_js_file": "feeds-visto-americano.js",
+  "discord_webhook_url": "https://discord.com/api/webhooks/1493298708996161749/32GkMICv-EreUDlxIcPl46Td_MxgbzIpsTwyp6x77JDXzXKsC426Sa56gazOjTQwPM7H"
 }

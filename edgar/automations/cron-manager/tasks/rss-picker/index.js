@@ -34,6 +34,7 @@ export default async function (context) {
   const { taskName, mode, executionId, inputs, runPrompt } = context;
   const itemIndex = inputs.item_index ?? null;
   const action = inputs.action ?? null;
+  const discordWebhookUrl = inputs.discord_webhook_url ?? null;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -72,7 +73,7 @@ export default async function (context) {
   if (action === "l1") {
     console.log(`\n/list command received (rss-picker)`);
 
-    const sent = await sendFullRssList(allItems, resolvedSet, statusData, topic);
+    const sent = await sendFullRssList(allItems, resolvedSet, statusData, topic, discordWebhookUrl);
 
     console.log(`✅ RSS list sent (${sent} message(s))`);
     return;
@@ -156,7 +157,7 @@ export default async function (context) {
     );
 
     if (newItems.length > 0) {
-      const sentCount = await sendInChunks(newItems, topic);
+      const sentCount = await sendInChunks(newItems, topic, discordWebhookUrl);
       console.log(`Discord notified with ${newItems.length} new item(s) in ${sentCount} message(s).`);
 
       // Persist the newly-sent indices so they are never re-sent
@@ -472,7 +473,7 @@ function buildItemBlock(item) {
  * if the content exceeds the 2000 character limit.
  * Only receives items that are genuinely new (not yet sent).
  */
-async function sendInChunks(items, topic) {
+async function sendInChunks(items, topic, discordWebhookUrl) {
   let sentMessages = 0;
 
   const safeTopic = truncate(topic, 100);
@@ -485,7 +486,7 @@ async function sendInChunks(items, topic) {
     const itemBlock = buildItemBlock(item);
 
     if ((currentMsg + itemBlock).length > DISCORD_MSG_MAX_LENGTH) {
-      await notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
       currentMsg = continuationHeader + itemBlock;
     } else {
@@ -494,7 +495,7 @@ async function sendInChunks(items, topic) {
   }
 
   if (currentMsg.trim()) {
-    await notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg, discordWebhookUrl);
     sentMessages++;
   }
 
@@ -509,7 +510,7 @@ function truncate(text, max = 100) {
   return text.length > max ? text.slice(0, max) + "..." : text;
 }
 
-async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
+async function sendFullRssList(allItems, resolvedSet, statusData, topic, discordWebhookUrl) {
   let sentMessages = 0;
 
   const safeTopic = truncate(topic, 100);
@@ -542,7 +543,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
     const line = `\n${icon} [${i}] ${title}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      await notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -551,7 +552,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic) {
   }
 
   if (currentMsg.trim()) {
-    await notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg, discordWebhookUrl);
     sentMessages++;
   }
 

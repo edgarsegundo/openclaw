@@ -3,7 +3,6 @@ import { exec } from "child_process";
 import { fileURLToPath } from "url";
 import { createTempInputFile } from "./common.js";
 import fs from "fs/promises";
-import FEED_SHORTCODES from "../../cron-manager/tasks/rss-fetcher/shortcodes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,22 +12,19 @@ export default {
   description: "Lista artigos por índice",
 
   async execute({ message, args, botName }) {
-    const shortcode = args[0];
-    const feedName = FEED_SHORTCODES[shortcode];
-    if (!feedName) {
-      return message.reply(
-        `❌ Shortcode inválido. Use um dos seguintes: ${Object.keys(FEED_SHORTCODES).join(", ")}`
-      );
-    }
     await message.reply(`✅ Listando artigos`);
     try {
-      const inputPath = path.resolve(
-        __dirname,
-        `../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-${feedName}.json`
-      );
-
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
       inputObj.action = "l1";
+      inputObj.botName = botName;
+
+
+      const inputPath = path.resolve(
+        __dirname,
+        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
+      );
+
+      console.log(`Executing .l1 with input:`, inputObj);
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =

@@ -5,5 +5,6 @@
   "exclude_patterns": "guerra; irã; rússia; china;",
   "feeds": "",
   "max_items": 100,
-  "feeds_js_file": "feeds-disney-orlando.js"
+  "feeds_js_file": "feeds-disney-orlando.js",
+  "discord_webhook_url": "https://discord.com/api/webhooks/1495928719489892352/aSJTMMVDfYRHPdsP0qhRprsUIBPiNWBHkUzi1lDtReUT7_5RAbgnhFPO6iIrs1r-0W2T"
 }
