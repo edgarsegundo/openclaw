@@ -1,5 +1,5 @@
 import Parser from "rss-parser";
-// Importação dinâmica do módulo de feeds será feita dentro da função principal
+import * as cheerio from "cheerio";
 import fs from "fs";
 import path from "path";
 import he from "he";
@@ -115,7 +115,6 @@ function removeFonteSuffix(str) {
  *   → metaphone → sort → join("-")
  *
  * Returns a stable, human-readable fingerprint string.
- * Example: "eua endurecem vistos america latina" → "AMRK-LTNK-NTR-ST-VS"
  */
 function titleFingerprint(title) {
   const clean = removeFonteSuffix(
@@ -149,15 +148,12 @@ const JACCARD_THRESHOLD = 0.7;
 
 // ── Seen-hashes persistence ───────────────────────────────────────────────────
 
-// seen_hashes.json agora é específico por inputId (ou padrão)
 function getSeenHashesFilename(inputId) {
   return inputId ? `seen_hashes-${inputId}.json` : "seen_hashes.json";
 }
 
 /**
  * Loads the seen-fingerprints map from disk, purges entries older than keepDays.
- * Keys: title fingerprints (metaphone tokens joined by "-").
- * Values: "YYYY-MM-DD" of first sighting.
  */
 function loadSeenHashes(artifactsDir, keepDays, inputId) {
   const filePath = path.join(artifactsDir, getSeenHashesFilename(inputId));
@@ -194,7 +190,6 @@ function saveSeenHashes(artifactsDir, hashes, inputId) {
 /**
  * Checks whether a fingerprint matches any entry in seenHashes.
  * Returns the matched key if duplicate, null otherwise.
- * Strategy: exact match O(1) first, then Jaccard O(n) fallback.
  */
 function findDuplicateInHistory(fp, seenHashes) {
   if (seenHashes[fp] !== undefined) return fp;
@@ -249,10 +244,300 @@ function scorePattern(text, pattern) {
   return score;
 }
 
+// ── Scraper ───────────────────────────────────────────────────────────────────
+
+const SCRAPER_USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+/**
+ * Returns a random delay in ms between minMs and maxMs.
+ */
+function randomDelay(minMs = 1500, maxMs = 4000) {
+  return Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+}
+
+/**
+ * Sleeps for ms milliseconds.
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Checks robots.txt for the given URL.
+ * Returns true if scraping is allowed, false if blocked.
+ * On any fetch error, defaults to allowed (fail-open).
+ */
+async function isAllowedByRobots(url) {
+  try {
+    const { origin, pathname } = new URL(url);
+    const robotsUrl = `${origin}/robots.txt`;
+    const res = await fetch(robotsUrl, {
+      headers: { "User-Agent": SCRAPER_USER_AGENT },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return true; // no robots.txt → allow
+
+    const text = await res.text();
+    const lines = text.split("\n").map((l) => l.trim());
+
+    let applicable = false;
+    for (const line of lines) {
+      if (/^user-agent:\s*\*/i.test(line)) { applicable = true; continue; }
+      if (/^user-agent:/i.test(line)) { applicable = false; continue; }
+      if (applicable && /^disallow:/i.test(line)) {
+        const disallowed = line.replace(/^disallow:\s*/i, "").trim();
+        if (disallowed && pathname.startsWith(disallowed)) return false;
+      }
+    }
+    return true;
+  } catch {
+    return true; // fail-open
+  }
+}
+
+/**
+ * Humanizes a URL slug into a readable title.
+ * Example: "/pato-donald-descubra-de-quem" → "Pato Donald Descubra De Quem"
+ */
+function slugToTitle(href) {
+  try {
+    const { pathname } = new URL(href, "https://example.com");
+    const segments = pathname.split("/").filter(Boolean);
+    const last = segments[segments.length - 1] || "";
+    // strip file extension and date-like segments
+    const cleaned = last
+      .replace(/\.(html?|ghtml|php|aspx)$/i, "")
+      .replace(/^\d{4}-\d{2}-\d{2}$/, "")
+      .replace(/[-_]/g, " ")
+      .trim();
+    if (cleaned.length < 10) return "";
+    return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Heuristic: decides if a candidate <a> looks like a news article link.
+ * Returns true if at least 2 of 4 criteria are met.
+ */
+function looksLikeArticle($, el, href) {
+  let score = 0;
+
+  // 1. Text length between 20 and 200 chars
+  const text = $(el).text().trim();
+  if (text.length >= 20 && text.length <= 200) score++;
+
+  // 2. URL pattern suggests an article (date, long slug, known extensions)
+  if (/\/\d{4}\/\d{2}\//.test(href) || /\.(html?|ghtml)$/i.test(href) || href.split("/").filter(Boolean).length >= 3) score++;
+
+  // 3. Inside a semantic container
+  const semanticParents = ["article", "main", "section"];
+  const semanticClasses = /feed|card|post|news|noticia|story|item/i;
+  const parents = $(el).parents().toArray();
+  const inSemantic = parents.some((p) => {
+    const tag = (p.tagName || "").toLowerCase();
+    const cls = ($(p).attr("class") || "");
+    return semanticParents.includes(tag) || semanticClasses.test(cls);
+  });
+  if (inSemantic) score++;
+
+  // 4. URL is not navigation/utility
+  const isNav = /\/(tag|autor|categoria|author|category|search|busca|login|register|#|mailto:|javascript:)/i.test(href);
+  if (!isNav) score++;
+
+  return score >= 2;
+}
+
+/**
+ * Fetches and parses a scraper feed.
+ * Returns an array of { title, link } objects (raw, before pipeline scoring).
+ *
+ * @param {object} feed - Feed object with optional scrap_layout_tips
+ */
+async function fetchFromScraper(feed) {
+  const tips = feed.scrap_layout_tips || {};
+  const { link_selector, title_selector } = tips;
+  const mode = link_selector ? "preciso" : "heurístico";
+
+  console.log(`[scraper] Fetching: ${feed.name} (modo: ${mode}${link_selector ? `, selector: ${link_selector}` : ""})`);
+
+  // ── robots.txt check ──────────────────────────────────────────────────────
+  const allowed = await isAllowedByRobots(feed.url);
+  if (!allowed) {
+    console.warn(`[scraper][robots] SKIP ${feed.url} — bloqueado por robots.txt`);
+    return [];
+  }
+
+  // ── fetch HTML ────────────────────────────────────────────────────────────
+  const res = await fetch(feed.url, {
+    headers: { "User-Agent": SCRAPER_USER_AGENT },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ao buscar ${feed.url}`);
+  }
+
+  const html = await res.text();
+  const $ = cheerio.load(html);
+  const origin = new URL(feed.url).origin;
+
+  const candidates = [];
+
+  if (link_selector) {
+    // ── Modo preciso: usa o seletor fornecido ──────────────────────────────
+    $(link_selector).each((_, el) => {
+      const rawHref = $(el).attr("href") || "";
+      if (!rawHref) return;
+
+      // Normalize to absolute URL
+      let href;
+      try {
+        href = new URL(rawHref, feed.url).href;
+      } catch {
+        return;
+      }
+
+      // Discard external links
+      if (!href.startsWith(origin)) return;
+
+      // Extract title: title_selector in parent container, or textContent of <a>
+      let title = "";
+      if (title_selector) {
+        const container = $(el).closest("*").find(title_selector).first();
+        title = container.text().trim();
+      }
+      if (!title) {
+        title = $(el).text().trim();
+      }
+
+      // Fallback to slug humanization
+      if (!title || title.length < 10) {
+        title = slugToTitle(href);
+      }
+
+      if (title && title.length >= 10) {
+        candidates.push({ title, link: href });
+      }
+    });
+  } else {
+    // ── Modo heurístico: percorre todos os <a> ─────────────────────────────
+    $("a[href]").each((_, el) => {
+      const rawHref = $(el).attr("href") || "";
+      if (!rawHref) return;
+
+      let href;
+      try {
+        href = new URL(rawHref, feed.url).href;
+      } catch {
+        return;
+      }
+
+      if (!href.startsWith(origin)) return;
+      if (!looksLikeArticle($, el, href)) return;
+
+      let title = $(el).text().trim();
+      if (!title || title.length < 10) {
+        title = slugToTitle(href);
+      }
+
+      if (title && title.length >= 10) {
+        candidates.push({ title, link: href });
+      }
+    });
+  }
+
+  // Deduplicate by link within this page
+  const seen = new Set();
+  const unique = candidates.filter(({ link }) => {
+    if (seen.has(link)) return false;
+    seen.add(link);
+    return true;
+  });
+
+  console.log(`[scraper] ${candidates.length} candidatos encontrados, ${unique.length} únicos com título válido.`);
+
+  if (unique.length === 0) {
+    console.warn(`[scraper][warn] Feed "${feed.name}" retornou 0 itens — verifique o layout ou o link_selector.`);
+  }
+
+  return unique;
+}
+
+// ── Shared item scoring & filtering ──────────────────────────────────────────
+
+/**
+ * Scores and filters a list of raw items (both RSS and scraper).
+ * Returns array of { title, link, published, score, fp, ... } or null entries filtered out.
+ *
+ * @param {Array}  rawItems     - Array of { title, link, published, summary? }
+ * @param {object} feed         - Feed metadata
+ * @param {Array}  topicPatterns
+ * @param {Array}  excludePatterns
+ * @param {Date|null} sinceCutoff
+ * @param {object} seenHashes
+ */
+function scoreAndFilterItems(rawItems, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes) {
+  return rawItems
+    .map((raw) => {
+      const title = stripHtml(raw.title || "").toLowerCase();
+
+      let score = 0;
+      for (const pattern of topicPatterns) {
+        score += scorePattern(title, pattern) * 2;
+      }
+      for (const pattern of excludePatterns) {
+        const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(escaped, "i");
+        if (regex.test(title)) score -= 2;
+      }
+
+      if (score < 2) {
+        console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
+        return null;
+      }
+
+      if (sinceCutoff && raw.published) {
+        const parsedDate = new Date(raw.published);
+        if (!isNaN(parsedDate.getTime()) && parsedDate < sinceCutoff) return null;
+      }
+
+      // Cross-execution deduplication
+      const fp = titleFingerprint(title);
+      const matchedKey = findDuplicateInHistory(fp, seenHashes);
+      if (matchedKey) {
+        const isExact = matchedKey === fp;
+        const simLabel = isExact ? "exact" : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
+        console.log(`  [skip][dup:${simLabel}] score=${score} "${(raw.title || "").slice(0, 80)}"`);
+        return null;
+      }
+
+      return {
+        title,
+        link: raw.link || "",
+        published: raw.published || null,
+        ...(raw.summary ? { summary: raw.summary } : {}),
+        source: feed.name,
+        source_url: feed.url,
+        language: feed.lang,
+        category: feed.category,
+        score,
+        _fp: fp,
+        fetched_at_item: new Date().toISOString(),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+}
+
+// ── Main task ─────────────────────────────────────────────────────────────────
+
 /**
  * export default async function (context) — rss-fetcher task
  *
- * Fetches news from RSS feeds, filters by topic relevance,
+ * Fetches news from RSS feeds and/or scraper feeds, filters by topic relevance,
  * deduplicates against a persistent cross-execution history,
  * and saves a raw_news.json artifact for downstream tasks.
  *
@@ -264,13 +549,12 @@ function scorePattern(text, pattern) {
  *   max_items        - max articles to collect total (default: 10)
  *   language         - preferred language: 'pt', 'en', 'es' (default: 'pt')
  *   since_hours      - only include items from the last X hours, 0 = disabled (default: 0)
- *   category         - filter default feeds by category: general, technology, finance, business (default: all)
+ *   category         - filter default feeds by category (default: all)
  */
 export default async function (context) {
   const { taskName, mode, executionId, inputs, saveArtifact } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
-
 
   const topic = (inputs.topic || "").trim().toLowerCase();
   const maxItems = Number(inputs.max_items) || 10;
@@ -281,10 +565,9 @@ export default async function (context) {
   const feedJsFile = (inputs.feeds_js_file || "").trim() || "feeds.js";
   const inputId = (inputs.id || "").trim();
 
-  // Importação dinâmica do módulo de feeds
+  // Dynamic import of feeds module
   let DEFAULT_FEEDS, parseCustomFeeds;
   try {
-    // Caminho relativo ao arquivo atual
     const feedsModule = await import(`./${feedJsFile}`);
     DEFAULT_FEEDS = feedsModule.DEFAULT_FEEDS;
     parseCustomFeeds = feedsModule.parseCustomFeeds;
@@ -313,7 +596,7 @@ export default async function (context) {
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);
 
-  // ── 1. Resolve feed list ─────────────────────────────────────────────────
+  // ── 1. Resolve feed list ──────────────────────────────────────────────────
   let feedList;
 
   if (customFeedsRaw) {
@@ -337,8 +620,8 @@ export default async function (context) {
     console.log(`Only including items published after: ${sinceCutoff.toISOString()} (last ${sinceHours}h)`);
   }
 
-  // ── 3. RSS parser ─────────────────────────────────────────────────────────
-  const parser = new Parser({
+  // ── 3. RSS parser instance ────────────────────────────────────────────────
+  const rssParser = new Parser({
     timeout: 10000,
     headers: { "User-Agent": "rss-fetcher-bot/1.0" },
     requestOptions: { agent: false },
@@ -360,83 +643,69 @@ export default async function (context) {
   const collectedItems = [];
   const errors = [];
 
-  // ── 5. Fetch feeds ────────────────────────────────────────────────────────
+  // ── 5. Fetch all feeds (RSS + scraper) ────────────────────────────────────
+  const todayIso = new Date().toISOString();
+
   for (const feed of feedList) {
     if (collectedItems.length >= maxItems * 2) break;
 
+    const feedType = feed.type || "rss";
+
     try {
-      process.stdout.write(`Fetching: ${feed.name} ... `);
+      if (feedType === "scraper") {
+        // ── Scraper path ───────────────────────────────────────────────────
+        const rawItems = await fetchFromScraper(feed);
 
-      const parsed = await parser.parseURL(feed.url);
-      const items = parsed.items || [];
+        // Map to common shape: published defaults to today
+        const shaped = rawItems.map((r) => ({
+          title: r.title,
+          link: r.link,
+          published: todayIso,
+        }));
 
-      const relevant = items
-        .map((item) => {
-          const title = stripHtml(item.title || "").toLowerCase();
-          const body = ""; // reserved for future use
+        const relevant = scoreAndFilterItems(
+          shaped, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes
+        );
 
-          let score = 0;
+        console.log(`${rawItems.length} itens extraídos, ${relevant.length} relevantes.`);
 
-          for (const pattern of topicPatterns) {
-            score += scorePattern(title, pattern) * 2;
-            if (body) score += scorePattern(body, pattern);
-          }
+        for (const item of relevant) {
+          if (collectedItems.length >= maxItems * 2) break;
+          collectedItems.push(item);
+        }
 
-          for (const pattern of excludePatterns) {
-            const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-            const regex = new RegExp(escaped, "i");
-            if (regex.test(title)) score -= 2;
-            if (body && regex.test(body)) score -= 1;
-          }
+        // Random delay after each scraper request to avoid rate limiting
+        const delay = randomDelay();
+        console.log(`[scraper] Aguardando ${delay}ms antes do próximo feed...`);
+        await sleep(delay);
 
-          if (score < 2) {
-            console.log(`  [skip] score=${score} "${item.title?.slice(0, 80)}"`);
-            return null;
-          }
+      } else {
+        // ── RSS path (original behaviour, unchanged) ───────────────────────
+        process.stdout.write(`Fetching: ${feed.name} ... `);
 
-          if (sinceCutoff) {
-            const pubDate = item.isoDate || item.pubDate;
-            if (!pubDate) return null;
-            const parsedDate = new Date(pubDate);
-            if (isNaN(parsedDate.getTime())) return null;
-            if (parsedDate < sinceCutoff) return null;
-          }
+        const parsed = await rssParser.parseURL(feed.url);
+        const items = parsed.items || [];
 
-          // ── Cross-execution deduplication ──────────────────────────────
-          const fp = titleFingerprint(title);
-          const matchedKey = findDuplicateInHistory(fp, seenHashes);
-
-          if (matchedKey) {
-            const isExact = matchedKey === fp;
-            const simLabel = isExact ? "exact" : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
-            console.log(`  [skip][dup:${simLabel}] score=${score} "${item.title?.slice(0, 80)}"`);
-            return null;
-          }
-
-          return { item, score, cleanTitle: title, fp };
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.score - a.score);
-
-      console.log(`${items.length} items found, ${relevant.length} relevant.`);
-
-      for (const { item, score, cleanTitle, fp } of relevant) {
-        if (collectedItems.length >= maxItems * 2) break;
-
-        collectedItems.push({
-          title: cleanTitle || stripHtml(item.title || ""),
+        // Map rss-parser items to common shape
+        const shaped = items.map((item) => ({
+          title: item.title || "",
           link: item.link || "",
           published: item.isoDate || item.pubDate || null,
-          summary: stripHtml(item.contentSnippet || item.summary || ""),
-          source: feed.name,
-          source_url: feed.url,
-          language: feed.lang,
-          category: feed.category,
-          score,
-          _fp: fp, // internal — removed before saving
-          fetched_at_item: new Date().toISOString(),
-        });
+          summary: item.contentSnippet || item.summary || "",
+        }));
+
+        const relevant = scoreAndFilterItems(
+          shaped, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes
+        );
+
+        console.log(`${items.length} items found, ${relevant.length} relevant.`);
+
+        for (const item of relevant) {
+          if (collectedItems.length >= maxItems * 2) break;
+          collectedItems.push(item);
+        }
       }
+
     } catch (err) {
       console.log(`ERROR — ${err.message}`);
       errors.push({ feed: feed.name, url: feed.url, error: err.message });
@@ -550,7 +819,6 @@ export default async function (context) {
   }
 
   // 12b. Delete seen_hashes.json if birthtime > keepDays
-  // (secondary mechanism — primary is entry-level purge in loadSeenHashes)
   try {
     const seenHashesPath = path.join(artifactsDir, getSeenHashesFilename(inputId));
     if (fs.existsSync(seenHashesPath)) {
@@ -558,7 +826,7 @@ export default async function (context) {
       const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
       if (ageInDays > keepDays) {
         fs.unlinkSync(seenHashesPath);
-        console.log(`[cleanup] Deleted ${SEEN_HASHES_FILENAME} (created > ${keepDays} days ago).`);
+        console.log(`[cleanup] Deleted seen_hashes file (created > ${keepDays} days ago).`);
       }
     }
   } catch (err) {

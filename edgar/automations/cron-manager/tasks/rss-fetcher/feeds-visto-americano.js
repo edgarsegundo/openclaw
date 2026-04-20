@@ -21,6 +21,7 @@ export const DEFAULT_FEEDS = [
     name: "CNN Brasil - Educação",
     lang: "pt",
     category: "education",
+    type: "rss",
   },
 
   {
@@ -28,6 +29,7 @@ export const DEFAULT_FEEDS = [
     name: "Veja - Vistos",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -35,6 +37,7 @@ export const DEFAULT_FEEDS = [
     name: "Correio da Manhã Canada",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -42,6 +45,7 @@ export const DEFAULT_FEEDS = [
     name: "G1 - Globo",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -49,6 +53,7 @@ export const DEFAULT_FEEDS = [
     name: "Folha de S.Paulo - Mundo",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -56,6 +61,7 @@ export const DEFAULT_FEEDS = [
     name: "UOL Notícias",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -63,6 +69,7 @@ export const DEFAULT_FEEDS = [
     name: "Agência Brasil",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -70,6 +77,7 @@ export const DEFAULT_FEEDS = [
     name: "Exame",
     lang: "pt",
     category: "business",
+    type: "rss",
   },
 
   {
@@ -77,6 +85,7 @@ export const DEFAULT_FEEDS = [
     name: "Reporter Maceió",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -84,6 +93,7 @@ export const DEFAULT_FEEDS = [
     name: 'Google Alerts - "Visto Americano"',
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -91,12 +101,14 @@ export const DEFAULT_FEEDS = [
     name: "Google Alerts - Visto Americano",
     lang: "pt",
     category: "general",
+    type: "rss",
   },
   {
     url: "https://www.google.com.br/alerts/feeds/03835077985665690492/14805574443330081222",
     name: 'Google Alerts - "Visto Canadá"',
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -104,6 +116,7 @@ export const DEFAULT_FEEDS = [
     name: 'Google Alerts - "Visto Canadense"',
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 
   {
@@ -111,6 +124,7 @@ export const DEFAULT_FEEDS = [
     name: 'Google Alerts - "Visto Mexicano"',
     lang: "pt",
     category: "general",
+    type: "rss",
   },
 ];
 

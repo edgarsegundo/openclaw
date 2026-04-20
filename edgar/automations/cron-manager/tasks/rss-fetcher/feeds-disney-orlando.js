@@ -20,7 +20,20 @@ export const DEFAULT_FEEDS = [
     name: 'Google Alerts - "Disney Orlando"',
     lang: "pt",
     category: "general",
+    type: "rss"
   },
+
+  {
+    url: "https://g1.globo.com/tudo-sobre/walt-disney-world/",
+    name: 'G1 - Walt Disney World',
+    lang: "pt",
+    category: "general",
+    type: "scraper",
+    scrap_layout_tips: {
+      link_selector: "a.feed-post-link",
+    }
+  },
+
 ];
 
 /**
