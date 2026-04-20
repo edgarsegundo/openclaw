@@ -279,6 +279,7 @@ export default async function (context) {
   const sinceHours = Number(inputs.since_hours) || 0;
   const category = (inputs.category || "").trim().toLowerCase();
   const feedJsFile = (inputs.feeds_js_file || "").trim() || "feeds.js";
+  const inputId = (inputs.id || "").trim();
 
   // Importação dinâmica do módulo de feeds
   let DEFAULT_FEEDS, parseCustomFeeds;
@@ -512,7 +513,6 @@ export default async function (context) {
 
   // ── 10. Save artifact (only if there are new items) ───────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const inputId = (inputs.id || "").trim();
   const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
 
   if (finalItems.length > 0) {
