@@ -1,8 +1,9 @@
 {
   "id": "rss-artifact-visto-americano",
   "topic": "visto americano",
-  "patterns": "visto americano; us visa; ds-160; consulado; visto; visto mexicano; visto do méxico; visto canadense; visto canadá;",
+  "patterns": "visto americano; us visa; ds-160; consulado; visto;",
   "exclude_patterns": "guerra; irã; rússia; china;",
   "feeds": "",
-  "max_items": 20
+  "max_items": 20,
+  "feeds_js_file": "feeds-visto-americano.js"
 }

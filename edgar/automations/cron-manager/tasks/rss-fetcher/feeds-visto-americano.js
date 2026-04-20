@@ -24,6 +24,13 @@ export const DEFAULT_FEEDS = [
   },
 
   {
+    url: "https://veja.abril.com.br/noticias-sobre/visto/rss/",
+    name: "Veja - Vistos",
+    lang: "pt",
+    category: "general",
+  },
+
+  {
     url: "https://www.correiodamanhacanada.com/feed/",
     name: "Correio da Manhã Canada",
     lang: "pt",
