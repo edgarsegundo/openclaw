@@ -57,7 +57,7 @@ export const DEFAULT_FEEDS = [
     lang: "pt",
     category: "general",
   },
-  
+
   {
     url: "https://exame.com/feed/",
     name: "Exame",
@@ -74,7 +74,7 @@ export const DEFAULT_FEEDS = [
 
   {
     url: "https://www.google.com.br/alerts/feeds/03835077985665690492/8012858652021800071",
-    name: "Google Alerts - \"Visto Americano\"",
+    name: 'Google Alerts - "Visto Americano"',
     lang: "pt",
     category: "general",
   },
@@ -87,18 +87,24 @@ export const DEFAULT_FEEDS = [
   },
   {
     url: "https://www.google.com.br/alerts/feeds/03835077985665690492/14805574443330081222",
-    name: "Google Alerts - \"Visto Canadá\"",
+    name: 'Google Alerts - "Visto Canadá"',
     lang: "pt",
     category: "general",
   },
 
   {
     url: "https://www.google.com.br/alerts/feeds/03835077985665690492/5047037072991100066",
-    name: "Google Alerts - \"Visto Canadense\"",
+    name: 'Google Alerts - "Visto Canadense"',
     lang: "pt",
     category: "general",
   },
 
+  {
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/10072337624775444540",
+    name: 'Google Alerts - "Visto Mexicano"',
+    lang: "pt",
+    category: "general",
+  },
 ];
 
 /**
