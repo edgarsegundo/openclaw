@@ -32,6 +32,8 @@ bots.forEach(({ token, name, channels }) => {
       if (message.author.bot) return;
       if (channels && !channels.includes(message.channel.id)) return;
 
+      console.log(`✅ [${name}] Processing message: "${message.content}" from ${message.author.tag} in channel ${message.channel.name} (${message.channel.id})`);
+
       await dispatch(message, {
         botName: name,
         client,
