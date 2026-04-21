@@ -1,5 +1,5 @@
 {
-  "id": "rss-artifact-disney-orlando",
+  "group": "disney-orlando",
   "topic": "disney orlando",
   "patterns": "disney orlando; disney world; disney parques; parque; parques; viagem; férias;",
   "exclude_patterns": "guerra; irã; rússia; china;",

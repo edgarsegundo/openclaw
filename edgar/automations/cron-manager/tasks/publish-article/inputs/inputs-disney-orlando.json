@@ -1,4 +1,5 @@
 {
+  "group": "disney-orlando",
   "articles_dir": "./artifacts/write-article/disney-orlando",
   "destinations": [
     {

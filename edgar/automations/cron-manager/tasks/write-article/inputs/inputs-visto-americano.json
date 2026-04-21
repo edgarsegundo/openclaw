@@ -1,4 +1,5 @@
 {
+    "group": "visto-americano",
     "rss_picker_file_pattern": "approved-visto-americano-[aaaa-mm-dd].json",
     "current_approved_list_path": "artifacts/rss-picker",
     "output_dir": "artifacts/write-article/visto-americano",

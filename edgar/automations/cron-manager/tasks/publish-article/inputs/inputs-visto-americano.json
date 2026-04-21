@@ -1,4 +1,5 @@
 {
+  "group": "visto-americano",
   "articles_dir": "./artifacts/write-article/visto-americano",
   "destinations": [
     {

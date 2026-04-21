@@ -148,15 +148,15 @@ const JACCARD_THRESHOLD = 0.7;
 
 // ── Seen-hashes persistence ───────────────────────────────────────────────────
 
-function getSeenHashesFilename(inputId) {
-  return inputId ? `seen_hashes-${inputId}.json` : "seen_hashes.json";
+function getSeenHashesFilename(group) {
+  return group ? `seen_hashes-${group}.json` : "seen_hashes.json";
 }
 
 /**
  * Loads the seen-fingerprints map from disk, purges entries older than keepDays.
  */
-function loadSeenHashes(artifactsDir, keepDays, inputId) {
-  const filePath = path.join(artifactsDir, getSeenHashesFilename(inputId));
+function loadSeenHashes(artifactsDir, keepDays, group) {
+  const filePath = path.join(artifactsDir, getSeenHashesFilename(group));
   let hashes = {};
 
   try {
@@ -182,8 +182,8 @@ function loadSeenHashes(artifactsDir, keepDays, inputId) {
   return hashes;
 }
 
-function saveSeenHashes(artifactsDir, hashes, inputId) {
-  const filePath = path.join(artifactsDir, getSeenHashesFilename(inputId));
+function saveSeenHashes(artifactsDir, hashes, group) {
+  const filePath = path.join(artifactsDir, getSeenHashesFilename(group));
   fs.writeFileSync(filePath, JSON.stringify(hashes, null, 2), "utf8");
 }
 
@@ -563,7 +563,12 @@ export default async function (context) {
   const sinceHours = Number(inputs.since_hours) || 0;
   const category = (inputs.category || "").trim().toLowerCase();
   const feedJsFile = (inputs.feeds_js_file || "").trim() || "feeds.js";
-  const inputId = (inputs.id || "").trim();
+  
+  const group = (inputs.group || "").trim();
+  if (!group) {
+    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    return;
+  }
 
   // Dynamic import of feeds module
   let DEFAULT_FEEDS, parseCustomFeeds;
@@ -637,7 +642,7 @@ export default async function (context) {
   const keepDays = 7;
 
   fs.mkdirSync(artifactsDir, { recursive: true });
-  const seenHashes = loadSeenHashes(artifactsDir, keepDays, inputId);
+  const seenHashes = loadSeenHashes(artifactsDir, keepDays, group);
   console.log(`[seen_hashes] Loaded ${Object.keys(seenHashes).length} known fingerprints.\n`);
 
   const collectedItems = [];
@@ -782,7 +787,7 @@ export default async function (context) {
 
   // ── 10. Save artifact (only if there are new items) ───────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const artifactName = inputId ? `${inputId}-${today}` : `raw_news-${today}`;
+  const artifactName = group ? `fetched-items-${group}-${today}` : `fetched-items-${today}`;
 
   if (finalItems.length > 0) {
     await saveArtifact(artifactName, artifact);
@@ -794,7 +799,7 @@ export default async function (context) {
 
   // ── 11. Update seen-hashes with this execution's items ───────────────────
   appendToSeenHashes(seenHashes, finalItems);
-  saveSeenHashes(artifactsDir, seenHashes, inputId);
+  saveSeenHashes(artifactsDir, seenHashes, group);
   console.log(`[seen_hashes] Updated with ${finalItems.length} new fingerprint(s).`);
 
   // ── 12. Cleanup ───────────────────────────────────────────────────────────
@@ -820,7 +825,7 @@ export default async function (context) {
 
   // 12b. Delete seen_hashes.json if birthtime > keepDays
   try {
-    const seenHashesPath = path.join(artifactsDir, getSeenHashesFilename(inputId));
+    const seenHashesPath = path.join(artifactsDir, getSeenHashesFilename(group));
     if (fs.existsSync(seenHashesPath)) {
       const stat = fs.statSync(seenHashesPath);
       const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);

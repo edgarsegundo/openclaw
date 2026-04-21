@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import slugify from "slugify";
 import { notifyDiscord } from "../../lib/discord.js";
 
 /**
@@ -13,8 +12,8 @@ import { notifyDiscord } from "../../lib/discord.js";
  *   Human path — unresolved items < min_items  → notifies Discord only with NEW items
  *                                                 (items not yet sent in a previous run)
  *
- * State is tracked exclusively via a daily status file per topic:
- *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json
+ * State is tracked exclusively via a daily status file per group:
+ *   artifacts/rss-picker/status-<group>-<YYYY-MM-DD>.json
  *
  * Inputs:
  *   rss_fetcher_output_artifact_file_name_pattern  — path pattern with {date} placeholder (required)
@@ -26,8 +25,8 @@ import { notifyDiscord } from "../../lib/discord.js";
  *   item_index     — 1-based index of the item in the fetcher array (manual command)
  *
  * Daily files:
- *   artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json   — resolved + sent items registry
- *   artifacts/rss-picker/approved-<topicSlug>-<YYYY-MM-DD>.json — approved items for article-writer
+ *   artifacts/rss-picker/status-<group>-<YYYY-MM-DD>.json   — resolved + sent items registry
+ *   artifacts/rss-picker/approved-<group>-<YYYY-MM-DD>.json — approved items for article-writer
  *   Both are deleted automatically after 7 days.
  */
 export default async function (context) {
@@ -35,6 +34,12 @@ export default async function (context) {
   const itemIndex = inputs.item_index ?? null;
   const action = inputs.action ?? null;
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
+
+  const group = (inputs.group || "").trim();
+  if (!group) {
+    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    return;
+  }
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -59,14 +64,12 @@ export default async function (context) {
   const fetcherArtifact = JSON.parse(fs.readFileSync(rawNewsPath, "utf-8"));
   const allItems = fetcherArtifact.items || [];
   const topic = fetcherArtifact.topic;
-  const topicSlug = slugify(topic, { lower: true });
 
   console.log(`Topic: ${topic}`);
-  console.log(`Topic slug: ${topicSlug}`);
   console.log(`Found ${allItems.length} total item(s) in today's fetcher file.`);
 
   // ── 2. Load today's status file ──────────────────────────────────────────
-  let { statusData, resolvedSet, sentSet } = loadStatus(topicSlug, today);
+  let { statusData, resolvedSet, sentSet } = loadStatus(group, today);
 
 
   // ── Command: list ─────────────────────────────────────────────
@@ -105,7 +108,7 @@ export default async function (context) {
       console.log(`\n.apr received for item ${itemIndex}: "${item.title}"`);
 
       // Append to today's approved file
-      appendToApproved(topicSlug, today, [
+      appendToApproved(group, today, [
         {
           title: stripHtmlTags(item.title),
           link: sanitizeGoogleLink(item.link),
@@ -118,7 +121,7 @@ export default async function (context) {
 
       // Mark as resolved in status
       statusData = addToStatus(statusData, fetcherIndex, "approved");
-      saveStatus(topicSlug, today, statusData);
+      saveStatus(group, today, statusData);
 
       console.log(`✅ Item ${itemIndex} manually approved and added to approved file.`);
       return;
@@ -129,7 +132,7 @@ export default async function (context) {
       console.log(`\n.del received for item ${itemIndex}: "${item.title}"`);
 
       statusData = addToStatus(statusData, fetcherIndex, "deleted");
-      saveStatus(topicSlug, today, statusData);
+      saveStatus(group, today, statusData);
 
       console.log(`🗑️  Item ${itemIndex} marked as deleted. Will not appear again.`);
       return;
@@ -165,7 +168,7 @@ export default async function (context) {
         sentSet.add(item.fetcherIndex);
       }
       statusData = { ...statusData, sent: Array.from(sentSet) };
-      saveStatus(topicSlug, today, statusData);
+      saveStatus(group, today, statusData);
     } else {
       console.log("No new items to notify. Nothing to do.");
     }
@@ -244,8 +247,8 @@ export default async function (context) {
     approved_at: new Date().toISOString(),
   }));
 
-  const savedCount = appendToApproved(topicSlug, today, newApprovedItems);
-  console.log(`\nAppended ${savedCount} new item(s) to approved-${topicSlug}-${today}.json`);
+  const savedCount = appendToApproved(group, today, newApprovedItems);
+  console.log(`\nAppended ${savedCount} new item(s) to approved-${group}-${today}.json`);
 
   // ── 11. Update status with AI triage results ─────────────────────────────
   // All evaluated items (approved OR rejected) are marked resolved in status,
@@ -263,8 +266,8 @@ export default async function (context) {
     }
   }
 
-  saveStatus(topicSlug, today, statusData);
-  console.log(`Updated status file for topic "${topicSlug}".`);
+  saveStatus(group, today, statusData);
+  console.log(`Updated status file for group "${group}".`);
 
   // ── 12. Delete files older than 7 days ───────────────────────────────────
   const pickerDir = path.resolve("artifacts/rss-picker");
@@ -291,7 +294,7 @@ export default async function (context) {
   console.log("─────────────────────────────────────────────────────────");
   console.log(`✅ Done!`);
   console.log(`   ${savedCount} new item(s) added to today's approved file.`);
-  console.log(`   Next step: run the article-writer task with approved-${topicSlug}-${today}.json.`);
+  console.log(`   Next step: run the article-writer task with approved-${group}-${today}.json.`);
 }
 
 // ── Status file helpers ───────────────────────────────────────────────────────
@@ -304,15 +307,15 @@ const DISCORD_MSG_MAX_LENGTH = 1800;
  *   resolvedSet — Set<number> of fetcher_index values already resolved (approved/deleted)
  *   sentSet     — Set<number> of fetcher_index values already sent to Discord
  */
-function loadStatus(topicSlug, today) {
+function loadStatus(group, today) {
   const statusPath = path.resolve(
-    `artifacts/rss-picker/status-${topicSlug}-${today}.json`
+    `artifacts/rss-picker/status-${group}-${today}.json`
   );
 
   if (!fs.existsSync(statusPath)) {
     return {
       statusData: {
-        topic_slug: topicSlug,
+        group: group,
         date: today,
         resolved: [],
         sent: [],
@@ -332,9 +335,9 @@ function loadStatus(topicSlug, today) {
 /**
  * Persist the status object to disk.
  */
-function saveStatus(topicSlug, today, statusData) {
+function saveStatus(group, today, statusData) {
   const statusPath = path.resolve(
-    `artifacts/rss-picker/status-${topicSlug}-${today}.json`
+    `artifacts/rss-picker/status-${group}-${today}.json`
   );
   fs.writeFileSync(statusPath, JSON.stringify(statusData, null, 2), "utf-8");
 }
@@ -364,9 +367,9 @@ function addToStatus(statusData, fetcherIndex, action) {
  * Skips items whose real URL is already in the file (deduplication across runs).
  * Returns the number of items actually written.
  */
-function appendToApproved(topicSlug, today, newItems) {
+function appendToApproved(group, today, newItems) {
   const filePath = path.resolve(
-    `artifacts/rss-picker/approved-${topicSlug}-${today}.json`
+    `artifacts/rss-picker/approved-${group}-${today}.json`
   );
 
   let existing = [];
@@ -383,7 +386,7 @@ function appendToApproved(topicSlug, today, newItems) {
   }
 
   const updated = {
-    topic_slug: topicSlug,
+    group: group,
     date: today,
     total_approved: existing.length + toAdd.length,
     items: [...existing, ...toAdd],

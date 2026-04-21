@@ -1,6 +1,0 @@
-{
-  "rss_fetcher_output_artifact_file_name_pattern": "artifacts/rss-fetcher/rss-artifact-visto-canadense-{date}.json",
-  "blog_context": "Blog voltado para brasileiros interessados em assuntos ligados ao visto canadense e aos serviços consulares do Canadá. O público busca informações práticas, atualizadas e confiáveis sobre solicitação, renovação, entrevistas, documentação, mudanças nas regras, notícias do consulado e outros temas relacionados ao processo consular.",
-  "min_items": 20,
-  "min_score": 7
-}

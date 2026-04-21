@@ -22,13 +22,13 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *     in today's status file, runs execute-publish-script + Google Indexing API,
  *     updates status to "published", and notifies Discord with the result.
  *
- * Status file (per articles_dir, per day):
- *   {articles_dir}/status-<YYYY-MM-DD>.json
+ * Status file (per groupDir, per day):
+ *   {groupDir}/status-<YYYY-MM-DD>.json
  *   Tracks every article that passed through Part 1 today, with sequential
  *   0-based indices that are permanent for the day.
  *
  * Inputs:
- *   articles_dir  — path to folder containing generated article *.json/*.md files (required)
+ *   groupDir  — path to folder containing generated article *.json/*.md files (required)
  *   destinations  — array of { business_id, blog_topic_slug, sitemap_url, site_id } (required)
  *   action        — "pub" (manual Discord command, triggers Part 2)
  *   item_index    — 0-based index from today's status file (for .pub N command)
@@ -38,8 +38,8 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *   GOOGLE_APPLICATION_CREDENTIALS         — path to Google Service Account JSON
  *
  * State files:
- *   {articles_dir}/publish-article.roundrobin.json — round-robin index (Part 1 only)
- *   {articles_dir}/status-<YYYY-MM-DD>.json        — daily article status registry
+ *   {groupDir}/publish-article.roundrobin.json — round-robin index (Part 1 only)
+ *   {groupDir}/status-<YYYY-MM-DD>.json        — daily article status registry
  *
  * Endpoint:
  *   POST http://localhost:3900/blog-article
@@ -50,6 +50,12 @@ export default async function (context) {
   const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
 
+  const group = (inputs.group || "").trim();
+  if (!group) {
+    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    return;
+  }
+
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
   // ── Validate core inputs ─────────────────────────────────────────────────
@@ -58,6 +64,9 @@ export default async function (context) {
   const itemIndex = inputs.item_index ?? null;
 
   if (!articlesDir) throw new Error("Missing required input: articles_dir");
+
+  const groupDir = path.join(articlesDir, group); // always "./artifacts/write-article/group"
+  
   if (!Array.isArray(destinations) || destinations.length === 0) {
     throw new Error("Missing required input: destinations (must be a non-empty array)");
   }
@@ -272,8 +281,8 @@ export default async function (context) {
 
   // ── 9. Clean up old files ─────────────────────────────────────────────────
   await cleanOldFiles(publishedDir, 7);
-  // Also clean up old status files in articles_dir
-  await cleanOldStatusFiles(articlesDir, 7);
+  // Also clean up old status files in groupDir
+  await cleanOldStatusFiles(groupDir, 7);
 
   console.log("\n✅ Done!");
 }
@@ -548,7 +557,7 @@ async function cleanOldFiles(dir, days) {
 }
 
 /**
- * Deletes status-<YYYY-MM-DD>.json files in articles_dir older than `days` days.
+ * Deletes status-<YYYY-MM-DD>.json files in groupDir older than `days` days.
  */
 async function cleanOldStatusFiles(articlesDir, days) {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;

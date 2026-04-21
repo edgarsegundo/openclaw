@@ -1,4 +1,5 @@
 {
+    "group": "disney-orlando",
     "rss_picker_file_pattern": "approved-disney-orlando-[aaaa-mm-dd].json",
     "current_approved_list_path": "artifacts/rss-picker",
     "output_dir": "artifacts/write-article/disney-orlando",
