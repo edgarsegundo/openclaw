@@ -12,14 +12,18 @@ export default {
   description: "Aprova artigo por índice",
 
   async execute({ message, args, botName }) {
+    const channelId = message.channel.id;
+    const channelName = message.channel.name;
+
     const index = args[0];
     if (!Number.isInteger(Number(args[0]))) {
       return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: .apr 1");
-    }    
+    }
+
     try {
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
+        `../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-${channelName}.json`
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));

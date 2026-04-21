@@ -17,11 +17,14 @@ export default {
       return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: .pub 1");
     }
 
+    const channelId = message.channel.id;
+    const channelName = message.channel.name;
+
     await message.reply(`⏳ Publicando artigo ${index}...`);
     try {
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/publish-article/inputs/inputs-visto-americano.json"
+        `../../../automations/cron-manager/tasks/publish-article/inputs/inputs-${channelName}.json`
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));

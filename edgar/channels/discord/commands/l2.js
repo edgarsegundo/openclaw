@@ -13,10 +13,13 @@ export default {
 
   async execute({ message, args, botName }) {
     await message.reply(`✅ Listando artigos`);
+    const channelId = message.channel.id;
+    const channelName = message.channel.name;
+
     try {
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/publish-article/inputs/inputs-visto-americano.json"
+        `../../../automations/cron-manager/tasks/publish-article/inputs/inputs-${channelName}.json`
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));

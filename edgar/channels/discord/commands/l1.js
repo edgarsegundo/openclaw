@@ -23,12 +23,11 @@ export default {
       console.log(`Executing .l1 with botName: ${botName}`);
       const inputPath = path.resolve(
         __dirname,
-        "../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-visto-americano.json"
+        `../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-${channelName}.json`
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
       inputObj.action = "l1";
-      inputObj.botName = botName;
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
       const cmd =
