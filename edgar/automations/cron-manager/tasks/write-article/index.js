@@ -35,8 +35,14 @@ export default async function (context) {
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
+  const group = (inputs.group || "").trim();
+  if (!group) {
+    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    return;
+  }
+
   // ─── Validate output directory ────────────────────────────────────────────
-  const outputDir = inputs.output_dir;
+  const outputDir = path.join(inputs.output_dir, group);
   if (!outputDir) {
     throw new Error("Missing required input: output_dir");
   }
@@ -48,7 +54,12 @@ export default async function (context) {
   // ─── Resolve file path with date pattern ──────────────────────────────────
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const pattern = inputs.rss_picker_file_pattern;
-  const resolvedFilename = pattern.replace("[aaaa-mm-dd]", today);
+
+  const resolvedFilename = 
+    pattern
+      .replace("{group}", group)
+      .replace("{date}", today)
+  
   const listPath = path.join(inputs.current_approved_list_path, resolvedFilename);
   const indexPath = path.join(
     inputs.current_approved_list_path,
