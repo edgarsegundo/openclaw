@@ -149,7 +149,7 @@ export default async function (context) {
     await saveStatus(articlesDir, today, updatedStatus);
 
     // Notify Discord
-    await notifyIndexingResult(entry.slug, apiResult, discordWebhookUrl);
+    await notifyIndexingResult(entry.slug, apiResult, json.site_id, discordWebhookUrl);
 
     console.log("\n✅ Part 2 done!");
     return;
@@ -373,13 +373,13 @@ async function sendPublishedList(statusData, articlesDir, newIndex, discordWebho
 /**
  * Notify Discord with the result of the Part 2 indexing action.
  */
-async function notifyIndexingResult(slug, apiResult, discordWebhookUrl) {
+async function notifyIndexingResult(slug, apiResult, siteId, discordWebhookUrl) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const apiIcon = apiResult.ok ? "✅" : "❌";
   let msg = apiResult.ok
-    ? `✅ Indexação e publicação concluída para: ${slug}`
-    : `⚠️ Indexação com erros para: ${slug}`;
+    ? `✅ Indexação e publicação concluída para: ${slug} em site_id=${siteId}`
+    : `⚠️ Indexação com erros para: ${slug} em site_id=${siteId}`;
 
   msg += `\n   Indexing API: ${apiIcon}`;
   if (!apiResult.ok && apiResult.error) {
