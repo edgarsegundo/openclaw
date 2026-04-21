@@ -55,7 +55,7 @@ artifacts/rss-picker/status-<topicSlug>-<YYYY-MM-DD>.json
 
 | Input | Tipo | Default | Descrição |
 |---|---|---|---|
-| `rss_fetcher_output_artifact_file_name_pattern` | string | — | Padrão com `{date}`, ex: `artifacts/rss-fetcher/rss-artifact-visto-americano-{date}.json` |
+| `rss_fetcher_output_artifact_file_name_pattern` | string | — | Padrão com `{date}`, ex: `artifacts/rss-fetcher/fetched-items-{group}-americano-{date}.json` |
 | `blog_context` | string | — | Contexto do blog para a IA |
 | `min_items` | number | 3 | Mínimo de itens não-resolvidos para acionar IA |
 | `min_score` | number | 7 | Score mínimo para aprovação pela IA |

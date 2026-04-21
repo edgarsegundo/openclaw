@@ -17,7 +17,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  *
  * Inputs:
  *   rss_fetcher_output_artifact_file_name_pattern  — path pattern with {date} placeholder (required)
- *                    e.g. "artifacts/rss-fetcher/rss-artifact-visto-americano-{date}.json"
+ *                    e.g. "artifacts/rss-fetcher/fetched-items-{group}-{date}.json"
  *   blog_context   — description of your blog and audience (optional)
  *   min_items      — minimum unresolved items required to trigger AI triage (default: 3)
  *   min_score      — minimum relevance score 0-10 to publish an item (default: 7)
@@ -51,7 +51,9 @@ export default async function (context) {
 
   const today = new Date().toISOString().slice(0, 10);
   const rawNewsPath = path.resolve(
-    inputs.rss_fetcher_output_artifact_file_name_pattern.replace("{date}", today)
+    inputs.rss_fetcher_output_artifact_file_name_pattern
+      .replace("{group}", group)
+      .replace("{date}", today)
   );
 
   console.log(`\nLooking for today's fetcher file: ${rawNewsPath}`);

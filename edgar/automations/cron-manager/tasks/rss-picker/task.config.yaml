@@ -15,7 +15,7 @@ inputs:
   - name: rss_fetcher_output_artifact_file_name_pattern
     type: string
     required: true
-    help_tip: "Path pattern to today's rss-fetcher artifact. Use {date} as placeholder for today's date. e.g. artifacts/rss-fetcher/rss-artifact-visto-americano-{date}.json"
+    help_tip: "Path pattern to today's rss-fetcher artifact. Use {group} and {date} as placeholders for the group name and today's date. e.g. artifacts/rss-fetcher/fetched-items-{group}-{date}.json"
 
   - name: blog_context
     type: string
