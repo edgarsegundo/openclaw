@@ -48,6 +48,7 @@ import { submitToIndexingApi } from "./google-indexing.js";
 export default async function (context) {
   const { taskName, mode, executionId, inputs } = context;
   const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
+  const discordWebhookUrl = inputs.discord_webhook_url ?? null;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -73,11 +74,11 @@ export default async function (context) {
 
     if (!statusData.articles.length) {
       const { notifyDiscord } = await import("../../lib/discord.js");
-      await notifyDiscord("📭 Nenhum artigo encontrado hoje.");
+      await notifyDiscord("📭 Nenhum artigo encontrado hoje.", discordWebhookUrl);
       return;
     }
 
-    await sendFullListToDiscord(statusData, articlesDir);
+    await sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl);
 
     console.log("✅ List sent to Discord!");
     return;
@@ -119,7 +120,7 @@ export default async function (context) {
     if (!publishSuccess) {
       console.error("POST to execute-publish-script failed.");
       const { notifyDiscord } = await import("../../lib/discord.js");
-      await notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`);
+      await notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`, discordWebhookUrl);
       return;
     }
 
@@ -139,7 +140,7 @@ export default async function (context) {
     await saveStatus(articlesDir, today, updatedStatus);
 
     // Notify Discord
-    await notifyIndexingResult(entry.slug, apiResult);
+    await notifyIndexingResult(entry.slug, apiResult, discordWebhookUrl);
 
     console.log("\n✅ Part 2 done!");
     return;
@@ -267,7 +268,7 @@ export default async function (context) {
   // ── 8. Send Discord notification ──────────────────────────────────────────
   // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
   // The article just saved is highlighted as 🆕.
-  await sendPublishedList(statusData, articlesDir, newIndex);
+  await sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl);
 
   // ── 9. Clean up old files ─────────────────────────────────────────────────
   await cleanOldFiles(publishedDir, 7);
@@ -323,7 +324,7 @@ const DISCORD_MSG_MAX_LENGTH = 1800;
  * Sorted newest-first (descending index) so the new article appears at the top.
  * The article with index === newIndex is highlighted with 🆕.
  */
-async function sendPublishedList(statusData, articlesDir, newIndex) {
+async function sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
@@ -342,7 +343,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
     const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      await notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -351,7 +352,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
   }
 
   if (currentMsg.trim()) {
-    await notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg, discordWebhookUrl);
     sentMessages++;
   }
 
@@ -363,7 +364,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex) {
 /**
  * Notify Discord with the result of the Part 2 indexing action.
  */
-async function notifyIndexingResult(slug, apiResult) {
+async function notifyIndexingResult(slug, apiResult, discordWebhookUrl) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const apiIcon = apiResult.ok ? "✅" : "❌";
@@ -376,7 +377,7 @@ async function notifyIndexingResult(slug, apiResult) {
     msg += `\n   Erro: ${apiResult.error}`;
   }
 
-  await notifyDiscord(msg);
+  await notifyDiscord(msg, discordWebhookUrl);
 }
 
 // ── File helpers ──────────────────────────────────────────────────────────────
@@ -573,7 +574,7 @@ async function cleanOldStatusFiles(articlesDir, days) {
   }
 }
 
-async function sendFullListToDiscord(statusData, articlesDir) {
+async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
@@ -594,7 +595,7 @@ async function sendFullListToDiscord(statusData, articlesDir) {
 
     // Se estourar limite do Discord
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
-      await notifyDiscord(currentMsg);
+      await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
       currentMsg = continuation + line;
     } else {
@@ -603,7 +604,7 @@ async function sendFullListToDiscord(statusData, articlesDir) {
   }
 
   if (currentMsg.trim()) {
-    await notifyDiscord(currentMsg);
+    await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
   }
 
