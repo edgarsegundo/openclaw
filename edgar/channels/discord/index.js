@@ -33,6 +33,8 @@ bots.forEach(({ token, name, channelId }) => {
       await dispatch(message, {
         botName: name,
         client,
+        // channelId: message.channel.id,
+        // channelName: message.channel.name,        
       });
     } catch (err) {
       console.error(`[${name}] Erro:`, err);

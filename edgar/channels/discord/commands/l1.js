@@ -13,6 +13,11 @@ export default {
 
   async execute({ message, args, botName }) {
     await message.reply(`✅ Listando artigos`);
+    const channelId = message.channel.id;
+    const channelName = message.channel.name;
+
+    console.log(`.l1 command executed by ${message.author.tag} in channel ${channelName} (${channelId}) with botName: ${botName}`); 
+
     try {
 
       console.log(`Executing .l1 with botName: ${botName}`);
