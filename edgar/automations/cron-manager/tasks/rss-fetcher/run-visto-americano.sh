@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
 LOCK_FILE="/tmp/rss-fetcher-visto-americano.lock"
@@ -9,16 +9,50 @@ cd "$BASE" || exit 1
 # Garante que o lock seja removido ao sair (mesmo em caso de erro)
 trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
-[ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
-[ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env' | xargs)
+# Carrega .env com mais segurança
+if [ -f "/home/ubuntu/openclaw/edgar/automations/ai-client/.env" ]; then
+  set -a
+  source /home/ubuntu/openclaw/edgar/automations/ai-client/.env
+  set +a
+fi
 
-# Executa rss-fetcher
+if [ -f "/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env" ]; then
+  set -a
+  source /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-picker/.env
+  set +a
+fi
+
+# =========================
+# [1/2] rss-fetcher
+# =========================
 echo "[1/2] Rodando rss-fetcher..."
-node cron-manager.js run rss-fetcher --template skip --input-file tasks/rss-fetcher/inputs/inputs-visto-americano.json
 
-echo "[2/2] Rodando rss-picker..."  
-node cron-manager.js run rss-picker --template feed-selector-news-related --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
-echo "exit code: $?"
+FETCH_EXIT=0
+node cron-manager.js run rss-fetcher \
+  --template skip \
+  --input-file tasks/rss-fetcher/inputs/inputs-visto-americano.json \
+  || FETCH_EXIT=$?
+
+if [ "$FETCH_EXIT" -ne 0 ]; then
+  echo "⚠️ rss-fetcher falhou (exit $FETCH_EXIT), continuando..."
+else
+  echo "✅ rss-fetcher OK"
+fi
+
+echo "exit fetcher: $FETCH_EXIT"
+
+# =========================
+# [2/2] rss-picker
+# =========================
+echo "[2/2] Rodando rss-picker..."
+
+node cron-manager.js run rss-picker \
+  --template feed-selector-news-related \
+  --input-file tasks/rss-picker/inputs/inputs-visto-americano.json
+
+PICKER_EXIT=$?
+
+echo "exit picker: $PICKER_EXIT"
 
 echo "Sequência finalizada com sucesso."
 
