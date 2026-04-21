@@ -28,13 +28,12 @@ bots.forEach(({ token, name, channelId }) => {
 
   client.on("messageCreate", async (message) => {
     try {
+      console.log(`📩 [${name}] Received message: "${message.content}" from ${message.author.tag} in channel ${message.channel.name} (${message.channel.id})`);
       if (message.author.bot) return;
       if (channelId && message.channel.id !== channelId) return;
       await dispatch(message, {
         botName: name,
         client,
-        // channelId: message.channel.id,
-        // channelName: message.channel.name,        
       });
     } catch (err) {
       console.error(`[${name}] Erro:`, err);
