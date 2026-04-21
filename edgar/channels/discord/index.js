@@ -7,7 +7,7 @@ import bots from "./bots.config.js";
 
 const clients = [];
 
-bots.forEach(({ token, name, channelId }) => {
+bots.forEach(({ token, name, channels }) => {
   if (!token) {
     throw new Error(`❌ Token não definido para ${name}`);
   }
@@ -30,7 +30,8 @@ bots.forEach(({ token, name, channelId }) => {
     try {
       console.log(`📩 [${name}] Received message: "${message.content}" from ${message.author.tag} in channel ${message.channel.name} (${message.channel.id})`);
       if (message.author.bot) return;
-      if (channelId && message.channel.id !== channelId) return;
+      if (channels && !channels.includes(message.channel.id)) return;
+
       await dispatch(message, {
         botName: name,
         client,
