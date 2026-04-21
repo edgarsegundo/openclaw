@@ -6,7 +6,7 @@ BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
 LOCK_FILE="/tmp/publish-article.lock"
 cd "$BASE" || exit 1
 
-# Garante que o lock seja removido ao sair (mesmo em caso de erro)c
+# Garante que o lock seja removido ao sair (mesmo em caso de erro)
 trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
