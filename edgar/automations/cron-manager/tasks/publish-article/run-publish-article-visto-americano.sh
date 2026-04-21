@@ -12,11 +12,12 @@ trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' | xargs)
 
-# Executa publish-article
+# Executa publish-article for each input file
 echo "[1/1] Rodando publish-article..."
 node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-visto-americano.json
+node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-disney-orlando.json
 
-echo "✅ Execução finalizada com sucesso."
+echo "✅ Execuções finalizadas com sucesso."
 
 # ============================================================================
 # Como agendar este script no cron:
