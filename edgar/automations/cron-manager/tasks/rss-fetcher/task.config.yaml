@@ -148,9 +148,3 @@ inputs:
 #     path: "article-{slug}.json"
 #     dynamic: true
 #     path_key: title             # artifact.title is slugified → filename
-
-artifacts:
-  - name: raw_news
-    description: Raw collected news items from RSS feeds, filtered by topic
-    template: none
-    path: raw_news.json

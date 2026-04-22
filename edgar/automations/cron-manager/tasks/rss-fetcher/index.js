@@ -785,14 +785,49 @@ export default async function (context) {
     }
   }
 
-  // ── 10. Save artifact (only if there are new items) ───────────────────────
+  // ── 10. Save artifact (merge with existing day file) ──────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const artifactName = group ? `fetched-items-${group}-${today}` : `fetched-items-${today}`;
+  const artifactName = group
+    ? `fetched-items-${group}-${today}`
+    : `fetched-items-${today}`;
 
   if (finalItems.length > 0) {
-    await saveArtifact(artifactName, artifact);
-    console.log(`\nArtifact saved: ${artifactName}.json`);
-    console.log("Next step: run the article-writer task consuming this artifact.");
+    // Tenta carregar o artefato já existente do dia via fs
+    let existingItems = [];
+    const artifactPath = path.join(artifactsDir, `${artifactName}.json`);
+    try {
+      const raw = fs.readFileSync(artifactPath, "utf8");
+      const existingArtifact = JSON.parse(raw);
+      if (Array.isArray(existingArtifact?.items)) {
+        existingItems = existingArtifact.items;
+      }
+    } catch {
+      // Arquivo ainda não existe — primeira execução do dia
+    }
+
+    // Mescla e deduplica por link
+    const mergedMap = new Map();
+    for (const item of [...existingItems, ...finalItems]) {
+      if (!mergedMap.has(item.link)) {
+        mergedMap.set(item.link, item);
+      }
+    }
+
+    const mergedItems = [...mergedMap.values()].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const da = a.published ? new Date(a.published) : 0;
+      const db = b.published ? new Date(b.published) : 0;
+      return db - da;
+    });
+
+    const mergedArtifact = {
+      ...artifact,
+      total_items_collected: mergedItems.length,
+      items: mergedItems,
+    };
+
+    await saveArtifact(artifactName, mergedArtifact);
+    console.log(`\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${finalItems.length} novos)`);
   } else {
     console.log(`\nNo new items — artifact not overwritten (${artifactName}.json preserved).`);
   }
@@ -809,7 +844,7 @@ export default async function (context) {
   try {
     const files = fs.readdirSync(artifactsDir);
     for (const file of files) {
-      const match = file.match(/^raw_news-(\d{4}-\d{2}-\d{2})\.json$/);
+      const match = file.match(/^fetched-items-.*-(\d{4}-\d{2}-\d{2})\.json$/);
       if (match) {
         const fileDate = new Date(match[1]);
         const diffDays = (now - fileDate) / (1000 * 60 * 60 * 24);
@@ -821,20 +856,5 @@ export default async function (context) {
     }
   } catch (err) {
     console.warn("[cleanup] Failed to delete old artifacts:", err.message);
-  }
-
-  // 12b. Delete seen_hashes.json if birthtime > keepDays
-  try {
-    const seenHashesPath = path.join(artifactsDir, getSeenHashesFilename(group));
-    if (fs.existsSync(seenHashesPath)) {
-      const stat = fs.statSync(seenHashesPath);
-      const ageInDays = (now - stat.birthtime) / (1000 * 60 * 60 * 24);
-      if (ageInDays > keepDays) {
-        fs.unlinkSync(seenHashesPath);
-        console.log(`[cleanup] Deleted seen_hashes file (created > ${keepDays} days ago).`);
-      }
-    }
-  } catch (err) {
-    console.warn("[cleanup] Failed to check/delete seen_hashes.json:", err.message);
   }
 }
