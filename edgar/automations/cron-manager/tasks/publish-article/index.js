@@ -378,8 +378,8 @@ async function notifyIndexingResult(slug, apiResult, siteId, discordWebhookUrl) 
 
   const apiIcon = apiResult.ok ? "✅" : "❌";
   let msg = apiResult.ok
-    ? `✅ Indexação e publicação concluída para: ${slug} em site_id=${siteId}`
-    : `⚠️ Indexação com erros para: ${slug} em site_id=${siteId}`;
+    ? `✅ Indexação e publicação concluída para '${slug}' com site-id da '${siteId}'`
+    : `⚠️ Indexação com erros para: '${slug}' com site-id da '${siteId}'`;
 
   msg += `\n   Indexing API: ${apiIcon}`;
   if (!apiResult.ok && apiResult.error) {

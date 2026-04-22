@@ -34,6 +34,33 @@ export const DEFAULT_FEEDS = [
     }
   },
 
+  {
+    url: "https://www.bbc.com/portuguese",
+    name: 'BBC - Portuguese',
+    lang: "pt",
+    category: "general",
+    type: "scraper"
+  },  
+
+  {
+    url: "https://gauchazh.clicrbs.com.br/ultimas-noticias/tag/visto-americano/",
+    name: 'Gauchazh - Visto Americano',
+    lang: "pt",
+    category: "general",
+    type: "scraper",
+  },
+
+  {
+    url: "https://exame.com/noticias-sobre/visto-eua/",
+    name: 'Exame - Visto EUA',
+    lang: "pt",
+    category: "general",
+    type: "scraper",
+    scrap_layout_tips: {
+      link_selector: "a.touch-area",
+    }
+  },
+
 ];
 
 /**
