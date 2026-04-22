@@ -50,20 +50,20 @@ export default async function (context) {
   fs.mkdirSync(path.resolve("artifacts/rss-picker"), { recursive: true });
 
   const today = new Date().toISOString().slice(0, 10);
-  const rawNewsPath = path.resolve(
+  const fetcherArtifactFilePath = path.resolve(
     inputs.rss_fetcher_output_artifact_file_name_pattern
       .replace("{group}", group)
       .replace("{date}", today)
   );
 
-  console.log(`\nLooking for today's fetcher file: ${rawNewsPath}`);
+  console.log(`\nLooking for today's fetcher file: ${fetcherArtifactFilePath}`);
 
-  if (!fs.existsSync(rawNewsPath)) {
+  if (!fs.existsSync(fetcherArtifactFilePath)) {
     console.log("File not found. rss-fetcher may not have run yet today. Exiting.");
     return;
   }
 
-  const fetcherArtifact = JSON.parse(fs.readFileSync(rawNewsPath, "utf-8"));
+  const fetcherArtifact = JSON.parse(fs.readFileSync(fetcherArtifactFilePath, "utf-8"));
   const allItems = fetcherArtifact.items || [];
   const topic = fetcherArtifact.topic;
 
@@ -72,7 +72,6 @@ export default async function (context) {
 
   // ── 2. Load today's status file ──────────────────────────────────────────
   let { statusData, resolvedSet, sentSet } = loadStatus(group, today);
-
 
   // ── Command: list ─────────────────────────────────────────────
   if (action === "l1") {
@@ -86,12 +85,12 @@ export default async function (context) {
 
   // ── 3. Process manual command (.apr N or .del N) ─────────────────────────
   if (action !== null && itemIndex !== null) {
-    const fetcherIndex = Number(itemIndex); // convert 1-based → 0-based
+    const fetcherIndex = Number(itemIndex); // 0-based, conforme exibido no Discord
 
     if (fetcherIndex < 0 || fetcherIndex >= allItems.length) {
       console.log(
         `item_index (${itemIndex}) out of range. ` +
-        `Fetcher has ${allItems.length} item(s) (valid range: 1–${allItems.length}).`
+        `Fetcher has ${allItems.length} item(s) (valid range: 0–${allItems.length - 1}).`
       );
       return;
     }
@@ -104,6 +103,7 @@ export default async function (context) {
     }
 
     const item = allItems[fetcherIndex];
+    console.log(`Resolvendo item [${fetcherIndex}]: "${item.title}"`);
 
     if (action === "apr") {
       // Approve manually — bypass AI
@@ -196,10 +196,16 @@ export default async function (context) {
     console.log(`Removed ${removedDupes} duplicate(s) before AI triage.`);
   }
 
-  // Build link → fetcherIndex map so we can write status after AI responds
+  // Build link → fetcherIndex map (array para cobrir duplicatas de URL real).
+  // Inclui tanto os itens que passaram na deduplicação quanto os descartados,
+  // garantindo que todos os índices sejam marcados como resolvidos no status.
   const linkToFetcherIndex = {};
-  for (const item of deduplicated) {
-    linkToFetcherIndex[extractRealUrl(item.link)] = item.fetcherIndex;
+  for (const item of unresolvedItems) {
+    const url = extractRealUrl(item.link);
+    if (!linkToFetcherIndex[url]) linkToFetcherIndex[url] = [];
+    if (!linkToFetcherIndex[url].includes(item.fetcherIndex)) {
+      linkToFetcherIndex[url].push(item.fetcherIndex);
+    }
   }
 
   // ── 7. Prepare items for AI ──────────────────────────────────────────────
@@ -255,16 +261,19 @@ export default async function (context) {
   // ── 11. Update status with AI triage results ─────────────────────────────
   // All evaluated items (approved OR rejected) are marked resolved in status,
   // so they are never sent to the AI again or shown in Discord notifications.
+  // Itera sobre todos os fetcherIndex associados à URL real (cobre duplicatas).
   for (const result of artifact.results) {
-    const fi = linkToFetcherIndex[extractRealUrl(result.link)];
-    if (fi === undefined) {
+    const indices = linkToFetcherIndex[extractRealUrl(result.link)];
+    if (!indices?.length) {
       console.log(`Warning: could not find fetcher_index for link: ${result.link}`);
       continue;
     }
-    if (!resolvedSet.has(fi)) {
-      const resultAction = result.score >= minScore ? "approved" : "deleted";
-      statusData = addToStatus(statusData, fi, resultAction);
-      resolvedSet.add(fi); // keep in-memory set consistent
+    const resultAction = result.score >= minScore ? "approved" : "deleted";
+    for (const fi of indices) {
+      if (!resolvedSet.has(fi)) {
+        statusData = addToStatus(statusData, fi, resultAction);
+        resolvedSet.add(fi); // keep in-memory set consistent
+      }
     }
   }
 

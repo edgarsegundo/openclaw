@@ -805,20 +805,18 @@ export default async function (context) {
       // Arquivo ainda não existe — primeira execução do dia
     }
 
-    // Mescla e deduplica por link
-    const mergedMap = new Map();
-    for (const item of [...existingItems, ...finalItems]) {
-      if (!mergedMap.has(item.link)) {
-        mergedMap.set(item.link, item);
-      }
-    }
+    // Mescla: existentes mantêm posição/índice fixos, novos vão ao final ordenados por score
+    const existingLinks = new Set(existingItems.map((i) => i.link));
+    const trulyNewItems = finalItems.filter((i) => !existingLinks.has(i.link));
 
-    const mergedItems = [...mergedMap.values()].sort((a, b) => {
+    trulyNewItems.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const da = a.published ? new Date(a.published) : 0;
       const db = b.published ? new Date(b.published) : 0;
       return db - da;
     });
+
+    const mergedItems = [...existingItems, ...trulyNewItems];
 
     const mergedArtifact = {
       ...artifact,
