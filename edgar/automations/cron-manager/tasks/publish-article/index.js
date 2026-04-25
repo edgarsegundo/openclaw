@@ -89,7 +89,7 @@ export default async function (context) {
       return;
     }
 
-    await sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl);
+    await sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl, group, null);
 
     console.log("✅ List sent to Discord!");
     return;
@@ -278,6 +278,7 @@ export default async function (context) {
     status: "saved",
     saved_at: new Date().toISOString(),
     published_at: null,
+    blog_article_id: blog_article_id,
   };
 
   statusData.articles.push(newEntry);
@@ -607,7 +608,13 @@ async function cleanOldStatusFiles(articlesDir, days) {
   }
 }
 
-async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl) {
+async function sendFullListToDiscord(
+  statusData,
+  articlesDir,
+  discordWebhookUrl,
+  group,
+  blog_article_id,
+) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
@@ -624,7 +631,14 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl)
   for (const article of sorted) {
     const statusIcon = article.status === "published" ? "✅" : "💾";
 
-    const line = `\n[${article.index}] ${article.slug} ${statusIcon}`;
+    let safeLink = "";
+    if (article.status === "published") {
+      safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${blog_article_id}&group=${group}`;
+      currentMsg += `\n[${article.index}] ${article.slug} ${statusIcon} - [Editar](<${safeLink}>)`;
+      continue;
+    }
+    const editLink = article.status === "published" ? ` - [Editar](<${safeLink}>)` : "";
+    const line = `\n[${article.index}] ${article.slug} ${statusIcon}${editLink}`;
 
     // Se estourar limite do Discord
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
