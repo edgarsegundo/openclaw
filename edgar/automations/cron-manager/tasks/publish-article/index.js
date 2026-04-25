@@ -243,7 +243,9 @@ export default async function (context) {
     return;
   }
 
-  const blog_article_id = apiResult.article.id ?? null;
+  // grava sem traços os blog_article_id para passar como query param pro editor de imagens do MsitesApp, que tem problema com traços no ID
+  const blog_article_id = (apiResult.article.id ?? "").replace(/-/g, "") || null;
+
   console.log(`** Article posted successfully with ID: ${blog_article_id}`);
 
   // return { error: true, status: res.status, article: null };
