@@ -97,6 +97,7 @@ export default async function (context) {
       discordWebhookUrl,
       group,
       statusData.blog_article_id,
+      apiKey,
     );
 
     console.log("✅ List sent to Discord!");
@@ -623,6 +624,7 @@ async function sendFullListToDiscord(
   discordWebhookUrl,
   group,
   blog_article_id,
+  apiKey,
 ) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
