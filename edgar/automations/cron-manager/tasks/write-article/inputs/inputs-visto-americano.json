@@ -1,8 +1,8 @@
 {
-    "group": "visto-americano",
-    "rss_picker_file_pattern": "approved-{group}-{date}.json",
-    "current_approved_list_path": "artifacts/rss-picker",
-    "output_dir": "artifacts/write-article",
-    "language": "pt-BR",
-    "blog_context": "Blog voltado para brasileiros que querem tirar ou renovar o visto americano ou outros tipos de visto. O público quer informações práticas, atualizadas e confiáveis sobre o processo de visto de qualquer país, sobretudo dos Estados Unidos."
+  "group": "visto-americano",
+  "rss_picker_file_pattern": "approved-{group}-{date}.json",
+  "current_approved_list_path": "../../artifacts/rss-picker",
+  "output_dir": "artifacts/write-article",
+  "language": "pt-BR",
+  "blog_context": "Blog voltado para brasileiros que querem tirar ou renovar o visto americano ou outros tipos de visto. O público quer informações práticas, atualizadas e confiáveis sobre o processo de visto de qualquer país, sobretudo dos Estados Unidos."
 }

@@ -3,7 +3,6 @@ dotenv.config();
 
 import fs from "fs/promises";
 import path from "path";
-import { randomUUID } from "crypto";
 import { submitToIndexingApi } from "./google-indexing.js";
 
 /**
@@ -156,7 +155,14 @@ export default async function (context) {
     await saveStatus(articlesDir, today, updatedStatus);
 
     // Notify Discord
-    await notifyIndexingResult(entry.slug, apiResult, json.site_id, discordWebhookUrl);
+    await notifyIndexingResult(
+      entry.slug,
+      apiResult,
+      json.site_id,
+      discordWebhookUrl,
+      domain,
+      articleUrl,
+    );
 
     console.log("\n✅ Part 2 done!");
     return;
@@ -211,10 +217,6 @@ export default async function (context) {
     typeof destination.business_id === "string"
       ? destination.business_id.replace(/-/g, "")
       : destination.business_id;
-
-  console.log(
-    `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`,
-  );
 
   await fs.writeFile(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
 
@@ -402,7 +404,14 @@ async function sendPublishedList(
 /**
  * Notify Discord with the result of the Part 2 indexing action.
  */
-async function notifyIndexingResult(slug, apiResult, siteId, discordWebhookUrl) {
+async function notifyIndexingResult(
+  slug,
+  apiResult,
+  siteId,
+  discordWebhookUrl,
+  domain,
+  articleUrl,
+) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const apiIcon = apiResult.ok ? "✅" : "❌";
@@ -410,7 +419,10 @@ async function notifyIndexingResult(slug, apiResult, siteId, discordWebhookUrl) 
     ? `✅ Indexação e publicação concluída para '${slug}' com site-id da '${siteId}'`
     : `⚠️ Indexação com erros para: '${slug}' com site-id da '${siteId}'`;
 
-  msg += `\n   Indexing API: ${apiIcon}`;
+  const searchConsoleLink = `https://search.google.com/search-console?resource_id=sc-domain%3A${domain}&hl=pt-br`;
+  msg += `\n  - [gsc](<${searchConsoleLink}>)`;
+  msg += `\n  - [artigo](<${articleUrl}>)`;
+
   if (!apiResult.ok && apiResult.error) {
     msg += `\n   Erro: ${apiResult.error}`;
   }

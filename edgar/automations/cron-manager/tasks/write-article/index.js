@@ -37,7 +37,9 @@ export default async function (context) {
 
   const group = (inputs.group || "").trim();
   if (!group) {
-    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    console.error(
+      "❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'",
+    );
     return;
   }
 
@@ -55,11 +57,8 @@ export default async function (context) {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const pattern = inputs.rss_picker_file_pattern;
 
-  const resolvedFilename = 
-    pattern
-      .replace("{group}", group)
-      .replace("{date}", today)
-  
+  const resolvedFilename = pattern.replace("{group}", group).replace("{date}", today);
+
   const listPath = path.join(inputs.current_approved_list_path, resolvedFilename);
   const indexPath = path.join(
     inputs.current_approved_list_path,
@@ -69,7 +68,7 @@ export default async function (context) {
   console.log(`\nResolving approved articles list:`);
   console.log(`  Pattern:     ${pattern}`);
   console.log(`  Date:        ${today}`);
-  console.log(`  List file:   ${listPath}`);
+  console.log(`  ** List file:   ${listPath}`);
   console.log(`  Index file:  ${indexPath}`);
 
   // ─── Read approved articles list ───────────────────────────────────────────
@@ -77,7 +76,7 @@ export default async function (context) {
     console.log(`\n⚠️  Articles list not found: ${listPath}`);
     console.log(`   No articles to process today.`);
     console.log(`   Run again when the list is available.`);
-    process.exit(0);
+    return { status: "no_articles", message: "No articles to process today." };
   }
 
   let articles;
@@ -126,7 +125,7 @@ export default async function (context) {
       `   Current index (${currentIndex}) reached end of list (${articles.length} articles)`,
     );
     console.log(`   Run again tomorrow or reset the index file to restart the cycle.`);
-    process.exit(0);
+    return { status: "all_articles_processed", message: "All articles processed!" };
   }
 
   const article = articles[currentIndex];
@@ -208,13 +207,21 @@ export default async function (context) {
 
   // Salva o JSON no outputDir, igual ao Markdown
   const jsonPath = path.join(outputDir, `${artifactName}.json`);
-  fs.writeFileSync(jsonPath, JSON.stringify({
-    ...enrichedArtifact,
-    reference_title: article.title,
-    reference_link: article.link,
-    generated_at: generatedAt,
-    word_count: wordCount,
-  }, null, 2), "utf8");
+  fs.writeFileSync(
+    jsonPath,
+    JSON.stringify(
+      {
+        ...enrichedArtifact,
+        reference_title: article.title,
+        reference_link: article.link,
+        generated_at: generatedAt,
+        word_count: wordCount,
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
 
   // ── Save Markdown final ─────────────────────────────────────────────────────
   const finalMarkdown = enrichedMarkdown.includes("\\n")

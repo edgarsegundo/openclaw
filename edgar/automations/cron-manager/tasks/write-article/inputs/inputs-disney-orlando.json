@@ -1,8 +1,8 @@
 {
-    "group": "disney-orlando",
-    "rss_picker_file_pattern": "approved-{group}-{date}.json",
-    "current_approved_list_path": "artifacts/rss-picker",
-    "output_dir": "artifacts/write-article",
-    "language": "pt-BR",
-    "blog_context": "Blog voltado para brasileiros que têm interesse em assuntos ligados ao Disney Orlando e aos parques da Disney. O público busca informações práticas, atualizadas e confiáveis sobre ingressos, atrações, hotéis, dicas de viagem, notícias dos parques e outros temas relacionados à experiência Disney em Orlando."
+  "group": "disney-orlando",
+  "rss_picker_file_pattern": "approved-{group}-{date}.json",
+  "current_approved_list_path": "../../artifacts/rss-picker",
+  "output_dir": "artifacts/write-article",
+  "language": "pt-BR",
+  "blog_context": "Blog voltado para brasileiros que têm interesse em assuntos ligados ao Disney Orlando e aos parques da Disney. O público busca informações práticas, atualizadas e confiáveis sobre ingressos, atrações, hotéis, dicas de viagem, notícias dos parques e outros temas relacionados à experiência Disney em Orlando."
 }
