@@ -633,7 +633,7 @@ async function sendFullListToDiscord(
     const statusIcon = article.status === "published" ? "✅" : "💾";
 
     let safeLink = "";
-    if (article.status === "published") {
+    if (article.status !== "published") {
       safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${blog_article_id}&group=${group}`;
       currentMsg += `\n[${article.index}] ${article.slug} ${statusIcon} - [Editar](<${safeLink}>)`;
       continue;
