@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 dotenv.config();
 
 import fs from "fs/promises";
@@ -52,7 +52,9 @@ export default async function (context) {
 
   const group = (inputs.group || "").trim();
   if (!group) {
-    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    console.error(
+      "❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'",
+    );
     return;
   }
 
@@ -66,7 +68,7 @@ export default async function (context) {
   if (!articlesDir) throw new Error("Missing required input: articles_dir");
 
   const groupDir = path.join(articlesDir, group); // always "./artifacts/write-article/group"
-  
+
   if (!Array.isArray(destinations) || destinations.length === 0) {
     throw new Error("Missing required input: destinations (must be a non-empty array)");
   }
@@ -129,7 +131,10 @@ export default async function (context) {
     if (!publishSuccess) {
       console.error("POST to execute-publish-script failed.");
       const { notifyDiscord } = await import("../../lib/discord.js");
-      await notifyDiscord(`❌ Falha ao executar o script de publicação para: ${entry.slug}`, discordWebhookUrl);
+      await notifyDiscord(
+        `❌ Falha ao executar o script de publicação para: ${entry.slug}`,
+        discordWebhookUrl,
+      );
       return;
     }
 
@@ -160,9 +165,8 @@ export default async function (context) {
   // ── 1. Find oldest unpublished JSON article ───────────────────────────────
   const allFiles = await fs.readdir(articlesDir);
   const jsonFiles = allFiles.filter(
-    (f) => f.endsWith(".json") &&
-      f !== "publish-article.roundrobin.json" &&
-      !f.startsWith("status-")
+    (f) =>
+      f.endsWith(".json") && f !== "publish-article.roundrobin.json" && !f.startsWith("status-"),
   );
 
   if (jsonFiles.length === 0) {
@@ -201,19 +205,20 @@ export default async function (context) {
   const nextIdx = (lastIdx + 1) % destinations.length;
   const destination = destinations[nextIdx];
 
-  const sanitizedBusinessId = typeof destination.business_id === "string"
-    ? destination.business_id.replace(/-/g, "")
-    : destination.business_id;
+  const sanitizedBusinessId =
+    typeof destination.business_id === "string"
+      ? destination.business_id.replace(/-/g, "")
+      : destination.business_id;
 
   console.log(
-    `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`
+    `Destination: business_id=${sanitizedBusinessId} | blog_topic_slug=${destination.blog_topic_slug}`,
   );
 
   await fs.writeFile(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
 
   // ── 5. Build and POST article payload ─────────────────────────────────────
   const payload = {
-    id: randomUUID(),
+    // id: randomUUID(),
     business_id: sanitizedBusinessId,
     blog_topic_slug: destination.blog_topic_slug,
     title: json.title,
@@ -228,12 +233,17 @@ export default async function (context) {
   console.log(`\nPosting: "${payload.title}"`);
   console.log(`Using API key: ${apiKey ? "****" + apiKey.slice(-4) : "(none)"}`);
 
-  const success = await postArticle(payload, apiKey);
-  if (!success) {
+  const apiResult = await postArticle(payload, apiKey);
+  if (!apiResult || apiResult.error) {
     // Part 1 failed — no Discord notification
     console.error("POST failed. Article will not be moved to published/.");
+    console.error(`Error status: ${apiResult ? apiResult.status : "N/A"}`);
     return;
   }
+
+  const blog_article_id = apiResult.article.id ?? null;
+
+  // return { error: true, status: res.status, article: null };
 
   console.log("Saved successfully!");
 
@@ -277,7 +287,14 @@ export default async function (context) {
   // ── 8. Send Discord notification ──────────────────────────────────────────
   // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
   // The article just saved is highlighted as 🆕.
-  await sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl);
+  await sendPublishedList(
+    statusData,
+    articlesDir,
+    newIndex,
+    discordWebhookUrl,
+    group,
+    blog_article_id,
+  );
 
   // ── 9. Clean up old files ─────────────────────────────────────────────────
   await cleanOldFiles(publishedDir, 7);
@@ -317,9 +334,7 @@ function markAsPublished(statusData, index) {
   return {
     ...statusData,
     articles: statusData.articles.map((a) =>
-      a.index === index
-        ? { ...a, status: "published", published_at: new Date().toISOString() }
-        : a
+      a.index === index ? { ...a, status: "published", published_at: new Date().toISOString() } : a,
     ),
   };
 }
@@ -333,7 +348,14 @@ const DISCORD_MSG_MAX_LENGTH = 1800;
  * Sorted newest-first (descending index) so the new article appears at the top.
  * The article with index === newIndex is highlighted with 🆕.
  */
-async function sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl) {
+async function sendPublishedList(
+  statusData,
+  articlesDir,
+  newIndex,
+  discordWebhookUrl,
+  group,
+  blog_article_id,
+) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
@@ -349,7 +371,8 @@ async function sendPublishedList(statusData, articlesDir, newIndex, discordWebho
     const isNew = article.index === newIndex;
     const statusLabel = article.status === "published" ? "(published ✅)" : "(saved)";
     const prefix = isNew ? "🆕" : "   ";
-    const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel}`;
+    const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${blog_article_id}&group=${group}`;
+    const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel} - [Editar](<${safeLink}>)`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       await notifyDiscord(currentMsg, discordWebhookUrl);
@@ -366,7 +389,7 @@ async function sendPublishedList(statusData, articlesDir, newIndex, discordWebho
   }
 
   console.log(
-    `Discord notified with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`
+    `Discord notified with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`,
   );
 }
 
@@ -475,13 +498,14 @@ async function postArticle(payload, apiKey) {
     if (!res.ok) {
       const body = await res.text();
       console.error(`POST failed: ${res.status} ${body}`);
-      return false;
+      return { error: true, status: res.status, article: null };
     }
 
-    return true;
+    const data = await res.json();
+    return { status: res.status, article: data.article };
   } catch (err) {
     console.error(`POST error: ${err.message}`);
-    return false;
+    return { error: true, status: res.status, article: null };
   }
 }
 
@@ -614,10 +638,10 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl)
 
   if (currentMsg.trim()) {
     await notifyDiscord(currentMsg, discordWebhookUrl);
-      sentMessages++;
+    sentMessages++;
   }
 
   console.log(
-    `Discord list sent with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`
+    `Discord list sent with ${statusData.articles.length} article(s) in ${sentMessages} message(s).`,
   );
 }
