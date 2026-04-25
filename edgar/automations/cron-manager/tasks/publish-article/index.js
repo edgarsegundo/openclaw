@@ -242,6 +242,7 @@ export default async function (context) {
   }
 
   const blog_article_id = apiResult.article.id ?? null;
+  console.log(`** Article posted successfully with ID: ${blog_article_id}`);
 
   // return { error: true, status: res.status, article: null };
 
