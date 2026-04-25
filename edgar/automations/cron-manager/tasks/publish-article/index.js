@@ -89,7 +89,15 @@ export default async function (context) {
       return;
     }
 
-    await sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl, group, null);
+    console.log(`** Loaded statusData: ${JSON.stringify(statusData)}`);
+
+    await sendFullListToDiscord(
+      statusData,
+      articlesDir,
+      discordWebhookUrl,
+      group,
+      statusData.blog_article_id,
+    );
 
     console.log("✅ List sent to Discord!");
     return;
