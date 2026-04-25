@@ -161,6 +161,37 @@ describe("device pairing tokens", () => {
     expect(second.request.requestId).toBe(first.request.requestId);
   });
 
+  test("re-requesting with identical params preserves the original ts to prevent queue-jumping", async () => {
+    // Regression: refreshPendingDevicePairingRequest must not bump ts to Date.now().
+    // An attacker who reconnects with the same key/role/scopes could otherwise
+    // silently move their request to the top of the implicit --latest approval queue.
+    const baseDir = await makeDevicePairingDir();
+    const first = await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1",
+        role: "operator",
+        scopes: ["operator.read"],
+      },
+      baseDir,
+    );
+    const originalTs = first.request.ts;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const second = await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1",
+        role: "operator",
+        scopes: ["operator.read"],
+      },
+      baseDir,
+    );
+
+    expect(second.created).toBe(false);
+    expect(second.request.requestId).toBe(first.request.requestId);
+    expect(second.request.ts).toBe(originalTs);
+  });
+
   test("supersedes pending requests when requested roles/scopes change", async () => {
     const baseDir = await makeDevicePairingDir();
     const first = await requestDevicePairing(
@@ -980,6 +1011,46 @@ describe("device pairing tokens", () => {
     await expect(getPairedDevice("device-1", baseDir)).resolves.toBeNull();
 
     await expect(removePairedDevice("device-1", baseDir)).resolves.toBeNull();
+  });
+
+  test("removing a paired device clears pending requests for that device only", async () => {
+    const baseDir = await makeDevicePairingDir();
+    await setupPairedOperatorDevice(baseDir, ["operator.read"]);
+
+    const staleRepair = await requestDevicePairing(
+      {
+        deviceId: "device-1",
+        publicKey: "public-key-1-rotated",
+        role: "operator",
+        scopes: ["operator.read"],
+      },
+      baseDir,
+    );
+    const otherPending = await requestDevicePairing(
+      {
+        deviceId: "device-2",
+        publicKey: "public-key-2",
+        role: "node",
+        scopes: [],
+      },
+      baseDir,
+    );
+
+    await expect(removePairedDevice("device-1", baseDir)).resolves.toEqual({
+      deviceId: "device-1",
+    });
+
+    const pending = (await listDevicePairing(baseDir)).pending;
+    expect(pending.map((entry) => entry.requestId)).not.toContain(staleRepair.request.requestId);
+    expect(pending.map((entry) => entry.requestId)).toContain(otherPending.request.requestId);
+    await expect(
+      approveDevicePairing(
+        staleRepair.request.requestId,
+        { callerScopes: ["operator.read"] },
+        baseDir,
+      ),
+    ).resolves.toBeNull();
+    await expect(getPairedDevice("device-1", baseDir)).resolves.toBeNull();
   });
 
   test("clears paired device state by device id", async () => {

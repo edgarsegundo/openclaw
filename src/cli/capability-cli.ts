@@ -1,5 +1,8 @@
+import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import type { Command } from "commander";
 import { agentCommand } from "../agents/agent-command.js";
 import { resolveAgentDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
@@ -13,13 +16,16 @@ import { loadModelCatalog } from "../agents/model-catalog.js";
 import { modelsAuthLoginCommand, modelsStatusCommand } from "../commands/models.js";
 import { loadConfig } from "../config/config.js";
 import { resolveAgentModelPrimaryValue } from "../config/model-input.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { callGateway, randomIdempotencyKey } from "../gateway/call.js";
 import { buildGatewayConnectionDetailsWithResolvers } from "../gateway/connection-details.js";
 import { isLoopbackHost } from "../gateway/net.js";
+import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../gateway/protocol/client-info.js";
 import { generateImage, listRuntimeImageGenerationProviders } from "../image-generation/runtime.js";
 import { buildMediaUnderstandingRegistry } from "../media-understanding/provider-registry.js";
 import {
   describeImageFile,
+  describeImageFileWithModel,
   describeVideoFile,
   transcribeAudioFile,
 } from "../media-understanding/runtime.js";
@@ -35,6 +41,7 @@ import {
   registerMemoryEmbeddingProvider,
 } from "../plugins/memory-embedding-providers.js";
 import { writeRuntimeJson, defaultRuntime, type RuntimeEnv } from "../runtime.js";
+import { getProviderEnvVars } from "../secrets/provider-env-vars.js";
 import {
   normalizeLowercaseStringOrEmpty,
   normalizeOptionalString,
@@ -53,8 +60,8 @@ import {
   setTtsProvider,
   textToSpeech,
 } from "../tts/tts.js";
-import { GATEWAY_CLIENT_MODES, GATEWAY_CLIENT_NAMES } from "../utils/message-channel.js";
 import { generateVideo, listRuntimeVideoGenerationProviders } from "../video-generation/runtime.js";
+import type { VideoGenerationResolution } from "../video-generation/types.js";
 import {
   isWebFetchProviderConfigured,
   resolveWebFetchDefinition,
@@ -67,6 +74,7 @@ import {
 } from "../web-search/runtime.js";
 import { runCommandWithRuntime } from "./cli-utils.js";
 import { createDefaultDeps } from "./deps.js";
+import { removeCommandByName } from "./program/command-tree.js";
 import { collectOption } from "./program/helpers.js";
 
 type CapabilityTransport = "local" | "gateway";
@@ -260,7 +268,19 @@ const CAPABILITY_METADATA: CapabilityMetadata[] = [
     id: "video.generate",
     description: "Generate video files with configured video providers.",
     transports: ["local"],
-    flags: ["--prompt", "--model", "--output", "--json"],
+    flags: [
+      "--prompt",
+      "--model",
+      "--size",
+      "--aspect-ratio",
+      "--resolution",
+      "--duration",
+      "--audio",
+      "--watermark",
+      "--timeout-ms",
+      "--output",
+      "--json",
+    ],
     resultShape: "saved video files plus attempts",
   },
   {
@@ -395,17 +415,14 @@ function resolveSelectedProviderFromModelRef(modelRef: string | undefined): stri
   return resolveModelRefOverride(modelRef).provider;
 }
 
-function getAuthProfileIdsForProvider(
-  cfg: ReturnType<typeof loadConfig>,
-  providerId: string,
-): string[] {
+function getAuthProfileIdsForProvider(cfg: OpenClawConfig, providerId: string): string[] {
   const agentDir = resolveAgentDir(cfg, resolveDefaultAgentId(cfg));
   const store = loadAuthProfileStoreForRuntime(agentDir);
   return listProfilesForProvider(store, providerId);
 }
 
 function providerHasGenericConfig(params: {
-  cfg: ReturnType<typeof loadConfig>;
+  cfg: OpenClawConfig;
   providerId: string;
   envVars?: string[];
 }): boolean {
@@ -526,6 +543,7 @@ async function runModelRun(params: {
         agentId,
         model: params.model,
         json: false,
+        cleanupBundleMcpOnRunEnd: true,
       },
       {
         ...defaultRuntime,
@@ -549,18 +567,19 @@ async function runModelRun(params: {
   }
 
   const { provider, model } = resolveModelRefOverride(params.model);
-  const response = await callGateway<{
+  const response: {
     result?: {
       payloads?: Array<{ text?: string; mediaUrl?: string | null; mediaUrls?: string[] }>;
       meta?: { agentMeta?: { provider?: string; model?: string } };
     };
-  }>({
+  } = await callGateway({
     method: "agent",
     params: {
       agentId,
       message: params.prompt,
       provider,
       model,
+      cleanupBundleMcpOnRunEnd: true,
       idempotencyKey: randomIdempotencyKey(),
     },
     expectFinal: true,
@@ -747,21 +766,32 @@ async function runImageDescribe(params: {
   model?: string;
 }) {
   const cfg = loadConfig();
+  const agentDir = resolveAgentDir(cfg, resolveDefaultAgentId(cfg));
   const activeModel = requireProviderModelOverride(params.model);
   const outputs = await Promise.all(
     params.files.map(async (filePath) => {
-      const result = await describeImageFile({
-        filePath: path.resolve(filePath),
-        cfg,
-        activeModel,
-      });
+      const resolvedPath = path.resolve(filePath);
+      const result = activeModel
+        ? await describeImageFileWithModel({
+            filePath: resolvedPath,
+            cfg,
+            agentDir,
+            provider: activeModel.provider,
+            model: activeModel.model,
+            prompt: "Describe the image.",
+          })
+        : await describeImageFile({
+            filePath: resolvedPath,
+            cfg,
+            agentDir,
+          });
       if (!result.text) {
-        throw new Error(`No description returned for image: ${path.resolve(filePath)}`);
+        throw new Error(`No description returned for image: ${resolvedPath}`);
       }
       return {
-        path: path.resolve(filePath),
+        path: resolvedPath,
         text: result.text,
-        provider: result.provider,
+        provider: activeModel?.provider ?? ("provider" in result ? result.provider : undefined),
         model: result.model,
         kind: "image.description",
       };
@@ -805,7 +835,48 @@ async function runAudioTranscribe(params: {
   } satisfies CapabilityEnvelope;
 }
 
-async function runVideoGenerate(params: { prompt: string; model?: string; output?: string }) {
+function parseOptionalFiniteNumber(
+  raw: string | number | undefined,
+  label: string,
+): number | undefined {
+  if (raw === undefined || (typeof raw === "string" && raw.trim() === "")) {
+    return undefined;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number`);
+  }
+  return value;
+}
+
+function normalizeVideoResolution(raw: string | undefined): VideoGenerationResolution | undefined {
+  const normalized = raw?.trim().toUpperCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === "480P" ||
+    normalized === "720P" ||
+    normalized === "768P" ||
+    normalized === "1080P"
+  ) {
+    return normalized;
+  }
+  throw new Error("video resolution must be one of 480P, 720P, 768P, or 1080P");
+}
+
+async function runVideoGenerate(params: {
+  prompt: string;
+  model?: string;
+  output?: string;
+  size?: string;
+  aspectRatio?: string;
+  resolution?: VideoGenerationResolution;
+  durationSeconds?: number;
+  audio?: boolean;
+  watermark?: boolean;
+  timeoutMs?: number;
+}) {
   const cfg = loadConfig();
   const agentDir = resolveAgentDir(cfg, resolveDefaultAgentId(cfg));
   const result = await generateVideo({
@@ -813,19 +884,61 @@ async function runVideoGenerate(params: { prompt: string; model?: string; output
     agentDir,
     prompt: params.prompt,
     modelOverride: params.model,
+    size: params.size,
+    aspectRatio: params.aspectRatio,
+    resolution: params.resolution,
+    durationSeconds: params.durationSeconds,
+    audio: params.audio,
+    watermark: params.watermark,
+    timeoutMs: params.timeoutMs,
   });
   const outputs = await Promise.all(
-    result.videos.map(async (video, index) => ({
-      ...(await writeOutputAsset({
-        buffer: video.buffer,
-        mimeType: video.mimeType,
-        originalFilename: video.fileName,
-        outputPath: params.output,
-        outputIndex: index,
-        outputCount: result.videos.length,
-        subdir: "generated",
-      })),
-    })),
+    result.videos.map(async (video, index) => {
+      if (!video.buffer && !video.url) {
+        throw new Error(`Video asset at index ${index} has neither buffer nor url`);
+      }
+
+      let videoBuffer = video.buffer;
+      if (!videoBuffer && video.url) {
+        const response = await fetch(video.url, { signal: AbortSignal.timeout(120_000) });
+        if (!response.ok) {
+          throw new Error(`Failed to download video from ${video.url}: ${response.status}`);
+        }
+        if (params.output && response.body) {
+          const mimeType = normalizeMimeType(video.mimeType);
+          const ext =
+            extensionForMime(mimeType) ||
+            path.extname(video.fileName ?? "") ||
+            path.extname(params.output ?? "");
+          const resolvedOutput = path.resolve(params.output);
+          const parsed = path.parse(resolvedOutput);
+          const filePath =
+            result.videos.length <= 1
+              ? path.join(parsed.dir, `${parsed.name}${ext}`)
+              : path.join(parsed.dir, `${parsed.name}-${String(index + 1)}${ext}`);
+          await fs.mkdir(path.dirname(filePath), { recursive: true });
+          await pipeline(
+            Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+            createWriteStream(filePath),
+          );
+          const stat = await fs.stat(filePath);
+          return { path: filePath, mimeType: video.mimeType, size: stat.size };
+        }
+        videoBuffer = Buffer.from(await response.arrayBuffer());
+      }
+
+      return {
+        ...(await writeOutputAsset({
+          buffer: videoBuffer!,
+          mimeType: video.mimeType,
+          originalFilename: video.fileName,
+          outputPath: params.output,
+          outputIndex: index,
+          outputCount: result.videos.length,
+          subdir: "generated",
+        })),
+      };
+    }),
   );
   return {
     ok: true,
@@ -871,12 +984,12 @@ async function runTtsConvert(params: {
 }) {
   if (params.transport === "gateway") {
     const gatewayConnection = buildGatewayConnectionDetailsWithResolvers({ config: loadConfig() });
-    const result = await callGateway<{
+    const result: {
       audioPath?: string;
       provider?: string;
       outputFormat?: string;
       voiceCompatible?: boolean;
-    }>({
+    } = await callGateway({
       method: "tts.convert",
       params: {
         text: params.text,
@@ -964,10 +1077,10 @@ async function runTtsConvert(params: {
 async function runTtsProviders(transport: CapabilityTransport) {
   const cfg = loadConfig();
   if (transport === "gateway") {
-    const payload = await callGateway<{
+    const payload: {
       providers?: Array<Record<string, unknown>>;
       active?: string;
-    }>({
+    } = await callGateway({
       method: "tts.providers",
       timeoutMs: 30_000,
     });
@@ -975,15 +1088,17 @@ async function runTtsProviders(transport: CapabilityTransport) {
       ...payload,
       providers: (payload.providers ?? []).map((provider) => {
         const id = typeof provider.id === "string" ? provider.id : "";
-        return {
-          available: true,
-          configured:
-            typeof provider.configured === "boolean"
-              ? provider.configured
-              : providerHasGenericConfig({ cfg, providerId: id }),
-          selected: Boolean(id && payload.active === id),
-          ...provider,
-        };
+        return Object.assign(
+          {
+            available: true,
+            configured:
+              typeof provider.configured === `boolean`
+                ? provider.configured
+                : providerHasGenericConfig({ cfg, providerId: id }),
+            selected: Boolean(id && payload.active === id),
+          },
+          provider,
+        );
       }),
     };
   }
@@ -1184,6 +1299,9 @@ function registerCapabilityListAndInspect(capability: Command) {
 }
 
 export function registerCapabilityCli(program: Command) {
+  removeCommandByName(program, "infer");
+  removeCommandByName(program, "capability");
+
   const capability = program
     .command("infer")
     .alias("capability")
@@ -1451,7 +1569,14 @@ export function registerCapabilityCli(program: Command) {
           .filter((provider) => provider.capabilities?.includes("audio"))
           .map((provider) => ({
             available: true,
-            configured: providerHasGenericConfig({ cfg, providerId: provider.id }),
+            configured: providerHasGenericConfig({
+              cfg,
+              providerId: provider.id,
+              envVars: getProviderEnvVars(provider.id, {
+                config: cfg,
+                includeUntrustedWorkspacePlugins: false,
+              }),
+            }),
             selected: false,
             id: provider.id,
             capabilities: provider.capabilities,
@@ -1616,6 +1741,13 @@ export function registerCapabilityCli(program: Command) {
     .description("Generate video")
     .requiredOption("--prompt <text>", "Prompt text")
     .option("--model <provider/model>", "Model override")
+    .option("--size <size>", "Size hint like 1280x720")
+    .option("--aspect-ratio <ratio>", "Aspect ratio hint like 16:9")
+    .option("--resolution <value>", "Resolution hint: 480P, 720P, 768P, or 1080P")
+    .option("--duration <seconds>", "Target duration in seconds")
+    .option("--audio", "Enable generated audio when supported")
+    .option("--watermark", "Request provider watermark when supported")
+    .option("--timeout-ms <ms>", "Provider request timeout in milliseconds")
     .option("--output <path>", "Output path")
     .option("--json", "Output JSON", false)
     .action(async (opts) => {
@@ -1624,6 +1756,13 @@ export function registerCapabilityCli(program: Command) {
           prompt: String(opts.prompt),
           model: opts.model as string | undefined,
           output: opts.output as string | undefined,
+          size: opts.size as string | undefined,
+          aspectRatio: opts.aspectRatio as string | undefined,
+          resolution: normalizeVideoResolution(opts.resolution as string | undefined),
+          durationSeconds: parseOptionalFiniteNumber(opts.duration, "--duration"),
+          audio: opts.audio === true ? true : undefined,
+          watermark: opts.watermark === true ? true : undefined,
+          timeoutMs: parseOptionalFiniteNumber(opts.timeoutMs, "--timeout-ms"),
         });
         emitJsonOrText(defaultRuntime, Boolean(opts.json), result, formatEnvelopeForText);
       });

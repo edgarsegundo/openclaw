@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { OpenClawConfig } from "../config/config.js";
+import type { OpenClawConfig } from "../config/types.js";
 import { createEmptyPluginRegistry } from "../plugins/registry-empty.js";
 import type { SpeechProviderPlugin } from "../plugins/types.js";
 
@@ -9,6 +9,7 @@ const loadPluginManifestRegistryMock = vi.fn(() => ({
     { id: "elevenlabs", origin: "bundled", contracts: { speechProviders: [{}] } },
     { id: "microsoft", origin: "bundled", contracts: { speechProviders: [{}] } },
     { id: "openai", origin: "bundled", contracts: { speechProviders: [{}] } },
+    { id: "tts-local-cli", origin: "bundled", contracts: { speechProviders: [{}] } },
   ],
 }));
 
@@ -120,9 +121,11 @@ describe("speech provider registry", () => {
             elevenlabs: { enabled: true },
             microsoft: { enabled: true },
             openai: { enabled: true },
+            "tts-local-cli": { enabled: true },
           },
         },
       },
+      activate: false,
     });
   });
 

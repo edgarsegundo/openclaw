@@ -1,6 +1,6 @@
 import { parseDurationMs } from "../cli/parse-duration.js";
+import { escapeRegExp } from "../shared/regexp.js";
 import { normalizeOptionalString } from "../shared/string-coerce.js";
-import { escapeRegExp } from "../utils.js";
 import { HEARTBEAT_TOKEN } from "./tokens.js";
 
 export type HeartbeatTask = {
@@ -249,12 +249,18 @@ export function parseHeartbeatTasks(content: string): HeartbeatTask[] {
         }
 
         // Check for task fields BEFORE checking for end of block
-        if (nextTrimmed.startsWith("interval:")) {
+        if (
+          nextTrimmed.startsWith("interval:") &&
+          (nextLine.startsWith(" ") || nextLine.startsWith("\t"))
+        ) {
           interval = nextTrimmed
             .replace("interval:", "")
             .trim()
             .replace(/^["']|["']$/g, "");
-        } else if (nextTrimmed.startsWith("prompt:")) {
+        } else if (
+          nextTrimmed.startsWith("prompt:") &&
+          (nextLine.startsWith(" ") || nextLine.startsWith("\t"))
+        ) {
           prompt = nextTrimmed
             .replace("prompt:", "")
             .trim()

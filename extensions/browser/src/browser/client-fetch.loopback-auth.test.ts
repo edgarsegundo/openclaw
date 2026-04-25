@@ -1,5 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "../../test-support/browser-security-runtime.mock.js";
 import type { BrowserDispatchResponse } from "./routes/dispatcher.js";
+
+vi.mock("openclaw/plugin-sdk/ssrf-runtime", async () => {
+  const actual = await vi.importActual<typeof import("openclaw/plugin-sdk/ssrf-runtime")>(
+    "openclaw/plugin-sdk/ssrf-runtime",
+  );
+  return {
+    ...actual,
+    fetchWithSsrFGuard: async (params: {
+      url: string;
+      init?: RequestInit;
+      signal?: AbortSignal;
+    }) => ({
+      response: await fetch(params.url, {
+        ...params.init,
+        signal: params.signal,
+      }),
+      finalUrl: params.url,
+      release: async () => {},
+    }),
+  };
+});
 
 function okDispatchResponse(): BrowserDispatchResponse {
   return { status: 200, body: { ok: true } };
@@ -87,6 +109,16 @@ async function expectThrownBrowserFetchError(
 describe("fetchBrowserJson loopback auth", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    for (const key of [
+      "ALL_PROXY",
+      "all_proxy",
+      "HTTP_PROXY",
+      "http_proxy",
+      "HTTPS_PROXY",
+      "https_proxy",
+    ]) {
+      vi.stubEnv(key, "");
+    }
     vi.stubEnv("OPENCLAW_GATEWAY_TOKEN", "loopback-token");
     mocks.loadConfig.mockClear();
     mocks.loadConfig.mockReturnValue({
@@ -165,11 +197,29 @@ describe("fetchBrowserJson loopback auth", () => {
     expect(headers.get("authorization")).toBe("Bearer loopback-token");
   });
 
-  it("preserves dispatcher error context while keeping no-retry hint", async () => {
+  it("preserves dispatcher timeout context without no-retry hint", async () => {
     mocks.dispatch.mockRejectedValueOnce(new Error("Chrome CDP handshake timeout"));
 
     await expectThrownBrowserFetchError(() => fetchBrowserJson<{ ok: boolean }>("/tabs"), {
-      contains: ["Chrome CDP handshake timeout", "Do NOT retry the browser tool"],
+      contains: ["Chrome CDP handshake timeout", "Restart the OpenClaw gateway"],
+      omits: ["Can't reach the OpenClaw browser control service", "Do NOT retry the browser tool"],
+    });
+  });
+
+  it("preserves dispatcher abort context without no-retry hint", async () => {
+    mocks.dispatch.mockRejectedValueOnce(new DOMException("operation aborted", "AbortError"));
+
+    await expectThrownBrowserFetchError(() => fetchBrowserJson<{ ok: boolean }>("/tabs"), {
+      contains: ["operation aborted", "Restart the OpenClaw gateway"],
+      omits: ["Do NOT retry the browser tool"],
+    });
+  });
+
+  it("keeps no-retry hint for persistent dispatcher failures", async () => {
+    mocks.dispatch.mockRejectedValueOnce(new Error("Chrome CDP connection refused"));
+
+    await expectThrownBrowserFetchError(() => fetchBrowserJson<{ ok: boolean }>("/tabs"), {
+      contains: ["Chrome CDP connection refused", "Do NOT retry the browser tool"],
       omits: ["Can't reach the OpenClaw browser control service"],
     });
   });
@@ -265,6 +315,40 @@ describe("fetchBrowserJson loopback auth", () => {
           "Can't reach the OpenClaw browser control service",
           "Do NOT retry the browser tool",
         ],
+      },
+    );
+  });
+
+  it("omits no-retry hint for absolute HTTP timeout failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("timed out");
+      }),
+    );
+
+    await expectThrownBrowserFetchError(
+      () => fetchBrowserJson<{ ok: boolean }>("http://example.com/", { timeoutMs: 1234 }),
+      {
+        contains: ["timed out after 1234ms"],
+        omits: ["Do NOT retry the browser tool"],
+      },
+    );
+  });
+
+  it("omits no-retry hint for absolute HTTP abort failures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new DOMException("operation aborted", "AbortError");
+      }),
+    );
+
+    await expectThrownBrowserFetchError(
+      () => fetchBrowserJson<{ ok: boolean }>("http://example.com/"),
+      {
+        contains: ["Browser control request was cancelled"],
+        omits: ["Do NOT retry the browser tool"],
       },
     );
   });

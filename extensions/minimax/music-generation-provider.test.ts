@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { expectExplicitMusicGenerationCapabilities } from "../../test/helpers/media-generation/provider-capability-assertions.js";
 import {
   getMinimaxProviderHttpMocks,
   installMinimaxProviderHttpMockCleanup,
@@ -31,6 +32,10 @@ function mockMusicGenerationResponse(json: Record<string, unknown>): void {
 }
 
 describe("minimax music generation provider", () => {
+  it("declares explicit mode capabilities", () => {
+    expectExplicitMusicGenerationCapabilities(buildMinimaxMusicGenerationProvider());
+  });
+
   it("creates music and downloads the generated track", async () => {
     mockMusicGenerationResponse({
       task_id: "task-123",
@@ -42,7 +47,7 @@ describe("minimax music generation provider", () => {
     const provider = buildMinimaxMusicGenerationProvider();
     const result = await provider.generateMusic({
       provider: "minimax",
-      model: "music-2.5+",
+      model: "",
       prompt: "upbeat dance-pop with female vocals",
       cfg: {},
       lyrics: "our city wakes",
@@ -56,7 +61,7 @@ describe("minimax music generation provider", () => {
           get: expect.any(Function),
         }),
         body: expect.objectContaining({
-          model: "music-2.5+",
+          model: "music-2.6",
           lyrics: "our city wakes",
           output_format: "url",
           audio_setting: {
@@ -90,7 +95,7 @@ describe("minimax music generation provider", () => {
     const provider = buildMinimaxMusicGenerationProvider();
     const result = await provider.generateMusic({
       provider: "minimax",
-      model: "music-2.5+",
+      model: "music-2.6",
       prompt: "upbeat dance-pop with female vocals",
       cfg: {},
       lyrics: "our city wakes",
@@ -111,7 +116,7 @@ describe("minimax music generation provider", () => {
     await expect(
       provider.generateMusic({
         provider: "minimax",
-        model: "music-2.5+",
+        model: "music-2.6",
         prompt: "driving techno",
         cfg: {},
         instrumental: true,
@@ -130,7 +135,7 @@ describe("minimax music generation provider", () => {
     const provider = buildMinimaxMusicGenerationProvider();
     await provider.generateMusic({
       provider: "minimax",
-      model: "music-2.5+",
+      model: "music-2.6",
       prompt: "upbeat dance-pop",
       cfg: {},
     });
@@ -138,7 +143,7 @@ describe("minimax music generation provider", () => {
     expect(postJsonRequestMock).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
-          model: "music-2.5+",
+          model: "music-2.6",
           lyrics_optimizer: true,
         }),
       }),
