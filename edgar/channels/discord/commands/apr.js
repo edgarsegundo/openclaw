@@ -23,7 +23,7 @@ export default {
     try {
       const inputPath = path.resolve(
         __dirname,
-        `../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-${channelName}.json`
+        `../../../automations/cron-manager/tasks/rss-picker/inputs/inputs-${channelName}.json`,
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
@@ -31,12 +31,8 @@ export default {
       inputObj.item_index = Number(index);
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
-      const cmd =
-        `node cron-manager.js run rss-picker --template feed-selector-news-related --input-file ${inputFile}`;
-      const cwd = path.resolve(
-        __dirname,
-        "../../../automations/cron-manager"
-      );      
+      const cmd = `node cron-manager.js run rss-picker --template feed-selector-news-related --input-file ${inputFile}`;
+      const cwd = path.resolve(__dirname, "../../../automations/cron-manager");
 
       await new Promise((resolve, reject) => {
         exec(cmd, { cwd }, (error, stdout, stderr) => {
@@ -50,7 +46,7 @@ export default {
         });
       });
 
-      await message.reply(`✅ Aprovando artigo ${index}`);
+      await message.reply(`✅ Artigo ${index} aprovado com sucesso!`);
     } catch (err) {
       console.error(err);
       await message.reply("❌ Erro ao aprovar o artigo. Verifique os logs para mais detalhes.");
