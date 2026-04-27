@@ -2,7 +2,7 @@
   "group": "visto-americano",
   "rss_fetcher_output_artifact_file_name_pattern": "artifacts/rss-fetcher/fetched-items-{group}-{date}.json",
   "blog_context": "Blog voltado para brasileiros interessados em assuntos ligados ao visto americano e aos serviços consulares dos EUA. O público busca informações práticas, atualizadas e confiáveis sobre solicitação, renovação, entrevistas, documentação, mudanças nas regras, notícias do consulado e outros temas relacionados ao processo consular.",
-  "min_items": 20,
+  "min_items": 50,
   "min_score": 7,
   "discord_webhook_url": "https://discord.com/api/webhooks/1493298708996161749/32GkMICv-EreUDlxIcPl46Td_MxgbzIpsTwyp6x77JDXzXKsC426Sa56gazOjTQwPM7H"
 }

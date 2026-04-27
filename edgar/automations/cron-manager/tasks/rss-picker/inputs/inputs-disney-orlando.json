@@ -2,7 +2,7 @@
   "group": "disney-orlando",
   "rss_fetcher_output_artifact_file_name_pattern": "artifacts/rss-fetcher/fetched-items-{group}-{date}.json",
   "blog_context": "Blog voltado para brasileiros interessados em assuntos ligados ao Disney Orlando e aos parques da Disney. O público busca informações práticas, atualizadas e confiáveis sobre ingressos, atrações, hotéis, dicas de viagem, notícias dos parques e outros temas relacionados à experiência Disney em Orlando.",
-  "min_items": 20,
+  "min_items": 50,
   "min_score": 7,
   "discord_webhook_url": "https://discord.com/api/webhooks/1495928719489892352/aSJTMMVDfYRHPdsP0qhRprsUIBPiNWBHkUzi1lDtReUT7_5RAbgnhFPO6iIrs1r-0W2T"
 }
