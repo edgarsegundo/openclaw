@@ -419,9 +419,9 @@ async function notifyIndexingResult(
     ? `✅ Indexação e publicação concluída para '${slug}' com site-id da '${siteId}'`
     : `⚠️ Indexação com erros para: '${slug}' com site-id da '${siteId}'`;
 
-  const searchConsoleLink = `https://search.google.com/search-console?resource_id=sc-domain%3A${domain}&hl=pt-br`;
-  msg += `\n  - [gsc](<${searchConsoleLink}>)`;
-  msg += `\n  - [artigo](<${articleUrl}>)`;
+  const searchConsoleLink = `https://search.google.com/search-console?resource_id=sc-domain%3A${encodeURIComponent(domain)}&hl=pt-br`;
+  msg += `\n- [GSC](<${searchConsoleLink}>)`;
+  msg += `\n\n- [Artigo](<${articleUrl}>)`;
 
   if (!apiResult.ok && apiResult.error) {
     msg += `\n   Erro: ${apiResult.error}`;
@@ -642,16 +642,15 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
   for (const article of sorted) {
     const statusIcon = article.status === "published" ? "✅" : "💾";
 
-    let safeLink = "";
+    let editLink = "";
+
     if (article.status !== "published") {
-      safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${article.blog_article_id}&group=${group}`;
-      currentMsg += `\n[${article.index}] ${article.slug} ${statusIcon} - [Editar](<${safeLink}>)`;
-      continue;
+      const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${article.blog_article_id}&group=${group}`;
+      editLink = ` - [Editar](<${safeLink}>)`;
     }
-    const editLink = article.status === "published" ? ` - [Editar](<${safeLink}>)` : "";
+
     const line = `\n[${article.index}] ${article.slug} ${statusIcon}${editLink}`;
 
-    // Se estourar limite do Discord
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       await notifyDiscord(currentMsg, discordWebhookUrl);
       sentMessages++;
