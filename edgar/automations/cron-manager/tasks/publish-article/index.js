@@ -120,7 +120,7 @@ export default async function (context) {
 
     const articleSlugField = json.slug ?? entry.slug;
     const domain = json.sitemap_url ? new URL(json.sitemap_url).origin : null;
-    const articleUrl = domain ? `${domain}/${articleSlugField}` : null;
+    const articleUrl = domain ? `${domain}/blog/${articleSlugField}` : null;
 
     console.log(`Article URL: ${articleUrl}`);
 
