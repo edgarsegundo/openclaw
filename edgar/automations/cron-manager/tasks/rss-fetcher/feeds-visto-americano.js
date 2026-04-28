@@ -126,6 +126,14 @@ export const DEFAULT_FEEDS = [
     category: "general",
     type: "rss",
   },
+
+  {
+    url: "https://diariodocomercio.com.br/feed/",
+    name: "Diário do Comércio",
+    lang: "pt",
+    category: "business",
+    type: "rss",
+  },
 ];
 
 /**
