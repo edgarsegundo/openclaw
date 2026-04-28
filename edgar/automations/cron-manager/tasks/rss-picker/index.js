@@ -1,3 +1,6 @@
+import { initMonitoring } from "../../lib/monitoring.js";
+initMonitoring();
+
 import fs from "fs";
 import path from "path";
 import { notifyDiscord } from "../../lib/discord.js";
@@ -37,7 +40,9 @@ export default async function (context) {
 
   const group = (inputs.group || "").trim();
   if (!group) {
-    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    console.error(
+      "❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'",
+    );
     return;
   }
 
@@ -53,7 +58,7 @@ export default async function (context) {
   const fetcherArtifactFilePath = path.resolve(
     inputs.rss_fetcher_output_artifact_file_name_pattern
       .replace("{group}", group)
-      .replace("{date}", today)
+      .replace("{date}", today),
   );
 
   console.log(`\nLooking for today's fetcher file: ${fetcherArtifactFilePath}`);
@@ -90,14 +95,14 @@ export default async function (context) {
     if (fetcherIndex < 0 || fetcherIndex >= allItems.length) {
       console.log(
         `item_index (${itemIndex}) out of range. ` +
-        `Fetcher has ${allItems.length} item(s) (valid range: 0–${allItems.length - 1}).`
+          `Fetcher has ${allItems.length} item(s) (valid range: 0–${allItems.length - 1}).`,
       );
       return;
     }
 
     if (resolvedSet.has(fetcherIndex)) {
       console.log(
-        `Item ${itemIndex} (fetcher_index: ${fetcherIndex}) is already resolved. Skipping.`
+        `Item ${itemIndex} (fetcher_index: ${fetcherIndex}) is already resolved. Skipping.`,
       );
       return;
     }
@@ -157,13 +162,13 @@ export default async function (context) {
 
   if (unresolvedItems.length < minItems) {
     // Only send items that have not been sent to Discord in a previous run
-    const newItems = unresolvedItems.filter(
-      (item) => !sentSet.has(item.fetcherIndex)
-    );
+    const newItems = unresolvedItems.filter((item) => !sentSet.has(item.fetcherIndex));
 
     if (newItems.length > 0) {
       const sentCount = await sendInChunks(newItems, topic, discordWebhookUrl);
-      console.log(`Discord notified with ${newItems.length} new item(s) in ${sentCount} message(s).`);
+      console.log(
+        `Discord notified with ${newItems.length} new item(s) in ${sentCount} message(s).`,
+      );
 
       // Persist the newly-sent indices so they are never re-sent
       for (const item of newItems) {
@@ -177,7 +182,7 @@ export default async function (context) {
 
     console.log(
       `Below minimum threshold (${unresolvedItems.length} < ${minItems}). ` +
-      `Waiting for more items or manual commands. Exiting.`
+        `Waiting for more items or manual commands. Exiting.`,
     );
     return;
   }
@@ -186,7 +191,9 @@ export default async function (context) {
   const seen = new Set();
   const deduplicated = unresolvedItems.filter((item) => {
     const url = extractRealUrl(item.link);
-    if (seen.has(url)) { return false; }
+    if (seen.has(url)) {
+      return false;
+    }
     seen.add(url);
     return true;
   });
@@ -288,7 +295,9 @@ export default async function (context) {
   for (const file of fs.readdirSync(pickerDir)) {
     // Matches both approved-<slug>-<date>.json and status-<slug>-<date>.json
     const match = file.match(/^(?:approved|status)-.+-(\d{4}-\d{2}-\d{2})\.json$/);
-    if (!match) { continue; }
+    if (!match) {
+      continue;
+    }
     const fileDate = new Date(match[1]);
     if (fileDate < cutoffDate) {
       fs.unlinkSync(path.join(pickerDir, file));
@@ -319,9 +328,7 @@ const DISCORD_MSG_MAX_LENGTH = 1800;
  *   sentSet     — Set<number> of fetcher_index values already sent to Discord
  */
 function loadStatus(group, today) {
-  const statusPath = path.resolve(
-    `artifacts/rss-picker/status-${group}-${today}.json`
-  );
+  const statusPath = path.resolve(`artifacts/rss-picker/status-${group}-${today}.json`);
 
   if (!fs.existsSync(statusPath)) {
     return {
@@ -347,9 +354,7 @@ function loadStatus(group, today) {
  * Persist the status object to disk.
  */
 function saveStatus(group, today, statusData) {
-  const statusPath = path.resolve(
-    `artifacts/rss-picker/status-${group}-${today}.json`
-  );
+  const statusPath = path.resolve(`artifacts/rss-picker/status-${group}-${today}.json`);
   fs.writeFileSync(statusPath, JSON.stringify(statusData, null, 2), "utf-8");
 }
 
@@ -379,9 +384,7 @@ function addToStatus(statusData, fetcherIndex, action) {
  * Returns the number of items actually written.
  */
 function appendToApproved(group, today, newItems) {
-  const filePath = path.resolve(
-    `artifacts/rss-picker/approved-${group}-${today}.json`
-  );
+  const filePath = path.resolve(`artifacts/rss-picker/approved-${group}-${today}.json`);
 
   let existing = [];
   if (fs.existsSync(filePath)) {
@@ -430,8 +433,12 @@ function extractRealUrl(link) {
  */
 function sanitizeGoogleLink(link) {
   try {
-    if (typeof link !== "string") { return link; }
-    if (!link.startsWith("https://www.google.com/url?")) { return link; }
+    if (typeof link !== "string") {
+      return link;
+    }
+    if (!link.startsWith("https://www.google.com/url?")) {
+      return link;
+    }
     const urlObj = new URL(link);
     const realUrl = urlObj.searchParams.get("url");
     return realUrl ? decodeURIComponent(realUrl) : link;
@@ -459,10 +466,27 @@ function stripHtmlTags(str = "") {
  * Format a date string as dd-mmm-yyyy hh:mm:ss (pt-BR month abbreviations).
  */
 function formatDate(dateStr) {
-  if (!dateStr) { return "sem data"; }
+  if (!dateStr) {
+    return "sem data";
+  }
   const date = new Date(dateStr);
-  if (isNaN(date)) { return dateStr; }
-  const meses = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  if (isNaN(date)) {
+    return dateStr;
+  }
+  const meses = [
+    "jan",
+    "fev",
+    "mar",
+    "abr",
+    "mai",
+    "jun",
+    "jul",
+    "ago",
+    "set",
+    "out",
+    "nov",
+    "dez",
+  ];
   const dd = String(date.getDate()).padStart(2, "0");
   const mm = meses[date.getMonth()];
   const yyyy = date.getFullYear();
@@ -479,6 +503,7 @@ function buildItemBlock(item) {
   const displayIndex = item.fetcherIndex;
   const safeTitle = truncate(stripHtmlTags(item.title), 300);
   const safeLink = truncate(sanitizeGoogleLink(item.link), 500);
+  // solution 1: [Link](${safeLink})
   return `\n**[${displayIndex}] ${safeTitle}** (${formatDate(item.published)}) - [Link](<${safeLink}>)\n`;
 }
 
@@ -520,7 +545,9 @@ async function sendInChunks(items, topic, discordWebhookUrl) {
  * Truncate a string to a maximum length, adding ellipsis if needed.
  */
 function truncate(text, max = 100) {
-  if (typeof text !== "string") { return text; }
+  if (typeof text !== "string") {
+    return text;
+  }
   return text.length > max ? text.slice(0, max) + "..." : text;
 }
 
@@ -529,9 +556,7 @@ async function sendFullRssList(allItems, resolvedSet, statusData, topic, discord
 
   const safeTopic = truncate(topic, 100);
 
-  const header =
-    `📋 Lista completa — "${safeTopic}":\n` +
-    `> .apr <N> | .del <N>\n`;
+  const header = `📋 Lista completa — "${safeTopic}":\n` + `> .apr <N> | .del <N>\n`;
 
   const continuation = `🔁 Continuação da lista:\n`;
 
