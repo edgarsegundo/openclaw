@@ -302,6 +302,7 @@ export default async function (context) {
     discordWebhookUrl,
     group,
     blog_article_id,
+    apiKey,
   );
 
   // ── 9. Clean up old files ─────────────────────────────────────────────────
@@ -363,6 +364,7 @@ async function sendPublishedList(
   discordWebhookUrl,
   group,
   blog_article_id,
+  apiKey,
 ) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
