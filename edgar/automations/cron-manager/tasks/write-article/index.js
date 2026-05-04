@@ -138,19 +138,10 @@ export default async function (context) {
   console.log(`  Title: ${article.title}`);
   console.log(`  Link:  ${article.link}`);
 
-  // ─── Lock next position BEFORE generating (simple and safe) ─────────────────
-  // if index update fails, abort (cron will retry with same article)
-  // if generation fails AFTER index update, it's acceptable (index is safe)
+  // ─── [PATCH] Index removido daqui — agora é gravado APÓS salvar o artigo ───
+  // Motivo: se runPrompt ou o save falharem, o index não deve avançar.
+  // O cron vai retentar o mesmo artigo na próxima execução.
   const nextIndex = currentIndex + 1;
-
-  if (nextIndex <= articles.length) {
-    try {
-      fs.writeFileSync(indexPath, nextIndex.toString(), "utf8");
-      console.log(`\n📊 Index locked: ${currentIndex} → ${nextIndex}`);
-    } catch (err) {
-      throw new Error(`Failed to lock index (aborting): ${err.message}`);
-    }
-  }
 
   // ─── Prepare inputs for prompt template ────────────────────────────────────
   const promptInputs = {
@@ -163,13 +154,25 @@ export default async function (context) {
 
   console.log(`\n📝 Generating article content...`);
 
-  const {
-    artifact,
-    model,
-    citations = [],
-    searchResults = [],
-    usage = {},
-  } = await runPrompt(promptInputs);
+  // ─── [PATCH] runPrompt envolto em try/catch explícito ────────────────────
+  // Erros aqui são silenciosos no fluxo original — agora surfaceiam com contexto claro.
+  let runResult;
+  try {
+    runResult = await runPrompt(promptInputs);
+  } catch (err) {
+    throw new Error(`runPrompt failed (index NOT advanced, will retry): ${err.message}`);
+  }
+
+  const { artifact, model, citations = [], searchResults = [], usage = {} } = runResult;
+
+  // ─── [PATCH] Valida retorno mínimo antes de continuar ────────────────────
+  // Se o artifact voltar incompleto, o erro é explícito e o index não avança.
+  if (!artifact?.slug || !artifact?.markdownText) {
+    throw new Error(
+      `runPrompt returned incomplete artifact (index NOT advanced). ` +
+        `slug=${artifact?.slug}, markdownText length=${artifact?.markdownText?.length ?? 0}`,
+    );
+  }
 
   // ── Print summary ─────────────────────────────────────────────────────────
   const wordCount = (artifact.markdownText ?? "").split(/\s+/).length;
@@ -195,44 +198,76 @@ export default async function (context) {
   const artifactName = `${artifact.slug}`;
   const generatedAt = new Date().toISOString();
 
-  // Enriquece o artigo com todas as transformações
-  const { enrichedMarkdown, enrichedArtifact } = enrichArticle({
-    artifact,
-    citations,
-    searchResults,
-    usage,
-  });
+  // ─── [PATCH] enrichArticle envolto em try/catch explícito ────────────────
+  let enrichedMarkdown, enrichedArtifact;
+  try {
+    // Enriquece o artigo com todas as transformações
+    ({ enrichedMarkdown, enrichedArtifact } = enrichArticle({
+      artifact,
+      citations,
+      searchResults,
+      usage,
+    }));
+  } catch (err) {
+    throw new Error(`enrichArticle failed (index NOT advanced): ${err.message}`);
+  }
 
   // ── Save JSON artifact (ENRICHED) ───────────────────────────────────────────
 
   // Salva o JSON no outputDir, igual ao Markdown
   const jsonPath = path.join(outputDir, `${artifactName}.json`);
-  fs.writeFileSync(
-    jsonPath,
-    JSON.stringify(
-      {
-        ...enrichedArtifact,
-        reference_title: article.title,
-        reference_link: article.link,
-        generated_at: generatedAt,
-        word_count: wordCount,
-      },
-      null,
-      2,
-    ),
-    "utf8",
-  );
+  // ─── [PATCH] fs.writeFileSync do JSON envolto em try/catch ───────────────
+  try {
+    fs.writeFileSync(
+      jsonPath,
+      JSON.stringify(
+        {
+          ...enrichedArtifact,
+          reference_title: article.title,
+          reference_link: article.link,
+          generated_at: generatedAt,
+          word_count: wordCount,
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+  } catch (err) {
+    throw new Error(`Failed to save JSON artifact (index NOT advanced): ${err.message}`);
+  }
 
   // ── Save Markdown final ─────────────────────────────────────────────────────
   const finalMarkdown = enrichedMarkdown.includes("\\n")
     ? enrichedMarkdown.replace(/\\n/g, "\n")
     : enrichedMarkdown;
   const mdPath = path.join(outputDir, `${artifact.slug}.md`);
-  fs.writeFileSync(mdPath, finalMarkdown, "utf8");
+  // ─── [PATCH] fs.writeFileSync do Markdown envolto em try/catch ───────────
+  try {
+    fs.writeFileSync(mdPath, finalMarkdown, "utf8");
+  } catch (err) {
+    // JSON já foi salvo — loga com contexto para não deixar inconsistência passar em silêncio
+    throw new Error(`Failed to save Markdown (JSON was saved, index NOT advanced): ${err.message}`);
+  }
 
   console.log(`\n📁 Artifacts saved:`);
   console.log(`   JSON:       ${outputDir}/${artifactName}.json`);
   console.log(`   Markdown:   ${outputDir}/${artifact.slug}.md`);
+
+  // ─── [PATCH] Index gravado AQUI — somente após JSON e Markdown salvos ─────
+  // Se a gravação do index falhar agora, o artigo já existe em disco.
+  // Preferimos um warn (e eventual duplicata na próxima run) a perder o artigo.
+  if (nextIndex <= articles.length) {
+    try {
+      fs.writeFileSync(indexPath, nextIndex.toString(), "utf8");
+      console.log(`\n📊 Index advanced: ${currentIndex} → ${nextIndex}`);
+    } catch (err) {
+      console.warn(`⚠️  Article saved but index update FAILED: ${err.message}`);
+      console.warn(
+        `   Next run will regenerate "${artifact.slug}" — remove duplicate manually if needed.`,
+      );
+    }
+  }
 
   // ─── Final summary ────────────────────────────────────────────────────────
   console.log("\n─────────────────────────────────────────────────────────");
