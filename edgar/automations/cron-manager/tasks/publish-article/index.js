@@ -16,10 +16,11 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *     then sends a Discord list of ALL today's articles with their status.
  *     Discord is only notified when Part 1 actually succeeds — silent otherwise.
  *
- *   Part 2 (manual, Discord command .pub N):
- *     Detects action=pub + item_index=N, looks up the article at index N
- *     in today's status file, runs execute-publish-script + Google Indexing API,
- *     updates status to "published", and notifies Discord with the result.
+ *   Part 2 (manual, Discord command .pub <site_id>):
+ *     Detects action=pub + site_id input, finds all articles in today's status
+ *     with that site_id and status "saved", runs execute-publish-script once for
+ *     that site, then for each article: Google Indexing API + marks as published
+ *     + notifies Discord. Continues even if one article fails.
  *
  * Status file (per groupDir, per day):
  *   {groupDir}/status-<YYYY-MM-DD>.json
@@ -27,10 +28,10 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *   0-based indices that are permanent for the day.
  *
  * Inputs:
- *   groupDir  — path to folder containing generated article *.json/*.md files (required)
+ *   groupDir      — path to folder containing generated article *.json/*.md files (required)
  *   destinations  — array of { business_id, blog_topic_slug, sitemap_url, site_id } (required)
  *   action        — "pub" (manual Discord command, triggers Part 2)
- *   item_index    — 0-based index from today's status file (for .pub N command)
+ *   site_id       — site_id to publish (e.g. "fastvistos") — used by Part 2
  *
  * Env vars:
  *   MYSITESAPP_API_KEY / x-api-key         — API key for the blog endpoint
@@ -62,7 +63,6 @@ export default async function (context) {
   // ── Validate core inputs ─────────────────────────────────────────────────
   const { articles_dir: articlesDir, destinations } = inputs;
   const action = inputs.action ?? null;
-  const itemIndex = inputs.item_index ?? null;
 
   if (!articlesDir) throw new Error("Missing required input: articles_dir");
 
@@ -96,44 +96,41 @@ export default async function (context) {
     return;
   }
 
-  // ── Part 2: manual indexing command (.pub N) ─────────────────────────────
-  if (action === "pub" && itemIndex !== null) {
-    console.log(`\n.pub command received. item_index=${itemIndex}`);
+  // ── Part 2: manual indexing command (.pub <site_id>) ─────────────────────
+  if (action === "pub" && inputs.site_id) {
+    const targetSiteId = (inputs.site_id || "").trim();
+    console.log(`\n.pub command received. site_id=${targetSiteId}`);
 
     const statusData = await loadStatus(articlesDir, today);
-    const idx = Number(itemIndex);
-    const entry = statusData.articles.find((a) => a.index === idx);
 
-    if (!entry) {
-      console.log(`No article found with index ${idx} in today's status. Exiting.`);
+    // Find all saved articles for this site_id
+    const pendingArticles = statusData.articles.filter(
+      (a) => a.site_id === targetSiteId && a.status === "saved",
+    );
+
+    if (!pendingArticles.length) {
+      console.log(`No saved articles found for site_id="${targetSiteId}" in today's status.`);
+      const { notifyDiscord } = await import("../../lib/discord.js");
+      await notifyDiscord(
+        `📭 Nenhum artigo pendente para publicar em '${targetSiteId}'.`,
+        discordWebhookUrl,
+      );
       return;
     }
 
-    console.log(`\nRunning Part 2 for: ${entry.slug}`);
+    console.log(
+      `Found ${pendingArticles.length} article(s) to publish for site_id="${targetSiteId}".`,
+    );
 
-    // Read the article JSON from published/ to get site_id and sitemap_url
-    const json = await readJson(path.join(publishedDir, `${entry.slug}.json`));
-    if (!json) {
-      console.error(`Could not read article JSON for slug: ${entry.slug}. Exiting.`);
-      return;
-    }
-
-    const articleSlugField = json.slug ?? entry.slug;
-    const domain = json.sitemap_url ? new URL(json.sitemap_url).origin : null;
-    const articleUrl = domain ? `${domain}/blog/${articleSlugField}` : null;
-
-    console.log(`Article URL: ${articleUrl}`);
-
-    // Execute publish script
-    const publishPayload = { site_id: json.site_id };
-    console.log(`Posting site_id="${json.site_id}" to execute-publish-script`);
-    const publishSuccess = await postPublish(publishPayload, apiKey);
+    // Execute publish script once for this site
+    console.log(`Posting site_id="${targetSiteId}" to execute-publish-script`);
+    const publishSuccess = await postPublish({ site_id: targetSiteId }, apiKey);
 
     if (!publishSuccess) {
       console.error("POST to execute-publish-script failed.");
       const { notifyDiscord } = await import("../../lib/discord.js");
       await notifyDiscord(
-        `❌ Falha ao executar o script de publicação para: ${entry.slug}`,
+        `❌ Falha ao executar o script de publicação para o site '${targetSiteId}'.`,
         discordWebhookUrl,
       );
       return;
@@ -141,30 +138,50 @@ export default async function (context) {
 
     console.log("Publish script executed successfully!");
 
-    // Submit to Google Indexing API
-    let apiResult = articleUrl
-      ? await submitToIndexingApi(articleUrl)
-      : { ok: false, error: "articleUrl could not be derived (missing sitemap_url in JSON)" };
+    // Process each article: Google Indexing + status update + Discord notification
+    let updatedStatusData = statusData;
 
-    if (!apiResult) {
-      apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
+    for (const entry of pendingArticles) {
+      console.log(`\nProcessing: ${entry.slug}`);
+
+      // Read the article JSON from published/ to get sitemap_url
+      const json = await readJson(path.join(publishedDir, `${entry.slug}.json`));
+      if (!json) {
+        console.error(`Could not read article JSON for slug: ${entry.slug}. Skipping.`);
+        continue;
+      }
+
+      const articleSlugField = json.slug ?? entry.slug;
+      const domain = json.sitemap_url ? new URL(json.sitemap_url).origin : null;
+      const articleUrl = domain ? `${domain}/blog/${articleSlugField}` : null;
+
+      console.log(`Article URL: ${articleUrl}`);
+
+      // Submit to Google Indexing API
+      let apiResult = articleUrl
+        ? await submitToIndexingApi(articleUrl)
+        : { ok: false, error: "articleUrl could not be derived (missing sitemap_url in JSON)" };
+
+      if (!apiResult) {
+        apiResult = { ok: false, error: "submitToIndexingApi returned undefined" };
+      }
+
+      // Update status to published
+      updatedStatusData = markAsPublished(updatedStatusData, entry.index);
+      await saveStatus(articlesDir, today, updatedStatusData);
+
+      // Notify Discord for this article
+      await notifyIndexingResult(
+        entry.slug,
+        apiResult,
+        targetSiteId,
+        discordWebhookUrl,
+        domain,
+        articleUrl,
+      );
     }
 
-    // Update status to published
-    const updatedStatus = markAsPublished(statusData, idx);
-    await saveStatus(articlesDir, today, updatedStatus);
-
-    // Notify Discord
-    await notifyIndexingResult(
-      entry.slug,
-      apiResult,
-      json.site_id,
-      discordWebhookUrl,
-      domain,
-      articleUrl,
-    );
-
-    console.log("\n✅ Part 2 done!");
+    console.log(`\n✅ Part 2 done! Processed ${pendingArticles.length} article(s).`);
     return;
   }
 
@@ -222,7 +239,6 @@ export default async function (context) {
 
   // ── 5. Build and POST article payload ─────────────────────────────────────
   const payload = {
-    // id: randomUUID(),
     business_id: sanitizedBusinessId,
     blog_topic_slug: destination.blog_topic_slug,
     title: json.title,
@@ -249,8 +265,6 @@ export default async function (context) {
   const blog_article_id = (apiResult.article.id ?? "").replace(/-/g, "") || null;
 
   console.log(`** Article posted successfully with ID: ${blog_article_id}`);
-
-  // return { error: true, status: res.status, article: null };
 
   console.log("Saved successfully!");
 
@@ -286,6 +300,7 @@ export default async function (context) {
     saved_at: new Date().toISOString(),
     published_at: null,
     blog_article_id: blog_article_id,
+    site_id: siteId, // ← added so Part 2 can filter by site
   };
 
   statusData.articles.push(newEntry);
@@ -347,7 +362,7 @@ const DISCORD_MSG_MAX_LENGTH = 1800;
 /**
  * Send today's full article list to Discord.
  * Sorted newest-first (descending index) so the new article appears at the top.
- * The article with index === newIndex is highlighted with 🆕.
+ * The article with index === newIndex is highlighted as 🆕.
  */
 async function sendPublishedList(
   statusData,
@@ -362,7 +377,7 @@ async function sendPublishedList(
   const topicLabel = path.basename(articlesDir);
   const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📰 Artigos do dia — "${topicLabel}":\n> .pub <N> para publicar e indexar no Google\n`;
+  const header = `📰 Artigos do dia — "${topicLabel}":\n> .pub <site_id> para publicar e indexar no Google\n`;
   const continuation = `🔁 Continuando...\n`;
 
   let currentMsg = header;
@@ -373,7 +388,8 @@ async function sendPublishedList(
     const statusLabel = article.status === "published" ? "(published ✅)" : "(saved)";
     const prefix = isNew ? "🆕" : "   ";
     const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${article.blog_article_id}&group=${group}`;
-    const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel} - [Editar](<${safeLink}>)`;
+    const siteLabel = article.site_id ? ` [${article.site_id}]` : "";
+    const line = `\n${prefix} [${article.index}] ${article.slug}${siteLabel} ${statusLabel} - [Editar](<${safeLink}>)`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       await notifyDiscord(currentMsg, discordWebhookUrl);
@@ -407,7 +423,6 @@ async function notifyIndexingResult(
 ) {
   const { notifyDiscord } = await import("../../lib/discord.js");
 
-  const apiIcon = apiResult.ok ? "✅" : "❌";
   let msg = apiResult.ok
     ? `✅ Indexação e publicação concluída para '${slug}' com site-id da '${siteId}'`
     : `⚠️ Indexação com erros para: '${slug}' com site-id da '${siteId}'`;
@@ -622,11 +637,9 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
   const { notifyDiscord } = await import("../../lib/discord.js");
 
   const topicLabel = path.basename(articlesDir);
-
-  // Ordena do mais recente para o mais antigo
   const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📋 Lista de artigos — "${topicLabel}":\n> .pub <N> para publicar\n`;
+  const header = `📋 Lista de artigos — "${topicLabel}":\n> .pub <site_id> para publicar\n`;
   const continuation = `🔁 Continuação da lista:\n`;
 
   let currentMsg = header;
@@ -636,13 +649,13 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
     const statusIcon = article.status === "published" ? "✅" : "💾";
 
     let editLink = "";
-
     if (article.status !== "published") {
       const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${article.blog_article_id}&group=${group}`;
       editLink = ` - [Editar](<${safeLink}>)`;
     }
 
-    const line = `\n[${article.index}] ${article.slug} ${statusIcon}${editLink}`;
+    const siteLabel = article.site_id ? ` [${article.site_id}]` : "";
+    const line = `\n[${article.index}] ${article.slug}${siteLabel} ${statusIcon}${editLink}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       await notifyDiscord(currentMsg, discordWebhookUrl);
