@@ -42,3 +42,9 @@ curl http://localhost:3099/api/visa-countries
    pm2 restart visa-api  # Reiniciar a API
    pm2 stop visa-api     # Parar a API
    ```
+
+## How to run locally?
+
+```bash
+cd /Users/edgar/Repos/openclaw/edgar/api & npm run start
+```

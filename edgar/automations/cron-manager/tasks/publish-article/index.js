@@ -525,7 +525,7 @@ async function postArticle(payload, apiKey) {
     return { status: res.status, article: data.article };
   } catch (err) {
     console.error(`POST error: ${err.message}`);
-    return { error: true, status: res.status, article: null };
+    return { error: true, status: null, article: null };
   }
 }
 
