@@ -295,15 +295,7 @@ export default async function (context) {
   // ── 8. Send Discord notification ──────────────────────────────────────────
   // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
   // The article just saved is highlighted as 🆕.
-  await sendPublishedList(
-    statusData,
-    articlesDir,
-    newIndex,
-    discordWebhookUrl,
-    group,
-    blog_article_id,
-    apiKey,
-  );
+  await sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl, group, apiKey);
 
   // ── 9. Clean up old files ─────────────────────────────────────────────────
   await cleanOldFiles(publishedDir, 7);
@@ -363,7 +355,6 @@ async function sendPublishedList(
   newIndex,
   discordWebhookUrl,
   group,
-  blog_article_id,
   apiKey,
 ) {
   const { notifyDiscord } = await import("../../lib/discord.js");
@@ -381,7 +372,7 @@ async function sendPublishedList(
     const isNew = article.index === newIndex;
     const statusLabel = article.status === "published" ? "(published ✅)" : "(saved)";
     const prefix = isNew ? "🆕" : "   ";
-    const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${blog_article_id}&group=${group}`;
+    const safeLink = `https://fastvistos.com.br/msitesapp/api/admin/image-uploader?token=${apiKey}&blog_article_id=${article.blog_article_id}&group=${group}`;
     const line = `\n${prefix} [${article.index}] ${article.slug} ${statusLabel} - [Editar](<${safeLink}>)`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
