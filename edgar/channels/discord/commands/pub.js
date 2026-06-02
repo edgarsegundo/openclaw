@@ -9,35 +9,41 @@ const __dirname = path.dirname(__filename);
 
 export default {
   name: ".pub",
-  description: "Publica artigo por índice",
+  description: "Publica artigo por site_id (ex: .pub fastvistos) ou por índice (ex: .pub 1)",
 
   async execute({ message, args, botName }) {
-    const index = args[0];
-    if (!Number.isInteger(Number(args[0]))) {
-      return message.reply("❌ Índice inválido. Use um número inteiro, por exemplo: .pub 1");
+    const arg = args[0];
+    if (!arg) {
+      return message.reply("❌ Argumento obrigatório. Use `.pub <site_id>` ou `.pub <índice>`.");
     }
 
-    const channelId = message.channel.id;
+    const isIndex = Number.isInteger(Number(arg));
     const channelName = message.channel.name;
 
-    await message.reply(`⏳ Publicando artigo ${index}...`);
+    await message.reply(
+      isIndex ? `⏳ Publicando artigo ${arg}...` : `⏳ Publicando artigos do site '${arg}'...`,
+    );
+
     try {
       const inputPath = path.resolve(
         __dirname,
-        `../../../automations/cron-manager/tasks/publish-article/inputs/inputs-${channelName}.json`
+        `../../../automations/cron-manager/tasks/publish-article/inputs/inputs-${channelName}.json`,
       );
 
       let inputObj = JSON.parse(await fs.readFile(inputPath, "utf-8"));
       inputObj.action = "pub";
-      inputObj.item_index = Number(index);
+
+      if (isIndex) {
+        inputObj.item_index = Number(arg);
+        delete inputObj.site_id;
+      } else {
+        inputObj.site_id = arg;
+        delete inputObj.item_index;
+      }
 
       const inputFile = createTempInputFile(inputObj, inputObj.action);
-      const cmd =
-        `node cron-manager.js run publish-article --template skip --input-file ${inputFile}`;
-      const cwd = path.resolve(
-        __dirname,
-        "../../../automations/cron-manager"
-      );      
+      const cmd = `node cron-manager.js run publish-article --template skip --input-file ${inputFile}`;
+      const cwd = path.resolve(__dirname, "../../../automations/cron-manager");
 
       await new Promise((resolve, reject) => {
         exec(cmd, { cwd }, (error, stdout, stderr) => {
@@ -51,10 +57,10 @@ export default {
         });
       });
 
-      console.log(`✅ Artigo ${index} publicado com sucesso.`);
+      console.log(`✅ Comando .pub ${arg} executado com sucesso.`);
     } catch (err) {
       console.error(err);
-      await message.reply("❌ Erro ao publicar o artigo. Verifique os logs para mais detalhes.");
+      await message.reply("❌ Erro ao publicar. Verifique os logs para mais detalhes.");
     }
   },
 };
