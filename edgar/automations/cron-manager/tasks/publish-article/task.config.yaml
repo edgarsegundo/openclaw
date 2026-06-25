@@ -17,12 +17,12 @@ entrypoint: node index.js
 working_dir: ./tasks/publish-article
 
 # ── Limits ────────────────────────────────────────────────────────────────────
-timeout_seconds:                # leave blank for no timeout
+timeout_seconds: 420            # must exceed the 300s execute-publish-script timeout
 
 retry:
-  max_retries: 0                # number of retries on failure
-  delay_seconds: 5              # wait between retries
-  backoff: linear               # linear | exponential
+  max_retries: 2                # safe: idempotency guard skips already-published items
+  delay_seconds: 10             # wait between retries
+  backoff: exponential          # linear | exponential
 
 # ── Environment variables ─────────────────────────────────────────────────────
 # Declare env vars your task needs. The runner will warn if they are missing.

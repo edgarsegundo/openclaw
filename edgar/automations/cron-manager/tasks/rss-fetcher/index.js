@@ -3,6 +3,11 @@ import * as cheerio from "cheerio";
 import fs from "fs";
 import path from "path";
 import he from "he";
+import { initMonitoring } from "../../lib/monitoring.js";
+import { itemIdFromUrl } from "../../lib/url.js";
+import { writeFileAtomicSync } from "../../lib/atomic.js";
+
+initMonitoring();
 
 // ── HTML utilities ────────────────────────────────────────────────────────────
 
@@ -21,7 +26,7 @@ function stripHtml(str) {
 // ── Metaphone PT-BR ───────────────────────────────────────────────────────────
 // Ported 1:1 from metaphone_pt.py (Python → JavaScript)
 
-const METAPHONE_VALID = new Set(["D","R","T","F","J","K","L","X","V","B","N","M"]);
+const METAPHONE_VALID = new Set(["D", "R", "T", "F", "J", "K", "L", "X", "V", "B", "N", "M"]);
 
 /**
  * Removes diacritics and uppercases — equivalent to Python's
@@ -44,14 +49,14 @@ function metaphonePtBr(word) {
   const output = [];
 
   for (let i = 0; i < length; i++) {
-    const c    = word[i];
+    const c = word[i];
     const next = i + 1 < length ? word[i + 1] : "";
-    const prev = i > 0          ? word[i - 1] : "";
+    const prev = i > 0 ? word[i - 1] : "";
 
     if ("AEIOUYH".includes(c)) {
       continue;
     } else if (c === "C") {
-      if (next === "H")            output.push("X");
+      if (next === "H") output.push("X");
       else if ("EI".includes(next)) output.push("S");
       else if ("AOU".includes(next)) output.push("K");
     } else if (c === "G") {
@@ -88,14 +93,82 @@ function metaphonePtBr(word) {
 // ── Stop words PT-BR ──────────────────────────────────────────────────────────
 
 const STOP_WORDS = new Set([
-  "a","ao","aos","as","com","da","das","de","do","dos","e","em","é",
-  "na","nas","no","nos","o","os","ou","para","pela","pelas","pelo",
-  "pelos","por","que","se","um","uma","uns","umas","à","às",
-  "mais","mas","já","até","após","sobre","entre","contra","sem",
-  "sua","seu","suas","seus","isso","este","esta","esse","essa",
-  "esses","estas","estes","essas","foi","são","está","ser",
-  "ter","tem","têm","havia","como","quando","onde","quem","qual",
-  "quais","novo","nova","novos","novas","grande","grandes",
+  "a",
+  "ao",
+  "aos",
+  "as",
+  "com",
+  "da",
+  "das",
+  "de",
+  "do",
+  "dos",
+  "e",
+  "em",
+  "é",
+  "na",
+  "nas",
+  "no",
+  "nos",
+  "o",
+  "os",
+  "ou",
+  "para",
+  "pela",
+  "pelas",
+  "pelo",
+  "pelos",
+  "por",
+  "que",
+  "se",
+  "um",
+  "uma",
+  "uns",
+  "umas",
+  "à",
+  "às",
+  "mais",
+  "mas",
+  "já",
+  "até",
+  "após",
+  "sobre",
+  "entre",
+  "contra",
+  "sem",
+  "sua",
+  "seu",
+  "suas",
+  "seus",
+  "isso",
+  "este",
+  "esta",
+  "esse",
+  "essa",
+  "esses",
+  "estas",
+  "estes",
+  "essas",
+  "foi",
+  "são",
+  "está",
+  "ser",
+  "ter",
+  "tem",
+  "têm",
+  "havia",
+  "como",
+  "quando",
+  "onde",
+  "quem",
+  "qual",
+  "quais",
+  "novo",
+  "nova",
+  "novos",
+  "novas",
+  "grande",
+  "grandes",
 ]);
 
 // ── Title fingerprint pipeline ────────────────────────────────────────────────
@@ -117,14 +190,12 @@ function removeFonteSuffix(str) {
  * Returns a stable, human-readable fingerprint string.
  */
 function titleFingerprint(title) {
-  const clean = removeFonteSuffix(
-    title.toLowerCase().trim().replace(/\s+/g, " ")
-  );
+  const clean = removeFonteSuffix(title.toLowerCase().trim().replace(/\s+/g, " "));
 
   const tokens = clean
     .split(/\s+/)
-    .map(w => w.replace(/[^a-záàãâéêíóôõúüçñ]/gi, ""))
-    .filter(w => w.length > 1 && !STOP_WORDS.has(w))
+    .map((w) => w.replace(/[^a-záàãâéêíóôõúüçñ]/gi, ""))
+    .filter((w) => w.length > 1 && !STOP_WORDS.has(w))
     .map(metaphonePtBr)
     .filter(Boolean);
 
@@ -138,7 +209,7 @@ function jaccardSimilarity(fpA, fpB) {
   if (!fpA || !fpB) return 0;
   const setA = new Set(fpA.split("-"));
   const setB = new Set(fpB.split("-"));
-  const intersection = [...setA].filter(t => setB.has(t)).length;
+  const intersection = [...setA].filter((t) => setB.has(t)).length;
   const union = new Set([...setA, ...setB]).size;
   return union === 0 ? 0 : intersection / union;
 }
@@ -166,13 +237,14 @@ function loadSeenHashes(artifactsDir, keepDays, group) {
     return {};
   }
 
-  const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const cutoff = new Date(Date.now() - keepDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   let purged = 0;
   for (const [key, date] of Object.entries(hashes)) {
-    if (date < cutoff) { delete hashes[key]; purged++; }
+    if (date < cutoff) {
+      delete hashes[key];
+      purged++;
+    }
   }
 
   if (purged > 0) {
@@ -184,7 +256,7 @@ function loadSeenHashes(artifactsDir, keepDays, group) {
 
 function saveSeenHashes(artifactsDir, hashes, group) {
   const filePath = path.join(artifactsDir, getSeenHashesFilename(group));
-  fs.writeFileSync(filePath, JSON.stringify(hashes, null, 2), "utf8");
+  writeFileAtomicSync(filePath, JSON.stringify(hashes, null, 2));
 }
 
 /**
@@ -230,10 +302,7 @@ function proximityBonus(text, pattern, windowSize = 8) {
 
 function scorePattern(text, pattern) {
   if (!text || !pattern) return 0;
-  const exactRegex = new RegExp(
-    pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    "i"
-  );
+  const exactRegex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
   let score = 0;
   if (exactRegex.test(text)) {
     score += 2;
@@ -283,8 +352,14 @@ async function isAllowedByRobots(url) {
 
     let applicable = false;
     for (const line of lines) {
-      if (/^user-agent:\s*\*/i.test(line)) { applicable = true; continue; }
-      if (/^user-agent:/i.test(line)) { applicable = false; continue; }
+      if (/^user-agent:\s*\*/i.test(line)) {
+        applicable = true;
+        continue;
+      }
+      if (/^user-agent:/i.test(line)) {
+        applicable = false;
+        continue;
+      }
       if (applicable && /^disallow:/i.test(line)) {
         const disallowed = line.replace(/^disallow:\s*/i, "").trim();
         if (disallowed && pathname.startsWith(disallowed)) return false;
@@ -330,7 +405,12 @@ function looksLikeArticle($, el, href) {
   if (text.length >= 20 && text.length <= 200) score++;
 
   // 2. URL pattern suggests an article (date, long slug, known extensions)
-  if (/\/\d{4}\/\d{2}\//.test(href) || /\.(html?|ghtml)$/i.test(href) || href.split("/").filter(Boolean).length >= 3) score++;
+  if (
+    /\/\d{4}\/\d{2}\//.test(href) ||
+    /\.(html?|ghtml)$/i.test(href) ||
+    href.split("/").filter(Boolean).length >= 3
+  )
+    score++;
 
   // 3. Inside a semantic container
   const semanticParents = ["article", "main", "section"];
@@ -338,13 +418,16 @@ function looksLikeArticle($, el, href) {
   const parents = $(el).parents().toArray();
   const inSemantic = parents.some((p) => {
     const tag = (p.tagName || "").toLowerCase();
-    const cls = ($(p).attr("class") || "");
+    const cls = $(p).attr("class") || "";
     return semanticParents.includes(tag) || semanticClasses.test(cls);
   });
   if (inSemantic) score++;
 
   // 4. URL is not navigation/utility
-  const isNav = /\/(tag|autor|categoria|author|category|search|busca|login|register|#|mailto:|javascript:)/i.test(href);
+  const isNav =
+    /\/(tag|autor|categoria|author|category|search|busca|login|register|#|mailto:|javascript:)/i.test(
+      href,
+    );
   if (!isNav) score++;
 
   return score >= 2;
@@ -361,7 +444,9 @@ async function fetchFromScraper(feed) {
   const { link_selector, title_selector } = tips;
   const mode = link_selector ? "preciso" : "heurístico";
 
-  console.log(`[scraper] Fetching: ${feed.name} (modo: ${mode}${link_selector ? `, selector: ${link_selector}` : ""})`);
+  console.log(
+    `[scraper] Fetching: ${feed.name} (modo: ${mode}${link_selector ? `, selector: ${link_selector}` : ""})`,
+  );
 
   // ── robots.txt check ──────────────────────────────────────────────────────
   const allowed = await isAllowedByRobots(feed.url);
@@ -457,10 +542,14 @@ async function fetchFromScraper(feed) {
     return true;
   });
 
-  console.log(`[scraper] ${candidates.length} candidatos encontrados, ${unique.length} únicos com título válido.`);
+  console.log(
+    `[scraper] ${candidates.length} candidatos encontrados, ${unique.length} únicos com título válido.`,
+  );
 
   if (unique.length === 0) {
-    console.warn(`[scraper][warn] Feed "${feed.name}" retornou 0 itens — verifique o layout ou o link_selector.`);
+    console.warn(
+      `[scraper][warn] Feed "${feed.name}" retornou 0 itens — verifique o layout ou o link_selector.`,
+    );
   }
 
   return unique;
@@ -479,7 +568,14 @@ async function fetchFromScraper(feed) {
  * @param {Date|null} sinceCutoff
  * @param {object} seenHashes
  */
-function scoreAndFilterItems(rawItems, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes) {
+function scoreAndFilterItems(
+  rawItems,
+  feed,
+  topicPatterns,
+  excludePatterns,
+  sinceCutoff,
+  seenHashes,
+) {
   return rawItems
     .map((raw) => {
       const title = stripHtml(raw.title || "").toLowerCase();
@@ -509,7 +605,9 @@ function scoreAndFilterItems(rawItems, feed, topicPatterns, excludePatterns, sin
       const matchedKey = findDuplicateInHistory(fp, seenHashes);
       if (matchedKey) {
         const isExact = matchedKey === fp;
-        const simLabel = isExact ? "exact" : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
+        const simLabel = isExact
+          ? "exact"
+          : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
         console.log(`  [skip][dup:${simLabel}] score=${score} "${(raw.title || "").slice(0, 80)}"`);
         return null;
       }
@@ -552,7 +650,7 @@ function scoreAndFilterItems(rawItems, feed, topicPatterns, excludePatterns, sin
  *   category         - filter default feeds by category (default: all)
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, saveArtifact } = context;
+  const { taskName, mode, executionId, inputs, saveArtifact, track } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -563,10 +661,12 @@ export default async function (context) {
   const sinceHours = Number(inputs.since_hours) || 0;
   const category = (inputs.category || "").trim().toLowerCase();
   const feedJsFile = (inputs.feeds_js_file || "").trim() || "feeds.js";
-  
+
   const group = (inputs.group || "").trim();
   if (!group) {
-    console.error("❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'");
+    console.error(
+      "❌ Parâmetro 'group' obrigatório. Defina no arquivo dentro do diretório 'inputs'",
+    );
     return;
   }
 
@@ -589,7 +689,10 @@ export default async function (context) {
     customPatterns.length > 0
       ? customPatterns
       : topic
-        ? topic.split(";").map((p) => p.trim().toLowerCase()).filter(Boolean)
+        ? topic
+            .split(";")
+            .map((p) => p.trim().toLowerCase())
+            .filter(Boolean)
         : [];
 
   if (topicPatterns.length === 0) {
@@ -614,15 +717,18 @@ export default async function (context) {
       return langMatch && categoryMatch;
     });
     const categoryLabel = category ? `category '${category}', ` : "";
-    console.log(`Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`);
+    console.log(
+      `Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`,
+    );
   }
 
   // ── 2. Compute date cutoff ────────────────────────────────────────────────
-  const sinceCutoff =
-    sinceHours > 0 ? new Date(Date.now() - sinceHours * 60 * 60 * 1000) : null;
+  const sinceCutoff = sinceHours > 0 ? new Date(Date.now() - sinceHours * 60 * 60 * 1000) : null;
 
   if (sinceCutoff) {
-    console.log(`Only including items published after: ${sinceCutoff.toISOString()} (last ${sinceHours}h)`);
+    console.log(
+      `Only including items published after: ${sinceCutoff.toISOString()} (last ${sinceHours}h)`,
+    );
   }
 
   // ── 3. RSS parser instance ────────────────────────────────────────────────
@@ -669,7 +775,12 @@ export default async function (context) {
         }));
 
         const relevant = scoreAndFilterItems(
-          shaped, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes
+          shaped,
+          feed,
+          topicPatterns,
+          excludePatterns,
+          sinceCutoff,
+          seenHashes,
         );
 
         console.log(`${rawItems.length} itens extraídos, ${relevant.length} relevantes.`);
@@ -683,7 +794,6 @@ export default async function (context) {
         const delay = randomDelay();
         console.log(`[scraper] Aguardando ${delay}ms antes do próximo feed...`);
         await sleep(delay);
-
       } else {
         // ── RSS path (original behaviour, unchanged) ───────────────────────
         process.stdout.write(`Fetching: ${feed.name} ... `);
@@ -700,7 +810,12 @@ export default async function (context) {
         }));
 
         const relevant = scoreAndFilterItems(
-          shaped, feed, topicPatterns, excludePatterns, sinceCutoff, seenHashes
+          shaped,
+          feed,
+          topicPatterns,
+          excludePatterns,
+          sinceCutoff,
+          seenHashes,
         );
 
         console.log(`${items.length} items found, ${relevant.length} relevant.`);
@@ -710,10 +825,17 @@ export default async function (context) {
           collectedItems.push(item);
         }
       }
-
     } catch (err) {
       console.log(`ERROR — ${err.message}`);
       errors.push({ feed: feed.name, url: feed.url, error: err.message });
+      track?.({
+        group,
+        step: "fetch",
+        status: "failed",
+        reason: "feed_error",
+        error: err,
+        meta: { feed: feed.name, url: feed.url },
+      });
     }
   }
 
@@ -722,9 +844,9 @@ export default async function (context) {
   const seenFps = [];
 
   for (const item of collectedItems) {
-    const isDup = seenFps.some(existingFp =>
-      existingFp === item._fp ||
-      jaccardSimilarity(item._fp, existingFp) >= JACCARD_THRESHOLD
+    const isDup = seenFps.some(
+      (existingFp) =>
+        existingFp === item._fp || jaccardSimilarity(item._fp, existingFp) >= JACCARD_THRESHOLD,
     );
 
     if (!isDup) {
@@ -734,9 +856,7 @@ export default async function (context) {
   }
 
   // Strip internal _fp field and apply max_items cap
-  const finalItems = uniqueItems
-    .slice(0, maxItems)
-    .map(({ _fp, ...rest }) => rest);
+  const finalItems = uniqueItems.slice(0, maxItems).map(({ _fp, ...rest }) => rest);
 
   // ── 7. Sort by score, then newest date ───────────────────────────────────
   finalItems.sort((a, b) => {
@@ -774,7 +894,9 @@ export default async function (context) {
   console.log("─────────────────────────────────────────────────────────\n");
 
   if (finalItems.length === 0) {
-    console.warn("No items found for this topic. Try broader patterns, fewer exclusions, a larger since_hours window, or more feeds.");
+    console.warn(
+      "No items found for this topic. Try broader patterns, fewer exclusions, a larger since_hours window, or more feeds.",
+    );
   } else {
     for (const item of finalItems) {
       const date = item.published
@@ -787,9 +909,7 @@ export default async function (context) {
 
   // ── 10. Save artifact (merge with existing day file) ──────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const artifactName = group
-    ? `fetched-items-${group}-${today}`
-    : `fetched-items-${today}`;
+  const artifactName = group ? `fetched-items-${group}-${today}` : `fetched-items-${today}`;
 
   if (finalItems.length > 0) {
     // Tenta carregar o artefato já existente do dia via fs
@@ -825,9 +945,24 @@ export default async function (context) {
     };
 
     await saveArtifact(artifactName, mergedArtifact);
-    console.log(`\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${finalItems.length} novos)`);
+    console.log(
+      `\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${finalItems.length} novos)`,
+    );
   } else {
     console.log(`\nNo new items — artifact not overwritten (${artifactName}.json preserved).`);
+  }
+
+  // ── 10b. Track items that entered the pipeline (observability) ────────────
+  for (const item of finalItems) {
+    track?.({
+      itemId: itemIdFromUrl(item.link),
+      group,
+      step: "fetch",
+      status: "ok",
+      title: item.title,
+      url: item.link,
+      meta: { score: item.score, source: item.source },
+    });
   }
 
   // ── 11. Update seen-hashes with this execution's items ───────────────────

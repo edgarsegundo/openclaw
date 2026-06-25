@@ -8,7 +8,16 @@ import chalk from "chalk";
 
 import logger from "./lib/logger.js";
 import { loadConfig, validateConfig, validateCronExpression } from "./lib/validator.js";
-import { initDb, getLastRun, getHistory, getFailedHistory } from "./lib/db.js";
+import {
+  initDb,
+  getLastRun,
+  getHistory,
+  getFailedHistory,
+  getAllGroups,
+  getStepFunnel,
+  getStuckItems,
+  getRecentErrors,
+} from "./lib/db.js";
 import { runTask, listTaskNames, getTaskDir, taskExists } from "./lib/runner.js";
 import {
   listTemplateNames,
@@ -97,14 +106,8 @@ program
     ]);
 
     // Read templates
-    const yamlTemplate = fs.readFileSync(
-      path.join(TEMPLATES_DIR, "task.config.yaml"),
-      "utf8"
-    );
-    const jsTemplate = fs.readFileSync(
-      path.join(TEMPLATES_DIR, "index.js"),
-      "utf8"
-    );
+    const yamlTemplate = fs.readFileSync(path.join(TEMPLATES_DIR, "task.config.yaml"), "utf8");
+    const jsTemplate = fs.readFileSync(path.join(TEMPLATES_DIR, "index.js"), "utf8");
 
     const today = new Date().toISOString().slice(0, 10);
     const templateName = answers.templateName?.trim() ?? "my-template";
@@ -159,7 +162,7 @@ program
       logger.info("Suggested crontab entry:");
       console.log();
       console.log(
-        `  ${answers.cronExpression} cd ${absPath} && node cron-manager.js run ${name} --mode cron`
+        `  ${answers.cronExpression} cd ${absPath} && node cron-manager.js run ${name} --mode cron`,
       );
       console.log();
     }
@@ -167,13 +170,15 @@ program
 
 // ── run ──────────────────────────────────────────────────────────────────────
 
-
 program
   .command("run <task>")
   .description("Run a task")
   .option("-m, --mode <mode>", "Execution mode: manual | cron", "manual")
   .option("-t, --template <template>", "Prompt template to use")
-  .option("-i, --input-file <path>", "Path to a JSON file with all inputs (skips interactive prompts)")
+  .option(
+    "-i, --input-file <path>",
+    "Path to a JSON file with all inputs (skips interactive prompts)",
+  )
   .option("--article-index <n>", "Índice do artigo em articleInputs[] (para cluster.result.json)")
   .option("--dry-run", "Show what would run without executing", false)
   .action(async (task, opts) => {
@@ -300,15 +305,11 @@ program
     initDb();
 
     const limit = parseInt(opts.limit, 10) || 20;
-    const runs = opts.failed
-      ? getFailedHistory(task, limit)
-      : getHistory(task, limit);
+    const runs = opts.failed ? getFailedHistory(task, limit) : getHistory(task, limit);
 
     if (runs.length === 0) {
       logger.info(
-        opts.failed
-          ? `No failed runs found for "${task}".`
-          : `No execution history for "${task}".`
+        opts.failed ? `No failed runs found for "${task}".` : `No execution history for "${task}".`,
       );
       return;
     }
@@ -323,6 +324,80 @@ program
     ]);
 
     logger.table(headers, rows);
+  });
+
+// ── pipeline ───────────────────────────────────────────────────────────────────
+
+const STEPS = ["fetch", "pick", "write", "publish", "index"];
+
+program
+  .command("pipeline")
+  .description("Show per-item pipeline tracking: funnel, stuck items, recent errors")
+  .option("-g, --group <group>", "Filter by pipeline group")
+  .action((opts) => {
+    initDb();
+    const group = opts.group || null;
+
+    const groups = getAllGroups();
+    logger.header("Pipeline status" + (group ? ` — ${group}` : ""));
+    if (groups.length) {
+      logger.step(`Groups: ${groups.join(", ")}`);
+    }
+
+    // Funnel: items per step, broken down by status.
+    const funnel = getStepFunnel(group);
+    const byStep = Object.fromEntries(STEPS.map((s) => [s, { ok: 0, skipped: 0, failed: 0 }]));
+    for (const r of funnel) {
+      if (byStep[r.step] && byStep[r.step][r.status] !== undefined) {
+        byStep[r.step][r.status] = r.items;
+      }
+    }
+    logger.header("\nFunnel (distinct items per step)");
+    logger.table(
+      ["STEP", "OK", "SKIPPED", "FAILED"],
+      STEPS.map((s) => [
+        s,
+        chalk.green(byStep[s].ok),
+        byStep[s].skipped ? chalk.yellow(byStep[s].skipped) : "0",
+        byStep[s].failed ? chalk.red(byStep[s].failed) : "0",
+      ]),
+    );
+
+    // Stuck items (current_status = failed).
+    const stuck = getStuckItems(50).filter((s) => !group || s.group_name === group);
+    logger.header("\nStuck items (failed)");
+    if (!stuck.length) {
+      logger.success("None 🎉");
+    } else {
+      logger.table(
+        ["ITEM", "GROUP", "STEP", "LAST ERROR"],
+        stuck.map((s) => [
+          (s.title || s.item_id || "").slice(0, 30),
+          s.group_name || "—",
+          s.current_step,
+          chalk.red((s.last_error || "").slice(0, 40)),
+        ]),
+      );
+    }
+
+    // Recent errors.
+    const errors = getRecentErrors(15).filter((e) => !group || e.group_name === group);
+    logger.header("\nRecent errors");
+    if (!errors.length) {
+      logger.success("None 🎉");
+    } else {
+      logger.table(
+        ["WHEN", "STEP", "GROUP", "MESSAGE"],
+        errors.map((e) => [
+          (e.created_at || "").replace("T", " ").slice(0, 19),
+          e.step,
+          e.group_name || "—",
+          chalk.red((e.error_message || e.reason || "").slice(0, 40)),
+        ]),
+      );
+    }
+
+    logger.step("\nFull timeline + auto-refresh: node apps/pipeline-dashboard/server.js");
   });
 
 // ── inspect ──────────────────────────────────────────────────────────────────
@@ -353,8 +428,8 @@ program
     logger.step(`working_dir:    ${chalk.white(config.working_dir || "./")}`);
     logger.step(
       `timeout:        ${chalk.white(
-        config.timeout_seconds ? `${config.timeout_seconds}s` : "none"
-      )}`
+        config.timeout_seconds ? `${config.timeout_seconds}s` : "none",
+      )}`,
     );
 
     const retry = config.retry || {};
@@ -362,8 +437,8 @@ program
       `retry:          ${chalk.white(
         retry.max_retries
           ? `${retry.max_retries} retries, ${retry.delay_seconds}s delay (${retry.backoff || "linear"})`
-          : "none"
-      )}`
+          : "none",
+      )}`,
     );
 
     // Env vars
@@ -393,13 +468,8 @@ program
       logger.step("Inputs:");
       for (const input of config.inputs) {
         const req = input.required ? chalk.red(" (required)") : "";
-        const def =
-          input.default != null
-            ? chalk.gray(` [default: ${input.default}]`)
-            : "";
-        logger.step(
-          `  ${chalk.cyan(input.name)} [${input.type || "string"}]${req}${def}`
-        );
+        const def = input.default != null ? chalk.gray(` [default: ${input.default}]`) : "";
+        logger.step(`  ${chalk.cyan(input.name)} [${input.type || "string"}]${req}${def}`);
       }
     }
 
@@ -413,7 +483,7 @@ program
           const tConfig = loadTemplateConfig(taskDir, tName);
           const inputCount = (tConfig.inputs || []).length;
           logger.step(
-            `  → ${chalk.cyan(tName)}  [${tConfig.provider} / ${tConfig.model}]  ${inputCount} input${inputCount !== 1 ? "s" : ""}`
+            `  → ${chalk.cyan(tName)}  [${tConfig.provider} / ${tConfig.model}]  ${inputCount} input${inputCount !== 1 ? "s" : ""}`,
           );
         } catch {
           logger.step(`  → ${chalk.cyan(tName)}  (invalid config)`);
@@ -431,7 +501,7 @@ program
         const exists = fs.existsSync(filePath);
         const status = exists ? chalk.green("exists") : chalk.gray("never saved");
         logger.step(
-          `  → ${chalk.cyan(art.name)}  [${art.template || "?"}]  ${path.relative(ROOT, filePath)}  ${status}`
+          `  → ${chalk.cyan(art.name)}  [${art.template || "?"}]  ${path.relative(ROOT, filePath)}  ${status}`,
         );
       }
     }
@@ -443,12 +513,8 @@ program
     if (last) {
       const ts = last.started_at.replace("T", " ").slice(0, 19);
       const statusColor =
-        last.status === "success"
-          ? chalk.green(last.status)
-          : chalk.red(last.status);
-      logger.step(
-        `Last run: ${ts} — ${statusColor} (${last.duration_ms ?? "?"}ms)`
-      );
+        last.status === "success" ? chalk.green(last.status) : chalk.red(last.status);
+      logger.step(`Last run: ${ts} — ${statusColor} (${last.duration_ms ?? "?"}ms)`);
     } else {
       logger.step("Last run: none");
     }

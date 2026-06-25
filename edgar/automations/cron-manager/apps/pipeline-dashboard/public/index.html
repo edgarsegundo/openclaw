@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pipeline Dashboard</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --panel: #171a21;
+        --border: #262b36;
+        --text: #e6e8ee;
+        --muted: #8b93a3;
+        --ok: #2ecc71;
+        --skip: #f1c40f;
+        --fail: #e74c3c;
+        --accent: #5b8def;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        z-index: 5;
+      }
+      header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+      header .spacer { flex: 1; }
+      select, button {
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      main { padding: 20px; display: grid; gap: 20px; }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 16px;
+      }
+      .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 12px; }
+      .funnel { display: flex; gap: 10px; flex-wrap: wrap; }
+      .stage {
+        flex: 1;
+        min-width: 130px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        background: #1c2029;
+      }
+      .stage .name { font-weight: 600; text-transform: capitalize; margin-bottom: 8px; }
+      .stage .count { font-size: 26px; font-weight: 700; }
+      .stage .breakdown { font-size: 12px; color: var(--muted); margin-top: 6px; }
+      .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+      .dot.ok { background: var(--ok); }
+      .dot.skipped { background: var(--skip); }
+      .dot.failed { background: var(--fail); }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+      tr.clickable:hover { background: #1c2029; cursor: pointer; }
+      .badge { padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+      .badge.ok { background: rgba(46,204,113,.15); color: var(--ok); }
+      .badge.skipped { background: rgba(241,196,15,.15); color: var(--skip); }
+      .badge.failed { background: rgba(231,76,60,.15); color: var(--fail); }
+      .badge.pending, .badge.started, .badge.retrying { background: rgba(91,141,239,.15); color: var(--accent); }
+      .muted { color: var(--muted); }
+      .err { color: var(--fail); font-size: 12px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+      /* modal */
+      .overlay {
+        position: fixed; inset: 0; background: rgba(0,0,0,.6);
+        display: none; align-items: center; justify-content: center; z-index: 20; padding: 20px;
+      }
+      .overlay.open { display: flex; }
+      .modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; max-width: 760px; width: 100%; max-height: 85vh; overflow: auto; padding: 20px; }
+      .timeline-step { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+      .timeline-step .when { color: var(--muted); font-size: 12px; min-width: 160px; }
+      .close { float: right; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>📊 Pipeline Dashboard</h1>
+      <select id="groupSelect"><option value="">(todos os grupos)</option></select>
+      <button id="refreshBtn">↻ Atualizar</button>
+      <label class="muted"><input type="checkbox" id="autoRefresh" checked /> auto 10s</label>
+      <div class="spacer"></div>
+      <span class="muted" id="lastUpdate"></span>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Funil — onde os itens estão (e onde travam)</h2>
+        <div class="funnel" id="funnel"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Itens (estado atual)</h2>
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Etapa</th><th>Status</th><th>Último erro</th><th>Atualizado</th></tr>
+          </thead>
+          <tbody id="itemsBody"><tr><td colspan="5" class="muted">Selecione um grupo…</td></tr></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Erros recentes</h2>
+        <table>
+          <thead>
+            <tr><th>Quando</th><th>Etapa</th><th>Grupo</th><th>Mensagem</th></tr>
+          </thead>
+          <tbody id="errorsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>Execuções recentes (runs)</h2>
+        <table>
+          <thead>
+            <tr><th>Task</th><th>Status</th><th>Início</th><th>Duração</th><th>Erro</th></tr>
+          </thead>
+          <tbody id="runsBody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <div class="overlay" id="overlay">
+      <div class="modal">
+        <button class="close" onclick="closeModal()">✕ fechar</button>
+        <h2 id="modalTitle">Timeline do item</h2>
+        <div id="timeline"></div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let currentGroup = "";
+
+      // Resolve API calls relative to the current page so the dashboard works
+      // both at the server root (http://localhost:4500/) and behind a reverse
+      // proxy subpath (https://fastvistos.com.br/pipeline/). Requires the page
+      // to be served with a trailing slash when under a subpath.
+      async function api(p) {
+        const r = await fetch(p.replace(/^\//, ""));
+        if (!r.ok) throw new Error((await r.json()).error || r.statusText);
+        return r.json();
+      }
+
+      function badge(status) {
+        return `<span class="badge ${status}">${status}</span>`;
+      }
+      function esc(s) {
+        return String(s ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+      }
+      function fmt(ts) {
+        if (!ts) return "—";
+        const d = new Date(ts);
+        return isNaN(d) ? ts : d.toLocaleString("pt-BR");
+      }
+
+      async function loadGroups() {
+        const groups = await api("/api/groups");
+        const sel = $("groupSelect");
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">(todos os grupos)</option>' +
+          groups.map((g) => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
+        sel.value = prev;
+      }
+
+      async function loadFunnel() {
+        const q = currentGroup ? `?group=${encodeURIComponent(currentGroup)}` : "";
+        const stages = await api("/api/funnel" + q);
+        $("funnel").innerHTML = stages
+          .map(
+            (s) => `
+          <div class="stage">
+            <div class="name">${esc(s.step)}</div>
+            <div class="count">${s.ok}</div>
+            <div class="breakdown">
+              <span class="dot ok"></span>${s.ok} ok
+              &nbsp;<span class="dot skipped"></span>${s.skipped} skip
+              &nbsp;<span class="dot failed"></span>${s.failed} fail
+            </div>
+          </div>`,
+          )
+          .join("");
+      }
+
+      async function loadItems() {
+        const body = $("itemsBody");
+        if (!currentGroup) {
+          body.innerHTML = '<tr><td colspan="5" class="muted">Selecione um grupo para ver os itens.</td></tr>';
+          return;
+        }
+        const items = await api(`/api/items?group=${encodeURIComponent(currentGroup)}`);
+        if (!items.length) {
+          body.innerHTML = '<tr><td colspan="5" class="muted">Nenhum item ainda.</td></tr>';
+          return;
+        }
+        body.innerHTML = items
+          .map(
+            (it) => `
+          <tr class="clickable" onclick="showTimeline('${esc(it.item_id)}','${esc(it.title)}')">
+            <td>${esc(it.title || it.item_id)}<div class="muted">${esc(it.item_id)}</div></td>
+            <td>${esc(it.current_step)}</td>
+            <td>${badge(it.current_status)}</td>
+            <td class="err" title="${esc(it.last_error || "")}">${esc(it.last_error || "")}</td>
+            <td class="muted">${fmt(it.updated_at)}</td>
+          </tr>`,
+          )
+          .join("");
+      }
+
+      async function loadErrors() {
+        const errs = await api("/api/errors");
+        $("errorsBody").innerHTML = errs.length
+          ? errs
+              .map(
+                (e) => `
+          <tr><td class="muted">${fmt(e.created_at)}</td><td>${esc(e.step)}</td>
+          <td>${esc(e.group_name || "—")}</td>
+          <td class="err" title="${esc(e.error_message || "")}">${esc(e.error_message || e.reason || "")}</td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="4" class="muted">Sem erros recentes 🎉</td></tr>';
+      }
+
+      async function loadRuns() {
+        const runs = await api("/api/runs");
+        $("runsBody").innerHTML = runs
+          .map(
+            (r) => `
+          <tr><td>${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
+          <td class="muted">${fmt(r.started_at)}</td>
+          <td class="muted">${r.duration_ms != null ? (r.duration_ms / 1000).toFixed(1) + "s" : "—"}</td>
+          <td class="err" title="${esc(r.error_message || "")}">${esc(r.error_message || "")}</td></tr>`,
+          )
+          .join("");
+      }
+
+      window.showTimeline = async function (id, title) {
+        $("modalTitle").textContent = title || id;
+        const events = await api(`/api/item?id=${encodeURIComponent(id)}`);
+        $("timeline").innerHTML = events
+          .map(
+            (e) => `
+          <div class="timeline-step">
+            <div class="when">${fmt(e.created_at)}</div>
+            <div style="flex:1">
+              <strong>${esc(e.step)}</strong> ${badge(e.status)}
+              ${e.attempt > 1 ? `<span class="muted">(tentativa ${e.attempt})</span>` : ""}
+              ${e.reason ? `<span class="muted"> — ${esc(e.reason)}</span>` : ""}
+              ${e.error_message ? `<pre>${esc(e.error_message)}</pre>` : ""}
+              ${e.error_stack ? `<pre>${esc(e.error_stack)}</pre>` : ""}
+              ${e.meta_json ? `<pre>${esc(e.meta_json)}</pre>` : ""}
+            </div>
+          </div>`,
+          )
+          .join("");
+        $("overlay").classList.add("open");
+      };
+      window.closeModal = () => $("overlay").classList.remove("open");
+
+      async function refresh() {
+        try {
+          await Promise.all([loadGroups(), loadFunnel(), loadItems(), loadErrors(), loadRuns()]);
+          $("lastUpdate").textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR");
+        } catch (e) {
+          $("lastUpdate").textContent = "erro: " + e.message;
+        }
+      }
+
+      $("groupSelect").addEventListener("change", (e) => {
+        currentGroup = e.target.value;
+        refresh();
+      });
+      $("refreshBtn").addEventListener("click", refresh);
+      $("overlay").addEventListener("click", (e) => {
+        if (e.target.id === "overlay") closeModal();
+      });
+
+      let timer = setInterval(() => $("autoRefresh").checked && refresh(), 10000);
+      refresh();
+    </script>
+  </body>
+</html>

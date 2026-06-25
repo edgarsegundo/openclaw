@@ -8,6 +8,14 @@ allow_cron: true
 entrypoint: node index.js
 working_dir: ./tasks/rss-picker
 
+# ── Limits ────────────────────────────────────────────────────────────────────
+timeout_seconds: 180            # AI triage call + I/O
+
+retry:
+  max_retries: 2                # number of retries on failure
+  delay_seconds: 10             # wait between retries
+  backoff: exponential          # linear | exponential
+
 env_vars:
   common: []
 

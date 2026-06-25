@@ -4,6 +4,21 @@ dotenv.config();
 import fs from "fs/promises";
 import path from "path";
 import { submitToIndexingApi } from "./google-indexing.js";
+import { initMonitoring } from "../../lib/monitoring.js";
+import { itemIdFromUrl } from "../../lib/url.js";
+import { writeFileAtomic } from "../../lib/atomic.js";
+
+initMonitoring();
+
+/** Resolve the stable item id for an article JSON (falls back to its source link). */
+function resolveItemId(json) {
+  return json?.item_id ?? (json?.reference_link ? itemIdFromUrl(json.reference_link) : null);
+}
+
+/** Base URL of the CMS/blog API. Override with CMS_BASE_URL; defaults to local dev. */
+function cmsBaseUrl() {
+  return (process.env.CMS_BASE_URL || "http://localhost:3900").replace(/\/+$/, "");
+}
 
 /**
  * publish-article task
@@ -41,12 +56,12 @@ import { submitToIndexingApi } from "./google-indexing.js";
  *   {groupDir}/publish-article.roundrobin.json — round-robin index (Part 1 only)
  *   {groupDir}/status-<YYYY-MM-DD>.json        — daily article status registry
  *
- * Endpoint:
- *   POST http://localhost:3900/blog-article
- *   POST http://localhost:3900/execute-publish-script
+ * Endpoint (base URL from CMS_BASE_URL env, default http://localhost:3900):
+ *   POST {CMS_BASE_URL}/blog-article
+ *   POST {CMS_BASE_URL}/execute-publish-script
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs } = context;
+  const { taskName, mode, executionId, inputs, track, hasCompleted } = context;
   const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
 
@@ -170,6 +185,17 @@ export default async function (context) {
       updatedStatusData = markAsPublished(updatedStatusData, entry.index);
       await saveStatus(articlesDir, today, updatedStatusData);
 
+      track?.({
+        itemId: resolveItemId(json),
+        group,
+        step: "index",
+        status: apiResult.ok ? "ok" : "failed",
+        reason: apiResult.ok ? null : "google_indexing",
+        url: articleUrl,
+        error: apiResult.ok ? undefined : new Error(apiResult.error ?? "indexing failed"),
+        meta: { site_id: targetSiteId, slug: entry.slug },
+      });
+
       // Notify Discord for this article
       await notifyIndexingResult(
         entry.slug,
@@ -195,8 +221,15 @@ export default async function (context) {
   );
 
   if (jsonFiles.length === 0) {
-    // No new articles — exit silently, no Discord notification
-    console.log("No .json articles found. Nothing to publish. Exiting silently.");
+    // No new articles — exit without Discord, but make it visible in tracking.
+    console.log("No .json articles found. Nothing to publish.");
+    track?.({
+      group,
+      step: "publish",
+      status: "skipped",
+      reason: "no_articles_to_publish",
+      meta: { articles_dir: articlesDir },
+    });
     return;
   }
 
@@ -212,6 +245,17 @@ export default async function (context) {
   const json = await readJson(jsonPath);
   if (!json) {
     console.error(`Failed to parse JSON: ${jsonPath}. Skipping.`);
+    track?.({ group, step: "publish", status: "failed", reason: "json_parse", meta: { slug } });
+    return;
+  }
+
+  const itemId = resolveItemId(json);
+
+  // Idempotency: never re-POST an item that already published OK (avoids
+  // duplicate CMS articles on retries / re-created files).
+  if (itemId && hasCompleted?.(itemId, group, "publish")) {
+    console.log(`Item ${itemId} (${slug}) already published. Skipping re-publish.`);
+    track?.({ itemId, group, step: "publish", status: "skipped", reason: "already_published" });
     return;
   }
 
@@ -221,6 +265,15 @@ export default async function (context) {
   const missingFields = ["title", "seoMetaDescription", "slug"].filter((f) => !json[f]);
   if (missingFields.length > 0) {
     console.error(`Missing required fields in JSON: ${missingFields.join(", ")}. Skipping.`);
+    track?.({
+      itemId,
+      group,
+      step: "publish",
+      status: "failed",
+      reason: "missing_fields",
+      error: new Error(`Missing required fields: ${missingFields.join(", ")}`),
+      meta: { slug },
+    });
     return;
   }
 
@@ -235,7 +288,7 @@ export default async function (context) {
       ? destination.business_id.replace(/-/g, "")
       : destination.business_id;
 
-  await fs.writeFile(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
+  await writeFileAtomic(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
 
   // ── 5. Build and POST article payload ─────────────────────────────────────
   const payload = {
@@ -258,6 +311,16 @@ export default async function (context) {
     // Part 1 failed — no Discord notification
     console.error("POST failed. Article will not be moved to published/.");
     console.error(`Error status: ${apiResult ? apiResult.status : "N/A"}`);
+    track?.({
+      itemId,
+      group,
+      step: "publish",
+      status: "failed",
+      reason: "cms_post",
+      url: json.reference_link,
+      error: new Error(`CMS POST failed (status ${apiResult ? apiResult.status : "N/A"})`),
+      meta: { slug, site_id: destination.site_id ?? null },
+    });
     return;
   }
 
@@ -307,6 +370,16 @@ export default async function (context) {
   await saveStatus(articlesDir, today, statusData);
   console.log(`Registered in status as index ${newIndex}: ${newSlug}`);
 
+  track?.({
+    itemId,
+    group,
+    step: "publish",
+    status: "ok",
+    title: json.title,
+    url: json.reference_link,
+    meta: { slug: newSlug, site_id: siteId, blog_article_id },
+  });
+
   // ── 8. Send Discord notification ──────────────────────────────────────────
   // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
   // The article just saved is highlighted as 🆕.
@@ -340,7 +413,7 @@ async function loadStatus(articlesDir, today) {
  */
 async function saveStatus(articlesDir, today, statusData) {
   const statusPath = path.join(articlesDir, `status-${today}.json`);
-  await fs.writeFile(statusPath, JSON.stringify(statusData, null, 2), "utf-8");
+  await writeFileAtomic(statusPath, JSON.stringify(statusData, null, 2));
 }
 
 /**
@@ -512,7 +585,7 @@ async function readLastIdx(statePath) {
 async function postArticle(payload, apiKey) {
   try {
     const { default: fetch } = await import("node-fetch");
-    const res = await fetch("http://localhost:3900/blog-article", {
+    const res = await fetch(`${cmsBaseUrl()}/blog-article`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -545,7 +618,7 @@ async function postPublish(payload, apiKey) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 300_000); // 5 minutos
 
-    const res = await fetch("http://localhost:3900/execute-publish-script", {
+    const res = await fetch(`${cmsBaseUrl()}/execute-publish-script`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

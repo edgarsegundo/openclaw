@@ -1,7 +1,7 @@
 import path from "path";
 import { exec } from "child_process";
 import { fileURLToPath } from "url";
-import { createTempInputFile } from "./common.js";
+import { createTempInputFile, removeTempInputFile } from "./common.js";
 import fs from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,17 +45,21 @@ export default {
       const cmd = `node cron-manager.js run publish-article --template skip --input-file ${inputFile}`;
       const cwd = path.resolve(__dirname, "../../../automations/cron-manager");
 
-      await new Promise((resolve, reject) => {
-        exec(cmd, { cwd }, (error, stdout, stderr) => {
-          if (error) {
-            console.error(stderr);
-            reject(error);
-          } else {
-            console.log(stdout);
-            resolve();
-          }
+      try {
+        await new Promise((resolve, reject) => {
+          exec(cmd, { cwd }, (error, stdout, stderr) => {
+            if (error) {
+              console.error(stderr);
+              reject(error);
+            } else {
+              console.log(stdout);
+              resolve();
+            }
+          });
         });
-      });
+      } finally {
+        removeTempInputFile(inputFile);
+      }
 
       console.log(`✅ Comando .pub ${arg} executado com sucesso.`);
     } catch (err) {

@@ -4,6 +4,9 @@ initMonitoring();
 import fs from "fs";
 import path from "path";
 import { notifyDiscord } from "../../lib/discord.js";
+import { itemIdFromUrl } from "../../lib/url.js";
+import { writeFileAtomicSync } from "../../lib/atomic.js";
+import { resolveDatedPath } from "../../lib/dates.js";
 
 /**
  * rss-picker task
@@ -33,7 +36,7 @@ import { notifyDiscord } from "../../lib/discord.js";
  *   Both are deleted automatically after 7 days.
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, runPrompt } = context;
+  const { taskName, mode, executionId, inputs, runPrompt, track } = context;
   const itemIndex = inputs.item_index ?? null;
   const action = inputs.action ?? null;
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
@@ -55,17 +58,33 @@ export default async function (context) {
   fs.mkdirSync(path.resolve("artifacts/rss-picker"), { recursive: true });
 
   const today = new Date().toISOString().slice(0, 10);
-  const fetcherArtifactFilePath = path.resolve(
-    inputs.rss_fetcher_output_artifact_file_name_pattern
-      .replace("{group}", group)
-      .replace("{date}", today),
-  );
 
-  console.log(`\nLooking for today's fetcher file: ${fetcherArtifactFilePath}`);
+  // Tolerate the midnight boundary: try today's fetcher file, fall back to yesterday.
+  const buildFetcherPath = (date) =>
+    path.resolve(
+      inputs.rss_fetcher_output_artifact_file_name_pattern
+        .replace("{group}", group)
+        .replace("{date}", date),
+    );
+  const fetcherFile = resolveDatedPath(buildFetcherPath, (p) => fs.existsSync(p));
+  const fetcherArtifactFilePath = fetcherFile.path;
 
-  if (!fs.existsSync(fetcherArtifactFilePath)) {
-    console.log("File not found. rss-fetcher may not have run yet today. Exiting.");
+  console.log(`\nLooking for fetcher file: ${fetcherArtifactFilePath}`);
+
+  if (!fetcherFile.found) {
+    console.log("File not found (today or yesterday). rss-fetcher may not have run yet. Exiting.");
+    track?.({
+      group,
+      step: "pick",
+      status: "skipped",
+      reason: "fetcher_file_missing",
+      meta: { expected: fetcherArtifactFilePath },
+    });
     return;
+  }
+
+  if (fetcherFile.date !== today) {
+    console.log(`Using yesterday's fetcher file (${fetcherFile.date}) — midnight boundary.`);
   }
 
   const fetcherArtifact = JSON.parse(fs.readFileSync(fetcherArtifactFilePath, "utf-8"));
@@ -129,6 +148,17 @@ export default async function (context) {
       // Mark as resolved in status
       statusData = addToStatus(statusData, fetcherIndex, "approved");
       saveStatus(group, today, statusData);
+
+      track?.({
+        itemId: itemIdFromUrl(item.link),
+        group,
+        step: "pick",
+        status: "ok",
+        reason: "manual",
+        title: stripHtmlTags(item.title),
+        url: sanitizeGoogleLink(item.link),
+        meta: { score: 10, source: item.source },
+      });
 
       console.log(`✅ Item ${itemIndex} manually approved and added to approved file.`);
       return;
@@ -282,6 +312,17 @@ export default async function (context) {
         resolvedSet.add(fi); // keep in-memory set consistent
       }
     }
+
+    track?.({
+      itemId: itemIdFromUrl(result.link),
+      group,
+      step: "pick",
+      status: result.score >= minScore ? "ok" : "skipped",
+      reason: result.score >= minScore ? "ai_approved" : "ai_low_score",
+      title: result.title,
+      url: sanitizeGoogleLink(result.link),
+      meta: { score: result.score, cost: usage?.cost?.total_cost ?? null },
+    });
   }
 
   saveStatus(group, today, statusData);
@@ -355,7 +396,7 @@ function loadStatus(group, today) {
  */
 function saveStatus(group, today, statusData) {
   const statusPath = path.resolve(`artifacts/rss-picker/status-${group}-${today}.json`);
-  fs.writeFileSync(statusPath, JSON.stringify(statusData, null, 2), "utf-8");
+  writeFileAtomicSync(statusPath, JSON.stringify(statusData, null, 2));
 }
 
 /**
@@ -406,7 +447,7 @@ function appendToApproved(group, today, newItems) {
     items: [...existing, ...toAdd],
   };
 
-  fs.writeFileSync(filePath, JSON.stringify(updated, null, 2), "utf-8");
+  writeFileAtomicSync(filePath, JSON.stringify(updated, null, 2));
   return toAdd.length;
 }
 

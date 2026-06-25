@@ -8,6 +8,14 @@ allow_cron: false
 entrypoint: node index.js
 working_dir: ./tasks/write-article
 
+# ── Limits ────────────────────────────────────────────────────────────────────
+timeout_seconds: 360            # must exceed the 240s Sonar web-research call
+
+retry:
+  max_retries: 2                # index not advanced on failure → retry same article
+  delay_seconds: 15             # wait between retries
+  backoff: exponential          # linear | exponential
+
 env_vars:
   common: []
 

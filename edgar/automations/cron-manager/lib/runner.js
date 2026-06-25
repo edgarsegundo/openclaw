@@ -5,8 +5,10 @@ import { pathToFileURL } from "url";
 import chalk from "chalk";
 import dotenv from "dotenv";
 import inquirer from "inquirer";
-import { initDb, insertRun, closeDb } from "./db.js";
+import { initDb, insertRun, recordStepEvent, closeDb } from "./db.js";
 import logger from "./logger.js";
+import { createTracker } from "./tracker.js";
+import { writeFileAtomicSync } from "./atomic.js";
 import { hasPromptTemplates, listTemplateNames, loadTemplateConfig } from "./prompt-loader.js";
 import {
   selectTemplate,
@@ -111,7 +113,7 @@ function saveArtifactFn(taskName, config) {
       : path.join(ARTIFACTS_DIR, taskName, `${name}.json`);
 
     fs.mkdirSync(path.dirname(savePath), { recursive: true });
-    fs.writeFileSync(savePath, JSON.stringify(data, null, 2), "utf8");
+    writeFileAtomicSync(savePath, JSON.stringify(data, null, 2));
     logger.success(`Artifact saved: ${path.relative(ROOT, savePath)}`);
   };
 }
@@ -311,7 +313,7 @@ async function withTimeout(fn, seconds) {
 
 // ── Retry ────────────────────────────────────────────────────────────────────
 
-async function withRetry(fn, retryConfig) {
+async function withRetry(fn, retryConfig, onRetry) {
   const maxRetries = retryConfig?.max_retries || 0;
   if (maxRetries === 0) {
     return fn();
@@ -334,11 +336,38 @@ async function withRetry(fn, retryConfig) {
         logger.warn(
           `Attempt ${attempt + 1} failed: ${err.message}. Retrying in ${delay / 1000}s...`,
         );
+        onRetry?.(attempt + 1, err);
         await new Promise((r) => setTimeout(r, delay));
       }
     }
   }
   throw lastError;
+}
+
+// ── Task-level tracking event (best-effort) ──────────────────────────────────
+
+/**
+ * Record a task-level step event (started/ok/failed/retrying) with full stack.
+ * Never throws — observability must not break the run.
+ */
+function recordTaskEvent({ executionId, step, status, attempt, error }) {
+  try {
+    recordStepEvent({
+      item_id: null,
+      group_name: null,
+      execution_id: executionId,
+      step,
+      status,
+      attempt: attempt ?? 1,
+      reason: null,
+      error_message: error ? (error.message ?? String(error)) : null,
+      error_stack: error?.stack ?? null,
+      meta_json: null,
+      created_at: new Date().toISOString(),
+    });
+  } catch (err) {
+    logger.warn(`[tracker] failed to record task event: ${err.message}`);
+  }
 }
 
 // ── Log file ─────────────────────────────────────────────────────────────────
@@ -440,7 +469,11 @@ export async function runTask(taskName, options = {}) {
     // Merge defaults from config inputs into file-loaded data
     for (const input of config.inputs || []) {
       if (input.type === "artifact") continue;
-      if (inputs[input.name] === undefined && input.default !== undefined && input.default !== null) {
+      if (
+        inputs[input.name] === undefined &&
+        input.default !== undefined &&
+        input.default !== null
+      ) {
         inputs[input.name] = input.default;
       }
     }
@@ -508,6 +541,12 @@ export async function runTask(taskName, options = {}) {
     runPrompt = undefined;
   }
 
+  // Init DB
+  initDb();
+
+  // Observability tracker (best-effort; never breaks the task)
+  const tracker = createTracker({ taskName, executionId });
+
   // Build context
   const context = {
     taskName,
@@ -518,10 +557,9 @@ export async function runTask(taskName, options = {}) {
     executionId,
     runPrompt: runPrompt, // undefined if no template selected
     saveArtifact: saveArtifactFn(taskName, config),
+    track: tracker.track,
+    hasCompleted: tracker.hasCompleted,
   };
-
-  // Init DB
-  initDb();
 
   // Log capture
   const logLines = [];
@@ -559,7 +597,17 @@ export async function runTask(taskName, options = {}) {
       throw new Error(`Task "${taskName}" does not export a default function.`);
     }
 
-    await withRetry(() => withTimeout(() => taskFn(context), config.timeout_seconds), config.retry);
+    const stepName = `task:${taskName}`;
+    recordTaskEvent({ executionId, step: stepName, status: "started" });
+
+    await withRetry(
+      () => withTimeout(() => taskFn(context), config.timeout_seconds),
+      config.retry,
+      (attempt, err) =>
+        recordTaskEvent({ executionId, step: stepName, status: "retrying", attempt, error: err }),
+    );
+
+    recordTaskEvent({ executionId, step: stepName, status: "ok" });
 
     const duration = Date.now() - startTime;
     const finishedAt = new Date().toISOString();
@@ -587,6 +635,11 @@ export async function runTask(taskName, options = {}) {
     closeDb();
 
     writeLogFile(taskName, executionId, startedAt, logLines);
+
+    // One-shot batch task: exit deterministically so a lingering open handle
+    // (Sentry transport, sockets, etc.) can't hang the process. This keeps the
+    // Discord .apr/.pub commands — which await this CLI via exec — from hanging.
+    process.exit(0);
   } catch (err) {
     const duration = Date.now() - startTime;
     const finishedAt = new Date().toISOString();
@@ -602,6 +655,8 @@ export async function runTask(taskName, options = {}) {
     console.error = originalError;
 
     logger.error(`Task "${taskName}" failed: ${err.message}`);
+
+    recordTaskEvent({ executionId, step: `task:${taskName}`, status: "failed", error: err });
 
     insertRun({
       task: taskName,

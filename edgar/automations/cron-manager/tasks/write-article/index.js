@@ -1,6 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { enrichArticle } from "./article-enricher.js";
+import { initMonitoring } from "../../lib/monitoring.js";
+import { itemIdFromUrl } from "../../lib/url.js";
+import { writeFileAtomicSync } from "../../lib/atomic.js";
+import { resolveDatedPath } from "../../lib/dates.js";
+
+initMonitoring();
 
 /**
  * write-article task
@@ -31,7 +37,7 @@ import { enrichArticle } from "./article-enricher.js";
  *   artifacts/write-article/{slug}.md    — raw markdown file
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, runPrompt, saveArtifact } = context;
+  const { taskName, mode, executionId, inputs, runPrompt, saveArtifact, track } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -57,25 +63,35 @@ export default async function (context) {
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const pattern = inputs.rss_picker_file_pattern;
 
-  const resolvedFilename = pattern.replace("{group}", group).replace("{date}", today);
-
-  const listPath = path.join(inputs.current_approved_list_path, resolvedFilename);
-  const indexPath = path.join(
-    inputs.current_approved_list_path,
-    resolvedFilename.replace(/\.json$/, ""),
-  );
+  // Tolerate the midnight boundary: try today's approved list, fall back to yesterday.
+  const buildListPath = (date) =>
+    path.join(
+      inputs.current_approved_list_path,
+      pattern.replace("{group}", group).replace("{date}", date),
+    );
+  const listFile = resolveDatedPath(buildListPath, (p) => fs.existsSync(p));
+  const listPath = listFile.path;
+  // Index file shares the list's resolved date (same name, no .json extension).
+  const indexPath = listPath.replace(/\.json$/, "");
 
   console.log(`\nResolving approved articles list:`);
   console.log(`  Pattern:     ${pattern}`);
-  console.log(`  Date:        ${today}`);
+  console.log(`  Date:        ${listFile.date}`);
   console.log(`  ** List file:   ${listPath}`);
   console.log(`  Index file:  ${indexPath}`);
 
   // ─── Read approved articles list ───────────────────────────────────────────
-  if (!fs.existsSync(listPath)) {
-    console.log(`\n⚠️  Articles list not found: ${listPath}`);
+  if (!listFile.found) {
+    console.log(`\n⚠️  Articles list not found (today or yesterday): ${listPath}`);
     console.log(`   No articles to process today.`);
     console.log(`   Run again when the list is available.`);
+    track?.({
+      group,
+      step: "write",
+      status: "skipped",
+      reason: "approved_list_missing",
+      meta: { expected: listPath },
+    });
     return { status: "no_articles", message: "No articles to process today." };
   }
 
@@ -133,6 +149,16 @@ export default async function (context) {
     throw new Error(`Article at index ${currentIndex} is missing 'title' or 'link' field`);
   }
 
+  const itemId = itemIdFromUrl(article.link);
+  track?.({
+    itemId,
+    group,
+    step: "write",
+    status: "started",
+    title: article.title,
+    url: article.link,
+  });
+
   console.log(`\n✓ Article selected from list:`);
   console.log(`  Index: ${currentIndex}`);
   console.log(`  Title: ${article.title}`);
@@ -160,7 +186,10 @@ export default async function (context) {
   try {
     runResult = await runPrompt(promptInputs);
   } catch (err) {
-    throw new Error(`runPrompt failed (index NOT advanced, will retry): ${err.message}`);
+    track?.({ itemId, group, step: "write", status: "failed", reason: "run_prompt", error: err });
+    throw new Error(`runPrompt failed (index NOT advanced, will retry): ${err.message}`, {
+      cause: err,
+    });
   }
 
   const { artifact, model, citations = [], searchResults = [], usage = {} } = runResult;
@@ -168,10 +197,19 @@ export default async function (context) {
   // ─── [PATCH] Valida retorno mínimo antes de continuar ────────────────────
   // Se o artifact voltar incompleto, o erro é explícito e o index não avança.
   if (!artifact?.slug || !artifact?.markdownText) {
-    throw new Error(
+    const err = new Error(
       `runPrompt returned incomplete artifact (index NOT advanced). ` +
         `slug=${artifact?.slug}, markdownText length=${artifact?.markdownText?.length ?? 0}`,
     );
+    track?.({
+      itemId,
+      group,
+      step: "write",
+      status: "failed",
+      reason: "incomplete_artifact",
+      error: err,
+    });
+    throw err;
   }
 
   // ── Print summary ─────────────────────────────────────────────────────────
@@ -209,7 +247,8 @@ export default async function (context) {
       usage,
     }));
   } catch (err) {
-    throw new Error(`enrichArticle failed (index NOT advanced): ${err.message}`);
+    track?.({ itemId, group, step: "write", status: "failed", reason: "enrich", error: err });
+    throw new Error(`enrichArticle failed (index NOT advanced): ${err.message}`, { cause: err });
   }
 
   // ── Save JSON artifact (ENRICHED) ───────────────────────────────────────────
@@ -223,6 +262,7 @@ export default async function (context) {
       JSON.stringify(
         {
           ...enrichedArtifact,
+          item_id: itemId,
           reference_title: article.title,
           reference_link: article.link,
           generated_at: generatedAt,
@@ -234,7 +274,10 @@ export default async function (context) {
       "utf8",
     );
   } catch (err) {
-    throw new Error(`Failed to save JSON artifact (index NOT advanced): ${err.message}`);
+    track?.({ itemId, group, step: "write", status: "failed", reason: "save_json", error: err });
+    throw new Error(`Failed to save JSON artifact (index NOT advanced): ${err.message}`, {
+      cause: err,
+    });
   }
 
   // ── Save Markdown final ─────────────────────────────────────────────────────
@@ -247,8 +290,29 @@ export default async function (context) {
     fs.writeFileSync(mdPath, finalMarkdown, "utf8");
   } catch (err) {
     // JSON já foi salvo — loga com contexto para não deixar inconsistência passar em silêncio
-    throw new Error(`Failed to save Markdown (JSON was saved, index NOT advanced): ${err.message}`);
+    track?.({ itemId, group, step: "write", status: "failed", reason: "save_md", error: err });
+    throw new Error(
+      `Failed to save Markdown (JSON was saved, index NOT advanced): ${err.message}`,
+      {
+        cause: err,
+      },
+    );
   }
+
+  // ─── Track successful write (observability) ───────────────────────────────
+  track?.({
+    itemId,
+    group,
+    step: "write",
+    status: "ok",
+    title: article.title,
+    url: article.link,
+    meta: {
+      slug: artifact.slug,
+      word_count: wordCount,
+      cost_usd: usage?.cost?.total_cost ?? null,
+    },
+  });
 
   console.log(`\n📁 Artifacts saved:`);
   console.log(`   JSON:       ${outputDir}/${artifactName}.json`);
@@ -259,7 +323,7 @@ export default async function (context) {
   // Preferimos um warn (e eventual duplicata na próxima run) a perder o artigo.
   if (nextIndex <= articles.length) {
     try {
-      fs.writeFileSync(indexPath, nextIndex.toString(), "utf8");
+      writeFileAtomicSync(indexPath, nextIndex.toString());
       console.log(`\n📊 Index advanced: ${currentIndex} → ${nextIndex}`);
     } catch (err) {
       console.warn(`⚠️  Article saved but index update FAILED: ${err.message}`);

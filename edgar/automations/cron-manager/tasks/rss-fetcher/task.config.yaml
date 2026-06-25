@@ -17,12 +17,12 @@ entrypoint: node index.js
 working_dir: ./tasks/rss-fetcher
 
 # ── Limits ────────────────────────────────────────────────────────────────────
-timeout_seconds:                # leave blank for no timeout
+timeout_seconds: 300            # many feeds + scraper delays
 
 retry:
-  max_retries: 0                # number of retries on failure
-  delay_seconds: 5              # wait between retries
-  backoff: linear               # linear | exponential
+  max_retries: 2                # number of retries on failure
+  delay_seconds: 10             # wait between retries
+  backoff: exponential          # linear | exponential
 
 # ── Environment variables ─────────────────────────────────────────────────────
 # Declare env vars your task needs. The runner will warn if they are missing.
@@ -60,6 +60,11 @@ inputs:
     type: string
     required: true
     help_tip: "Unique identifier for this execution (e.g. rss-inputs-visto-americano). Used for tracking and artifact naming."
+
+  - name: group
+    type: string
+    required: true
+    help_tip: "Pipeline group slug (e.g. visto-americano). Used for artifact naming and cross-stage correlation."
 
   - name: topic
     type: string
