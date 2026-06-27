@@ -7,6 +7,7 @@ import {
   getAllGroups,
   getItemsByGroup,
   getItemTimeline,
+  getStepEventById,
   getStuckItems,
   getRecentErrors,
   getStepFunnel,
@@ -84,6 +85,13 @@ const server = http.createServer((req, res) => {
     }
     if (route === "/api/errors") {
       return sendJson(res, getRecentErrors(100));
+    }
+    if (route === "/api/error") {
+      const id = Number(url.searchParams.get("id"));
+      if (!id) return sendError(res, 400, "id query param required");
+      const event = getStepEventById(id);
+      if (!event) return sendError(res, 404, "not found");
+      return sendJson(res, event);
     }
     if (route === "/api/runs") {
       return sendJson(res, getRecentRuns(100));

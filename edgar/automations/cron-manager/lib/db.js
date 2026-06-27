@@ -264,6 +264,27 @@ export function getStuckItems(limit = 100) {
 }
 
 /**
+ * Full detail for a single step_event row, joined with pipeline_items for
+ * item title/url. Used by the dashboard error-detail modal.
+ */
+export function getStepEventById(id) {
+  const db = initDb();
+  return (
+    db
+      .prepare(`
+        SELECT e.*,
+               i.title AS item_title,
+               i.url   AS item_url
+        FROM step_events e
+        LEFT JOIN pipeline_items i
+               ON i.item_id = e.item_id AND i.group_name = e.group_name
+        WHERE e.id = ?
+      `)
+      .get(id) ?? null
+  );
+}
+
+/**
  * Recent failure events across all steps (with stack), newest first.
  */
 export function getRecentErrors(limit = 50) {

@@ -12,14 +12,53 @@ initMonitoring();
 // ── XML sanitization ──────────────────────────────────────────────────────────
 
 /**
- * Replace bare & characters that are NOT part of a valid XML/HTML entity
- * reference with &amp; so malformed RSS feeds don't crash the XML parser.
+ * Sanitize malformed RSS/XML so the parser doesn't choke on common HTML-isms.
  *
- * Preserved:  &amp; &lt; &copy; &#123; &#xAB;  (valid entity syntax)
- * Replaced:   AT&T  &123  &-foo  & (space)     (invalid entity syntax)
+ * Fixes handled:
+ *  1. Bare & not part of a valid entity reference → &amp;
+ *     (e.g. "AT&T", "price=10&20")
+ *  2. HTML boolean attributes without a value → attr=""
+ *     (e.g. <img loading> <input disabled checked> — valid HTML5, invalid XML)
+ *
+ * The boolean-attribute fixer processes only XML start tags (<tagname ...>),
+ * skipping comments (<!--), CDATA (<![), closing tags (</) and quoted values
+ * inside tags so it never corrupts attribute values.
  */
 function sanitizeXml(str) {
-  return str.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;");
+  // 1. Fix bare &
+  str = str.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;");
+
+  // 2. Fix boolean attributes — only in opening start tags (< followed by a letter)
+  str = str.replace(/<[a-zA-Z][^<>]*>/g, (tag) => {
+    const out = [];
+    let i = 0;
+    while (i < tag.length) {
+      const ch = tag[i];
+      // Copy quoted attribute values verbatim
+      if (ch === '"' || ch === "'") {
+        const end = tag.indexOf(ch, i + 1);
+        if (end < 0) {
+          out.push(tag.slice(i));
+          break;
+        }
+        out.push(tag.slice(i, end + 1));
+        i = end + 1;
+        continue;
+      }
+      // Detect whitespace + attribute-name NOT followed by =
+      const m = /^(\s+)([a-zA-Z][a-zA-Z0-9:-]*)/.exec(tag.slice(i));
+      if (m && tag[i + m[0].length] !== "=") {
+        out.push(m[1], m[2], '=""');
+        i += m[0].length;
+        continue;
+      }
+      out.push(ch);
+      i++;
+    }
+    return out.join("");
+  });
+
+  return str;
 }
 
 // ── HTML utilities ────────────────────────────────────────────────────────────
