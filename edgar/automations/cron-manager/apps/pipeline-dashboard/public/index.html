@@ -129,7 +129,7 @@
         <h2>Erros recentes</h2>
         <table>
           <thead>
-            <tr><th>Quando</th><th>Etapa</th><th>Grupo</th><th>Mensagem</th></tr>
+            <tr><th>Quando</th><th>Etapa</th><th>Grupo</th><th>Mensagem</th><th>Feed / URL</th></tr>
           </thead>
           <tbody id="errorsBody"></tbody>
         </table>
@@ -246,18 +246,36 @@
           .join("");
       }
 
+      function parseMeta(raw) {
+        try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+      }
+
+      function metaSource(e) {
+        const m = parseMeta(e.meta_json);
+        if (!m) return "—";
+        // fetch errors: {feed, url}
+        const label = m.feed || m.site_id || m.slug || "";
+        const link  = m.url  || m.source || "";
+        if (link) return `<span title="${esc(link)}">${esc(label || link)}</span>`;
+        return esc(label) || "—";
+      }
+
       async function loadErrors() {
         const errs = await api("/api/errors");
         $("errorsBody").innerHTML = errs.length
           ? errs
               .map(
                 (e) => `
-          <tr><td class="muted">${fmt(e.created_at)}</td><td>${esc(e.step)}</td>
-          <td>${esc(e.group_name || "—")}</td>
-          <td class="err" title="${esc(e.error_message || "")}">${esc(e.error_message || e.reason || "")}</td></tr>`,
+          <tr>
+            <td class="muted">${fmt(e.created_at)}</td>
+            <td>${esc(e.step)}</td>
+            <td>${esc(e.group_name || "—")}</td>
+            <td class="err" title="${esc(e.error_message || "")}">${esc(e.error_message || e.reason || "")}</td>
+            <td class="muted" style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${metaSource(e)}</td>
+          </tr>`,
               )
               .join("")
-          : '<tr><td colspan="4" class="muted">Sem erros recentes 🎉</td></tr>';
+          : '<tr><td colspan="5" class="muted">Sem erros recentes 🎉</td></tr>';
       }
 
       let runsData = [];

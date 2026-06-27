@@ -9,6 +9,19 @@ import { writeFileAtomicSync } from "../../lib/atomic.js";
 
 initMonitoring();
 
+// ── XML sanitization ──────────────────────────────────────────────────────────
+
+/**
+ * Replace bare & characters that are NOT part of a valid XML/HTML entity
+ * reference with &amp; so malformed RSS feeds don't crash the XML parser.
+ *
+ * Preserved:  &amp; &lt; &copy; &#123; &#xAB;  (valid entity syntax)
+ * Replaced:   AT&T  &123  &-foo  & (space)     (invalid entity syntax)
+ */
+function sanitizeXml(str) {
+  return str.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;");
+}
+
 // ── HTML utilities ────────────────────────────────────────────────────────────
 
 /**
@@ -795,10 +808,18 @@ export default async function (context) {
         console.log(`[scraper] Aguardando ${delay}ms antes do próximo feed...`);
         await sleep(delay);
       } else {
-        // ── RSS path (original behaviour, unchanged) ───────────────────────
+        // ── RSS path ───────────────────────────────────────────────────────
         process.stdout.write(`Fetching: ${feed.name} ... `);
 
-        const parsed = await rssParser.parseURL(feed.url);
+        // Fetch raw XML manually so we can sanitize bare & before parsing.
+        // Some feeds ship malformed XML (e.g. "AT&T" instead of "AT&amp;T")
+        // that would otherwise throw "Invalid character in entity name".
+        const feedRes = await fetch(feed.url, {
+          headers: { "User-Agent": "rss-fetcher-bot/1.0" },
+          signal: AbortSignal.timeout(10000),
+        });
+        const rawXml = await feedRes.text();
+        const parsed = await rssParser.parseString(sanitizeXml(rawXml));
         const items = parsed.items || [];
 
         // Map rss-parser items to common shape
