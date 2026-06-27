@@ -28,18 +28,15 @@ function sanitizeXml(str) {
   // 1. Fix bare &
   str = str.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;");
 
-  // 2. Strip <script> and <style> blocks — JS/CSS often contains bare < (comparison operators)
-  //    that break strict XML parsing.  RSS parsers don't need this content anyway.
-  str = str.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, "");
-  str = str.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, "");
-
-  // 3. Fix < used as a comparison operator: <word; or < word; patterns are never valid XML tag
+  // 2. Fix < used as a comparison operator: <word; or < word; patterns are never valid XML tag
   //    names (nameStart chars followed by nameBody chars ending in ; before whitespace/>).
   //    Covers ASCII and Unicode nameStart chars (_/:) missed by the old [a-zA-Z] guard.
   //    Replaces the bare < with &lt; so the text is preserved correctly.
+  //    Note: stripping <script>/<style> blocks was tried but corrupts feeds when those tags
+  //    span CDATA boundaries — this targeted replacement is sufficient.
   str = str.replace(/<(\s*)([^\s<>/!?"'=][^<>;"'\s]*);/g, "&lt;$1$2;");
 
-  // 4. Fix boolean attributes — only in opening start tags (< followed by a letter)
+  // 3. Fix boolean attributes — only in opening start tags (< followed by a letter)
   str = str.replace(/<[a-zA-Z][^<>]*>/g, (tag) => {
     const out = [];
     let i = 0;

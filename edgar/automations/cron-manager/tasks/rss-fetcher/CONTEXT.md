@@ -32,7 +32,8 @@ Busca feeds RSS e scraper, filtra por tópico, deduplicata por fingerprint de t�
 
 - `Invalid character in entity name` → corrigido por `sanitizeXml()` (bare `&`)
 - `Attribute without value` → corrigido por `sanitizeXml()` (boolean attrs HTML)
-- `Invalid character in tag name` (Char: `;`) → corrigido por `sanitizeXml()`: strips `<script>`/`<style>` (JS/CSS com operadores `<`) e converte `<word;` ou `< word;` em `&lt;word;` (nunca é nome de tag XML válido)
+- `Invalid character in tag name` (Char: `;`) → corrigido por `sanitizeXml()`: converte `<word;` ou `< word;` em `&lt;word;` — nunca é nome de tag XML válido, é operador de comparação em JS/CSS sem CDATA
+- `Feed not recognized as RSS 1 or 2` → causado por strip de `<script>`/`<style>` que cruzava boundary de CDATA e comia elementos RSS; removido — o `&lt;` fix acima já é suficiente
 - Todos aparecem no dashboard em `Erros recentes` com o nome do feed na coluna Feed/URL
 
 ## Como rodar
