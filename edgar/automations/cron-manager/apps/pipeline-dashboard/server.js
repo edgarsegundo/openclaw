@@ -15,6 +15,7 @@ import {
   getRunByExecutionId,
   getEventsByExecution,
   getBadFeeds,
+  getAiCostsByGroup,
   wipeAll,
   pruneOlderThan,
 } from "../../lib/db.js";
@@ -64,6 +65,23 @@ function removeFeedEntry(filePath, feedUrl) {
 
   const newLines = [...lines.slice(0, start), ...lines.slice(end + 1)];
   fs.writeFileSync(filePath, newLines.join("\n"), "utf8");
+}
+
+// Recursively find all *.json files under tasks/<task>/inputs/ without external deps.
+function scanInputsFiles() {
+  const tasksDir = path.join(CRON_MANAGER_ROOT, "tasks");
+  const results = [];
+  if (!fs.existsSync(tasksDir)) return results;
+  for (const task of fs.readdirSync(tasksDir)) {
+    const inputsDir = path.join(tasksDir, task, "inputs");
+    if (!fs.existsSync(inputsDir) || !fs.statSync(inputsDir).isDirectory()) continue;
+    for (const file of fs.readdirSync(inputsDir)) {
+      if (file.endsWith(".json")) {
+        results.push(`tasks/${task}/inputs/${file}`);
+      }
+    }
+  }
+  return results;
 }
 
 const STEPS = ["fetch", "pick", "write", "publish", "index"];
@@ -168,6 +186,41 @@ const server = http.createServer(async (req, res) => {
       removeFeedEntry(fullPath, url);
       console.log(`[dashboard] removed feed "${url}" from ${feeds_js_path}`);
       return sendJson(res, { ok: true });
+    }
+
+    if (route === "/api/ai-costs") {
+      const period = url.searchParams.get("period") || "month";
+      return sendJson(res, getAiCostsByGroup(period));
+    }
+
+    if (route === "/api/inputs") {
+      if (req.method === "POST") {
+        const body = JSON.parse(await readBody(req));
+        const { file, content } = body;
+        if (!file || content === undefined) return sendError(res, 400, "file and content required");
+        if (!file.startsWith("tasks/") || file.includes(".."))
+          return sendError(res, 400, "invalid file path");
+        const fullPath = path.resolve(CRON_MANAGER_ROOT, file);
+        if (!fullPath.startsWith(path.resolve(CRON_MANAGER_ROOT, "tasks")))
+          return sendError(res, 400, "path outside tasks directory");
+        // Validate that content is valid JSON before writing
+        JSON.parse(content);
+        fs.writeFileSync(fullPath, content, "utf8");
+        console.log(`[dashboard] inputs file updated: ${file}`);
+        return sendJson(res, { ok: true });
+      }
+      // GET: list or read one file
+      const file = url.searchParams.get("file");
+      if (file) {
+        if (!file.startsWith("tasks/") || file.includes(".."))
+          return sendError(res, 400, "invalid file path");
+        const fullPath = path.resolve(CRON_MANAGER_ROOT, file);
+        if (!fullPath.startsWith(path.resolve(CRON_MANAGER_ROOT, "tasks")))
+          return sendError(res, 400, "path outside tasks directory");
+        const content = JSON.parse(fs.readFileSync(fullPath, "utf8"));
+        return sendJson(res, { file, content });
+      }
+      return sendJson(res, scanInputsFiles());
     }
 
     // ── Destructive maintenance (POST only) ────────────────────────────────────

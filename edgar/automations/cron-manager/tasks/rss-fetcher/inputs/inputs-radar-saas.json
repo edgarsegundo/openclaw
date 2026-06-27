@@ -6,6 +6,8 @@
   "exclude_patterns": "patrocinado;publicidade;promoção;sponsored;advertisement;crypto;nft",
   "feeds": "",
   "max_items": 20,
+  "max_per_feed": 5,
   "feeds_js_file": "feeds-radar-saas.js",
-  "discord_webhook_url": "https://discord.com/api/webhooks/1520454669338546336/la9xqIz5fMkerG7xfAZztub6SslSZSMFZgbGAMsmgOuxjeyIlOEju0x2ZhQVIqczT_iS"
+  "discord_webhook_url": "https://discord.com/api/webhooks/1520454669338546336/la9xqIz5fMkerG7xfAZztub6SslSZSMFZgbGAMsmgOuxjeyIlOEju0x2ZhQVIqczT_iS",
+  "ai_filter_prompt": ""
 }

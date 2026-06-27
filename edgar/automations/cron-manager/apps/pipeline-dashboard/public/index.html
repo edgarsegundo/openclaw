@@ -119,6 +119,22 @@
       .flow-extra { margin: 6px 0 16px; font-size: 12px; color: var(--muted); }
       .run-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
       .run-meta strong { color: var(--text); font-weight: 600; }
+      /* chip UI for patterns */
+      .chip-area { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; min-height: 38px; background: var(--bg); cursor: text; }
+      .chip { display: inline-flex; align-items: center; gap: 4px; background: rgba(91,141,239,.18); color: var(--accent); border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+      .chip button { background: none; border: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 13px; line-height: 1; opacity: .7; }
+      .chip button:hover { opacity: 1; }
+      .chip-add { border: none; background: none; color: var(--muted); font-size: 13px; outline: none; min-width: 100px; flex: 1; }
+      .chip-add:focus { color: var(--text); }
+      /* inputs editor modal */
+      .inputs-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.65); display: none; align-items: center; justify-content: center; z-index: 30; padding: 20px; }
+      .inputs-overlay.open { display: flex; }
+      .inputs-modal { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; max-width: 700px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 24px; }
+      .inputs-field { margin-bottom: 14px; }
+      .inputs-field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+      .inputs-field input[type=text], .inputs-field input[type=number], .inputs-field select, .inputs-field textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
+      .inputs-field textarea { resize: vertical; min-height: 80px; }
+      .inputs-modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
     </style>
   </head>
   <body>
@@ -129,6 +145,7 @@
       <label class="muted"><input type="checkbox" id="autoRefresh" checked /> auto 10s</label>
       <div class="spacer"></div>
       <span class="muted" id="lastUpdate"></span>
+      <button id="inputsBtn" title="Editar arquivos de inputs dos grupos">⚙️ Inputs</button>
       <button id="pruneBtn" class="danger-soft" title="Remove eventos/runs com mais de 7 dias">🧹 Limpar &gt;7d</button>
       <button id="wipeBtn" class="danger">🗑️ Zerar banco</button>
     </header>
@@ -169,6 +186,16 @@
         </table>
       </section>
 
+      <section class="panel" id="aiCostsSection">
+        <h2>Custo de IA <span id="aiCostsPeriod" style="color:var(--muted);font-size:11px;font-weight:400;text-transform:none">(este mês)</span></h2>
+        <table>
+          <thead>
+            <tr><th>Grupo</th><th>Runs c/ IA</th><th>Enviados</th><th>Aprovados</th><th>Tokens entrada</th><th>Tokens saída</th><th>Custo (mês)</th></tr>
+          </thead>
+          <tbody id="aiCostsBody"><tr><td colspan="7" class="muted">Carregando…</td></tr></tbody>
+        </table>
+      </section>
+
       <section class="panel">
         <h2>Execuções recentes (runs)</h2>
         <div style="margin-bottom:10px">
@@ -189,6 +216,71 @@
         <button class="close" onclick="closeModal()">✕ fechar</button>
         <h2 id="modalTitle">Timeline do item</h2>
         <div id="timeline"></div>
+      </div>
+    </div>
+
+    <div class="inputs-overlay" id="inputsOverlay">
+      <div class="inputs-modal">
+        <button class="close" onclick="closeInputsModal()">✕ fechar</button>
+        <h2 style="margin:0 0 16px;font-size:15px">⚙️ Editar inputs</h2>
+
+        <div class="inputs-field">
+          <label>Arquivo</label>
+          <select id="inputsFileSelect" style="width:100%">
+            <option value="">Carregando…</option>
+          </select>
+        </div>
+
+        <div id="inputsFormArea" style="display:none">
+          <div class="inputs-field">
+            <label>Grupo (group)</label>
+            <input type="text" id="inp_group" readonly style="opacity:.6" />
+          </div>
+          <div class="inputs-field">
+            <label>Topic</label>
+            <input type="text" id="inp_topic" />
+          </div>
+          <div class="inputs-field">
+            <label>Language</label>
+            <select id="inp_language">
+              <option value="all">all</option>
+              <option value="pt">pt</option>
+              <option value="en">en</option>
+              <option value="es">es</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:12px">
+            <div class="inputs-field" style="flex:1">
+              <label>Max items</label>
+              <input type="number" id="inp_max_items" min="1" max="200" />
+            </div>
+            <div class="inputs-field" style="flex:1">
+              <label>Max por feed (0 = sem limite)</label>
+              <input type="number" id="inp_max_per_feed" min="0" max="50" />
+            </div>
+          </div>
+          <div class="inputs-field">
+            <label>Patterns <span style="font-weight:400;text-transform:none">(Enter para adicionar)</span></label>
+            <div class="chip-area" id="patternsChipArea" onclick="this.querySelector('.chip-add').focus()"></div>
+          </div>
+          <div class="inputs-field">
+            <label>Exclude patterns <span style="font-weight:400;text-transform:none">(Enter para adicionar)</span></label>
+            <div class="chip-area" id="excludeChipArea" onclick="this.querySelector('.chip-add').focus()"></div>
+          </div>
+          <div class="inputs-field">
+            <label>AI Filter Prompt <span style="font-weight:400;text-transform:none">(deixe vazio para desativar o filtro de IA)</span></label>
+            <textarea id="inp_ai_filter_prompt" rows="4" placeholder="Ex: Keep only articles about founders who built and launched a SaaS product. Exclude news, opinion pieces, and generic tech articles."></textarea>
+          </div>
+          <div class="inputs-field">
+            <label>Feeds JS File</label>
+            <input type="text" id="inp_feeds_js_file" />
+          </div>
+          <div id="inputsSaveMsg" style="font-size:12px;color:var(--ok);display:none;margin-bottom:8px">✓ Salvo com sucesso!</div>
+          <div class="inputs-modal-footer">
+            <button onclick="closeInputsModal()">Cancelar</button>
+            <button id="inputsSaveBtn" onclick="saveInputs()" style="background:var(--accent);border-color:var(--accent);color:#fff">💾 Salvar</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -597,9 +689,151 @@
         }
       };
 
+      async function loadAiCosts() {
+        const rows = await api("/api/ai-costs?period=month");
+        const body = $("aiCostsBody");
+        if (!rows.length) {
+          body.innerHTML = '<tr><td colspan="7" class="muted">Nenhum uso de IA registrado este mês.</td></tr>';
+          return;
+        }
+        body.innerHTML = rows.map((r) => `
+          <tr>
+            <td><strong>${esc(r.grp || "—")}</strong></td>
+            <td class="muted">${r.runs ?? 0}</td>
+            <td class="muted">${r.total_input ?? 0}</td>
+            <td class="muted">${r.total_approved ?? 0}</td>
+            <td class="muted">${(r.total_prompt_tokens ?? 0).toLocaleString("pt-BR")}</td>
+            <td class="muted">${(r.total_completion_tokens ?? 0).toLocaleString("pt-BR")}</td>
+            <td><strong>$${(r.total_cost_usd ?? 0).toFixed(6)}</strong></td>
+          </tr>`).join("");
+      }
+
+      // ── Inputs editor ──────────────────────────────────────────────────────────
+      let _currentInputsFile = null;
+      let _currentInputsContent = {};
+
+      function makeChipArea(areaId, values) {
+        const area = $(areaId);
+        area.innerHTML = "";
+        for (const v of values) {
+          area.appendChild(makeChip(areaId, v));
+        }
+        const input = document.createElement("input");
+        input.className = "chip-add";
+        input.placeholder = "Adicionar…";
+        input.addEventListener("keydown", (e) => {
+          if ((e.key === "Enter" || e.key === ",") && input.value.trim()) {
+            e.preventDefault();
+            area.insertBefore(makeChip(areaId, input.value.trim()), input);
+            input.value = "";
+          } else if (e.key === "Backspace" && !input.value) {
+            const chips = area.querySelectorAll(".chip");
+            if (chips.length) chips[chips.length - 1].remove();
+          }
+        });
+        area.appendChild(input);
+      }
+
+      function makeChip(areaId, value) {
+        const span = document.createElement("span");
+        span.className = "chip";
+        span.dataset.value = value;
+        const label = document.createTextNode(value + " ");
+        span.appendChild(label);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "×";
+        btn.title = "Remover";
+        btn.addEventListener("click", () => span.remove());
+        span.appendChild(btn);
+        return span;
+      }
+
+      function getChipValues(areaId) {
+        return [...$(areaId).querySelectorAll(".chip")].map((c) => c.dataset.value);
+      }
+
+      async function openInputsEditor() {
+        $("inputsFormArea").style.display = "none";
+        $("inputsSaveMsg").style.display = "none";
+        $("inputsOverlay").classList.add("open");
+        try {
+          const files = await api("/api/inputs");
+          const sel = $("inputsFileSelect");
+          sel.innerHTML = '<option value="">— selecionar arquivo —</option>' +
+            files.map((f) => `<option value="${esc(f)}">${esc(f)}</option>`).join("");
+          sel.value = _currentInputsFile || "";
+          if (sel.value) loadInputsFile(sel.value);
+        } catch (e) {
+          alert("Erro ao listar inputs: " + e.message);
+        }
+      }
+
+      async function loadInputsFile(file) {
+        $("inputsFormArea").style.display = "none";
+        if (!file) return;
+        try {
+          const { content } = await api("/api/inputs?file=" + encodeURIComponent(file));
+          _currentInputsFile = file;
+          _currentInputsContent = content;
+          $("inp_group").value = content.group || "";
+          $("inp_topic").value = content.topic || "";
+          $("inp_language").value = content.language || "all";
+          $("inp_max_items").value = content.max_items ?? "";
+          $("inp_max_per_feed").value = content.max_per_feed ?? 0;
+          makeChipArea("patternsChipArea", (content.patterns || "").split(";").map((s) => s.trim()).filter(Boolean));
+          makeChipArea("excludeChipArea", (content.exclude_patterns || "").split(";").map((s) => s.trim()).filter(Boolean));
+          $("inp_ai_filter_prompt").value = content.ai_filter_prompt || "";
+          $("inp_feeds_js_file").value = content.feeds_js_file || "";
+          $("inputsFormArea").style.display = "block";
+        } catch (e) {
+          alert("Erro ao carregar arquivo: " + e.message);
+        }
+      }
+
+      window.saveInputs = async function () {
+        if (!_currentInputsFile) return;
+        const patterns = getChipValues("patternsChipArea").join(";");
+        const excludePatterns = getChipValues("excludeChipArea").join(";");
+        const updated = {
+          ..._currentInputsContent,
+          group: $("inp_group").value,
+          topic: $("inp_topic").value,
+          language: $("inp_language").value,
+          max_items: Number($("inp_max_items").value) || _currentInputsContent.max_items,
+          max_per_feed: Number($("inp_max_per_feed").value) || 0,
+          patterns,
+          exclude_patterns: excludePatterns,
+          ai_filter_prompt: $("inp_ai_filter_prompt").value.trim(),
+          feeds_js_file: $("inp_feeds_js_file").value.trim(),
+        };
+        const btn = $("inputsSaveBtn");
+        btn.disabled = true;
+        btn.textContent = "Salvando…";
+        try {
+          const r = await fetch("api/inputs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: _currentInputsFile, content: JSON.stringify(updated, null, 2) }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || r.statusText);
+          _currentInputsContent = updated;
+          $("inputsSaveMsg").style.display = "block";
+          setTimeout(() => { $("inputsSaveMsg").style.display = "none"; }, 3000);
+        } catch (e) {
+          alert("Erro ao salvar: " + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "💾 Salvar";
+        }
+      };
+
+      window.closeInputsModal = () => $("inputsOverlay").classList.remove("open");
+
       async function refresh() {
         try {
-          await Promise.all([loadGroups(), loadFunnel(), loadItems(), loadErrors(), loadBadFeeds(), loadRuns()]);
+          await Promise.all([loadGroups(), loadFunnel(), loadItems(), loadErrors(), loadBadFeeds(), loadAiCosts(), loadRuns()]);
           $("lastUpdate").textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR");
         } catch (e) {
           $("lastUpdate").textContent = "erro: " + e.message;
@@ -628,6 +862,11 @@
       $("overlay").addEventListener("click", (e) => {
         if (e.target.id === "overlay") closeModal();
       });
+      $("inputsOverlay").addEventListener("click", (e) => {
+        if (e.target.id === "inputsOverlay") closeInputsModal();
+      });
+      $("inputsBtn").addEventListener("click", openInputsEditor);
+      $("inputsFileSelect").addEventListener("change", (e) => loadInputsFile(e.target.value));
 
       $("wipeBtn").addEventListener("click", async () => {
         if (!confirm("Zerar TODO o banco de tracking (itens, eventos, estados e runs)?\n\nIsso apaga todo o histórico. Não dá pra desfazer.")) return;

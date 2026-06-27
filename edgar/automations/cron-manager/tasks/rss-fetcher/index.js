@@ -635,10 +635,17 @@ function scoreAndFilterItems(
   excludePatterns,
   sinceCutoff,
   seenHashes,
+  aiMode = false,
 ) {
   return rawItems
     .map((raw) => {
       const title = stripHtml(raw.title || "").toLowerCase();
+
+      // In AI mode: drop titles that are clearly too short/long to be real articles
+      if (aiMode) {
+        const len = title.length;
+        if (len < 15 || len > 300) return null;
+      }
 
       let score = 0;
       for (const pattern of topicPatterns) {
@@ -650,8 +657,9 @@ function scoreAndFilterItems(
         if (regex.test(title)) score -= 2;
       }
 
-      // pass_through feeds (e.g. Product Hunt, indie) include all items not explicitly excluded
-      const minScore = feed.pass_through ? 0 : 2;
+      // In AI mode: threshold relaxed — only hard-exclude items, semantic filter comes later.
+      // pass_through feeds include all items not explicitly excluded.
+      const minScore = aiMode || feed.pass_through ? 0 : 2;
       if (score < minScore) {
         console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
         return null;
@@ -690,6 +698,72 @@ function scoreAndFilterItems(
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Send a list of article titles to GPT-4o mini for semantic filtering.
+ * Returns { items: Item[], usage: {prompt_tokens,completion_tokens}, error?: string }.
+ * Fail-open: on any error returns all items unchanged so the pipeline continues.
+ */
+async function aiFilterItems(items, systemPrompt, apiKey) {
+  if (!items.length) return { items, usage: { prompt_tokens: 0, completion_tokens: 0 } };
+
+  const userMessage = items.map((it, i) => `${i}. ${it.title}`).join("\n");
+
+  let raw;
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: AbortSignal.timeout(30000),
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content:
+              systemPrompt +
+              "\n\nReturn ONLY a valid JSON array of 0-based indices of matching articles. Example: [0,3,7]. If none match, return []. No explanation.",
+          },
+          { role: "user", content: userMessage },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      return {
+        items,
+        usage: { prompt_tokens: 0, completion_tokens: 0 },
+        error: `HTTP ${res.status}: ${text.slice(0, 200)}`,
+      };
+    }
+
+    raw = await res.json();
+  } catch (err) {
+    return { items, usage: { prompt_tokens: 0, completion_tokens: 0 }, error: err.message };
+  }
+
+  const usage = raw.usage ?? { prompt_tokens: 0, completion_tokens: 0 };
+  const content = raw.choices?.[0]?.message?.content ?? "[]";
+
+  let indices;
+  try {
+    // Extract JSON array even if the model wrapped it in markdown fences
+    const match = content.match(/\[[\s\S]*\]/);
+    indices = JSON.parse(match ? match[0] : content);
+    if (!Array.isArray(indices)) throw new Error("not an array");
+  } catch {
+    // If parsing fails, return all items (fail-open)
+    return { items, usage, error: `bad_response: ${content.slice(0, 100)}` };
+  }
+
+  const approved = items.filter((_, i) => indices.includes(i));
+  return { items: approved, usage };
 }
 
 // ── Main task ─────────────────────────────────────────────────────────────────
@@ -731,6 +805,9 @@ export default async function (context) {
     );
     return;
   }
+
+  const aiFilterPrompt = (inputs.ai_filter_prompt || "").trim();
+  const maxPerFeed = Number(inputs.max_per_feed) || 0; // 0 = no cap
 
   // Dynamic import of feeds module
   let DEFAULT_FEEDS, parseCustomFeeds;
@@ -852,11 +929,13 @@ export default async function (context) {
           excludePatterns,
           sinceCutoff,
           seenHashes,
+          !!aiFilterPrompt,
         );
 
-        console.log(`${rawItems.length} itens extraídos, ${relevant.length} relevantes.`);
+        const capped = maxPerFeed > 0 ? relevant.slice(0, maxPerFeed) : relevant;
+        console.log(`${rawItems.length} itens extraídos, ${capped.length} relevantes.`);
 
-        for (const item of relevant) {
+        for (const item of capped) {
           if (collectedItems.length >= maxItems * 2) break;
           collectedItems.push(item);
         }
@@ -895,11 +974,13 @@ export default async function (context) {
           excludePatterns,
           sinceCutoff,
           seenHashes,
+          !!aiFilterPrompt,
         );
 
-        console.log(`${items.length} items found, ${relevant.length} relevant.`);
+        const capped = maxPerFeed > 0 ? relevant.slice(0, maxPerFeed) : relevant;
+        console.log(`${items.length} items found, ${capped.length} relevant.`);
 
-        for (const item of relevant) {
+        for (const item of capped) {
           if (collectedItems.length >= maxItems * 2) break;
           collectedItems.push(item);
         }
@@ -992,6 +1073,48 @@ export default async function (context) {
     top_score: finalItems[0]?.score ?? null,
   });
 
+  // ── 7b. AI semantic filter (optional) ────────────────────────────────────
+  let publishItems = finalItems;
+  if (aiFilterPrompt && finalItems.length > 0) {
+    const apiKey = process.env.OPENAI_API_KEY || "";
+    if (!apiKey) {
+      console.warn("[ai_filter] OPENAI_API_KEY not set — skipping AI filter (fail-open)");
+      flow?.("ai_filter", "skipped", { reason: "no_api_key", input: finalItems.length });
+    } else {
+      console.log(`\n[ai_filter] Sending ${finalItems.length} titles to GPT-4o mini...`);
+      const result = await aiFilterItems(finalItems, aiFilterPrompt, apiKey);
+
+      const promptTokens = result.usage.prompt_tokens;
+      const completionTokens = result.usage.completion_tokens;
+      // GPT-4o mini pricing: $0.15/1M input, $0.60/1M output
+      const costUsd = (promptTokens * 0.15 + completionTokens * 0.6) / 1_000_000;
+
+      if (result.error) {
+        console.warn(`[ai_filter] Error (fail-open): ${result.error}`);
+        flow?.("ai_filter", "skipped", {
+          reason: "api_error",
+          error: result.error,
+          input: finalItems.length,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          cost_usd: costUsd,
+        });
+      } else {
+        publishItems = result.items;
+        console.log(
+          `[ai_filter] ${finalItems.length} → ${publishItems.length} approved (cost: $${costUsd.toFixed(6)})`,
+        );
+        flow?.("ai_filter", "ok", {
+          input: finalItems.length,
+          approved: publishItems.length,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          cost_usd: costUsd,
+        });
+      }
+    }
+  }
+
   // ── 8. Build artifact ─────────────────────────────────────────────────────
   const artifact = {
     topic: inputs.topic,
@@ -1004,8 +1127,8 @@ export default async function (context) {
     total_feeds_attempted: feedList.length,
     total_feeds_failed: errors.length,
     total_feeds_bad: badFeeds.length,
-    total_items_collected: finalItems.length,
-    items: finalItems,
+    total_items_collected: publishItems.length,
+    items: publishItems,
     errors: errors.length > 0 ? errors : undefined,
     bad_feeds: badFeeds.length > 0 ? badFeeds : undefined,
   };
@@ -1019,15 +1142,20 @@ export default async function (context) {
   console.log(`Feeds fetched:  ${artifact.total_feeds_attempted}`);
   console.log(`Feeds failed:   ${artifact.total_feeds_failed}`);
   console.log(`Feeds bad RSS:  ${artifact.total_feeds_bad}`);
-  console.log(`Items found:    ${artifact.total_items_collected}`);
+  if (aiFilterPrompt) {
+    console.log(`Items (pre-AI): ${finalItems.length}`);
+    console.log(`Items (post-AI):${publishItems.length}`);
+  } else {
+    console.log(`Items found:    ${publishItems.length}`);
+  }
   console.log("─────────────────────────────────────────────────────────\n");
 
-  if (finalItems.length === 0) {
+  if (publishItems.length === 0) {
     console.warn(
       "No items found for this topic. Try broader patterns, fewer exclusions, a larger since_hours window, or more feeds.",
     );
   } else {
-    for (const item of finalItems) {
+    for (const item of publishItems) {
       const date = item.published
         ? new Date(item.published).toLocaleDateString("pt-BR")
         : "no date";
@@ -1040,7 +1168,7 @@ export default async function (context) {
   const today = new Date().toISOString().slice(0, 10);
   const artifactName = group ? `fetched-items-${group}-${today}` : `fetched-items-${today}`;
 
-  if (finalItems.length > 0) {
+  if (publishItems.length > 0) {
     // Tenta carregar o artefato já existente do dia via fs
     let existingItems = [];
     const artifactPath = path.join(artifactsDir, `${artifactName}.json`);
@@ -1056,7 +1184,7 @@ export default async function (context) {
 
     // Mescla: existentes mantêm posição/índice fixos, novos vão ao final ordenados por score
     const existingLinks = new Set(existingItems.map((i) => i.link));
-    const trulyNewItems = finalItems.filter((i) => !existingLinks.has(i.link));
+    const trulyNewItems = publishItems.filter((i) => !existingLinks.has(i.link));
 
     trulyNewItems.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -1075,7 +1203,7 @@ export default async function (context) {
 
     await saveArtifact(artifactName, mergedArtifact);
     console.log(
-      `\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${finalItems.length} novos)`,
+      `\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${publishItems.length} novos)`,
     );
     flow?.("save_artifact", "ok", {
       artifact: `${artifactName}.json`,

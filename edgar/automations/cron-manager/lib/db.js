@@ -323,6 +323,37 @@ export function getBadFeeds() {
 }
 
 /**
+ * Aggregate AI filter costs per group for a given period.
+ * Reads cost/token data from flow.ai_filter step_events.
+ * period: 'month' (current calendar month) | 'all' (all time)
+ */
+export function getAiCostsByGroup(period = "month") {
+  const db = initDb();
+  let dateFilter = "";
+  if (period === "month") {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    dateFilter = `AND created_at >= '${monthStart}'`;
+  }
+  return db
+    .prepare(`
+      SELECT
+        group_name                                                  AS grp,
+        COUNT(*)                                                    AS runs,
+        SUM(json_extract(meta_json, '$.input'))                     AS total_input,
+        SUM(json_extract(meta_json, '$.approved'))                  AS total_approved,
+        SUM(json_extract(meta_json, '$.prompt_tokens'))             AS total_prompt_tokens,
+        SUM(json_extract(meta_json, '$.completion_tokens'))         AS total_completion_tokens,
+        SUM(json_extract(meta_json, '$.cost_usd'))                  AS total_cost_usd
+      FROM step_events
+      WHERE step = 'flow.ai_filter' AND status = 'ok' ${dateFilter}
+      GROUP BY group_name
+      ORDER BY total_cost_usd DESC
+    `)
+    .all();
+}
+
+/**
  * Funnel counts: how many items reached each step, broken down by status.
  * Counts distinct items per (step,status) so retries don't inflate totals.
  */

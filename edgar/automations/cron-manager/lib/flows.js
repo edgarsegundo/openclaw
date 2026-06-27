@@ -41,6 +41,11 @@ export const FLOWS = {
         desc: "Ordena por score+data e corta em max_items.",
       },
       {
+        key: "ai_filter",
+        label: "Filtro IA",
+        desc: "Opcional — GPT-4o mini decide semanticamente quais títulos são relevantes (fail-open).",
+      },
+      {
         key: "save_artifact",
         label: "Salvar artifact",
         desc: "Mescla com o artifact do dia e grava os itens novos.",
