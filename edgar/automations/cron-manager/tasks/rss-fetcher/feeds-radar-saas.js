@@ -411,7 +411,7 @@ export const DEFAULT_FEEDS = [
 
   // --- Padrão 1: Fundação da empresa ---
   {
-    url: "PLACEHOLDER_ALERT_fundou_startup_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/7013177064250075458",
     name: 'Google Alert BR — "fundou uma startup"',
     lang: "pt",
     category: "alerts_br",
@@ -420,7 +420,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"fundou uma startup"',
   },
   {
-    url: "PLACEHOLDER_ALERT_criou_empresa_resolver_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/13255713360504013742",
     name: 'Google Alert BR — "criou uma empresa para resolver"',
     lang: "pt",
     category: "alerts_br",
@@ -429,7 +429,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"criou uma empresa para resolver"',
   },
   {
-    url: "PLACEHOLDER_ALERT_startup_criada_resolver_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/12824532936329812672",
     name: 'Google Alert BR — "startup criada para resolver"',
     lang: "pt",
     category: "alerts_br",
@@ -438,7 +438,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"startup criada para resolver"',
   },
   {
-    url: "PLACEHOLDER_ALERT_empresa_nasceu_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/2031763522497183144",
     name: 'Google Alert BR — "empresa nasceu para resolver"',
     lang: "pt",
     category: "alerts_br",
@@ -447,7 +447,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"empresa nasceu para resolver"',
   },
   {
-    url: "PLACEHOLDER_ALERT_transformou_problema_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/148465259427060185",
     name: 'Google Alert BR — "transformou um problema em negócio"',
     lang: "pt",
     category: "alerts_br",
@@ -458,7 +458,7 @@ export const DEFAULT_FEEDS = [
 
   // --- Padrão 2: Empreendedor percebeu/identificou ---
   {
-    url: "PLACEHOLDER_ALERT_empreendedor_percebeu_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/17279962655246894371",
     name: 'Google Alert BR — "empreendedor percebeu que"',
     lang: "pt",
     category: "alerts_br",
@@ -467,7 +467,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"empreendedor percebeu que"',
   },
   {
-    url: "PLACEHOLDER_ALERT_identificou_oportunidade_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/7406136404353422673",
     name: 'Google Alert BR — "identificou uma oportunidade"',
     lang: "pt",
     category: "alerts_br",
@@ -475,7 +475,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"identificou uma oportunidade" startup',
   },
   {
-    url: "PLACEHOLDER_ALERT_dor_do_mercado_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/14553500549936145519",
     name: 'Google Alert BR — "dor do mercado" startup',
     lang: "pt",
     category: "alerts_br",
@@ -485,7 +485,7 @@ export const DEFAULT_FEEDS = [
 
   // --- Padrão 3: SaaS Brasil específico ---
   {
-    url: "PLACEHOLDER_ALERT_saas_brasil_lancamento_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/5424428422161408416",
     name: "Google Alert BR — SaaS Brasil lançamento",
     lang: "pt",
     category: "alerts_br",
@@ -494,7 +494,7 @@ export const DEFAULT_FEEDS = [
     alert_query: "SaaS Brasil lançamento startup",
   },
   {
-    url: "PLACEHOLDER_ALERT_rodada_seed_brasil_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/6386236636422196988",
     name: "Google Alert BR — rodada seed Brasil",
     lang: "pt",
     category: "alerts_br",
@@ -503,7 +503,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"rodada seed" startup Brasil',
   },
   {
-    url: "PLACEHOLDER_ALERT_resolveu_problema_saas_pt",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/2777005685216324474",
     name: 'Google Alert BR — "resolveu o problema"',
     lang: "pt",
     category: "alerts_br",
@@ -520,7 +520,7 @@ export const DEFAULT_FEEDS = [
 
   // --- Origin stories ---
   {
-    url: "PLACEHOLDER_ALERT_founded_company_solve_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/15997105674885522253",
     name: 'Google Alert EN — "founded the company to solve"',
     lang: "en",
     category: "alerts_en",
@@ -529,7 +529,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"founded the company to solve"',
   },
   {
-    url: "PLACEHOLDER_ALERT_built_because_problem_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/4517715440664858484",
     name: 'Google Alert EN — "built it because"',
     lang: "en",
     category: "alerts_en",
@@ -537,7 +537,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"built it because" startup saas',
   },
   {
-    url: "PLACEHOLDER_ALERT_scratching_own_itch_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/3453037174369065092",
     name: 'Google Alert EN — "scratching my own itch"',
     lang: "en",
     category: "alerts_en",
@@ -546,7 +546,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"scratching my own itch" startup',
   },
   {
-    url: "PLACEHOLDER_ALERT_noticed_nobody_was_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/5542576469396350643",
     name: 'Google Alert EN — "noticed that nobody was"',
     lang: "en",
     category: "alerts_en",
@@ -554,7 +554,7 @@ export const DEFAULT_FEEDS = [
     alert_query: '"noticed that nobody was" startup founder',
   },
   {
-    url: "PLACEHOLDER_ALERT_problem_we_were_solving_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/5077868257655223599",
     name: 'Google Alert EN — "the problem we were solving"',
     lang: "en",
     category: "alerts_en",
@@ -564,7 +564,7 @@ export const DEFAULT_FEEDS = [
 
   // --- Show HN style ---
   {
-    url: "PLACEHOLDER_ALERT_show_hn_i_built_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/3036151989281425023",
     name: 'Google Alert EN — "Show HN: I built"',
     lang: "en",
     category: "alerts_en",
@@ -575,7 +575,7 @@ export const DEFAULT_FEEDS = [
 
   // --- SaaS específico ---
   {
-    url: "PLACEHOLDER_ALERT_saas_product_launch_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/6051402825775030168",
     name: 'Google Alert EN — SaaS "pain point"',
     lang: "en",
     category: "alerts_en",
@@ -583,7 +583,7 @@ export const DEFAULT_FEEDS = [
     alert_query: 'SaaS startup "pain point" "we built"',
   },
   {
-    url: "PLACEHOLDER_ALERT_founder_story_saas_en",
+    url: "https://www.google.com.br/alerts/feeds/03835077985665690492/10212333512447824158",
     name: "Google Alert EN — founder story SaaS",
     lang: "en",
     category: "alerts_en",
