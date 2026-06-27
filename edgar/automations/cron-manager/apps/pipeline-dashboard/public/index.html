@@ -232,49 +232,7 @@
         </div>
 
         <div id="inputsFormArea" style="display:none">
-          <div class="inputs-field">
-            <label>Grupo (group)</label>
-            <input type="text" id="inp_group" readonly style="opacity:.6" />
-          </div>
-          <div class="inputs-field">
-            <label>Topic</label>
-            <input type="text" id="inp_topic" />
-          </div>
-          <div class="inputs-field">
-            <label>Language</label>
-            <select id="inp_language">
-              <option value="all">all</option>
-              <option value="pt">pt</option>
-              <option value="en">en</option>
-              <option value="es">es</option>
-            </select>
-          </div>
-          <div style="display:flex;gap:12px">
-            <div class="inputs-field" style="flex:1">
-              <label>Max items</label>
-              <input type="number" id="inp_max_items" min="1" max="200" />
-            </div>
-            <div class="inputs-field" style="flex:1">
-              <label>Max por feed (0 = sem limite)</label>
-              <input type="number" id="inp_max_per_feed" min="0" max="50" />
-            </div>
-          </div>
-          <div class="inputs-field">
-            <label>Patterns <span style="font-weight:400;text-transform:none">(Enter para adicionar)</span></label>
-            <div class="chip-area" id="patternsChipArea" onclick="this.querySelector('.chip-add').focus()"></div>
-          </div>
-          <div class="inputs-field">
-            <label>Exclude patterns <span style="font-weight:400;text-transform:none">(Enter para adicionar)</span></label>
-            <div class="chip-area" id="excludeChipArea" onclick="this.querySelector('.chip-add').focus()"></div>
-          </div>
-          <div class="inputs-field">
-            <label>AI Filter Prompt <span style="font-weight:400;text-transform:none">(deixe vazio para desativar o filtro de IA)</span></label>
-            <textarea id="inp_ai_filter_prompt" rows="4" placeholder="Ex: Keep only articles about founders who built and launched a SaaS product. Exclude news, opinion pieces, and generic tech articles."></textarea>
-          </div>
-          <div class="inputs-field">
-            <label>Feeds JS File</label>
-            <input type="text" id="inp_feeds_js_file" />
-          </div>
+          <div id="inputsFormFields"></div>
           <div id="inputsSaveMsg" style="font-size:12px;color:var(--ok);display:none;margin-bottom:8px">✓ Salvo com sucesso!</div>
           <div class="inputs-modal-footer">
             <button onclick="closeInputsModal()">Cancelar</button>
@@ -796,35 +754,24 @@
       // ── Inputs editor ──────────────────────────────────────────────────────────
       let _currentInputsFile = null;
       let _currentInputsContent = {};
+      let _fieldConfigs = {};
 
-      function makeChipArea(areaId, values) {
-        const area = $(areaId);
-        area.innerHTML = "";
-        for (const v of values) {
-          area.appendChild(makeChip(areaId, v));
-        }
-        const input = document.createElement("input");
-        input.className = "chip-add";
-        input.placeholder = "Adicionar…";
-        input.addEventListener("keydown", (e) => {
-          if ((e.key === "Enter" || e.key === ",") && input.value.trim()) {
-            e.preventDefault();
-            area.insertBefore(makeChip(areaId, input.value.trim()), input);
-            input.value = "";
-          } else if (e.key === "Backspace" && !input.value) {
-            const chips = area.querySelectorAll(".chip");
-            if (chips.length) chips[chips.length - 1].remove();
-          }
-        });
-        area.appendChild(input);
+      // Infer field type from key name and value.
+      function inferFieldType(key, value) {
+        const k = key.toLowerCase();
+        if (k === "group") return "readonly";
+        if (k.includes("prompt") || (typeof value === "string" && value.length > 120 && !value.includes(";"))) return "textarea";
+        if (k.includes("pattern") || (typeof value === "string" && value.includes(";"))) return "chips";
+        if (typeof value === "number") return "number";
+        if (typeof value === "boolean") return "checkbox";
+        return "text";
       }
 
-      function makeChip(areaId, value) {
+      function makeChip(value) {
         const span = document.createElement("span");
         span.className = "chip";
         span.dataset.value = value;
-        const label = document.createTextNode(value + " ");
-        span.appendChild(label);
+        span.appendChild(document.createTextNode(value + " "));
         const btn = document.createElement("button");
         btn.type = "button";
         btn.textContent = "×";
@@ -834,8 +781,99 @@
         return span;
       }
 
-      function getChipValues(areaId) {
-        return [...$(areaId).querySelectorAll(".chip")].map((c) => c.dataset.value);
+      function buildChipArea(values) {
+        const area = document.createElement("div");
+        area.className = "chip-area";
+        area.addEventListener("click", () => area.querySelector(".chip-add")?.focus());
+        for (const v of values) area.appendChild(makeChip(v));
+        const input = document.createElement("input");
+        input.className = "chip-add";
+        input.placeholder = "Adicionar… (Enter)";
+        input.addEventListener("keydown", (e) => {
+          if ((e.key === "Enter" || e.key === ",") && input.value.trim()) {
+            e.preventDefault();
+            area.insertBefore(makeChip(input.value.trim()), input);
+            input.value = "";
+          } else if (e.key === "Backspace" && !input.value) {
+            const chips = area.querySelectorAll(".chip");
+            if (chips.length) chips[chips.length - 1].remove();
+          }
+        });
+        area.appendChild(input);
+        return area;
+      }
+
+      // Build the form dynamically from any JSON object.
+      function buildInputsForm(content) {
+        _fieldConfigs = {};
+        const container = $("inputsFormFields");
+        container.innerHTML = "";
+
+        for (const [key, value] of Object.entries(content)) {
+          const type = inferFieldType(key, value);
+          _fieldConfigs[key] = type;
+
+          const div = document.createElement("div");
+          div.className = "inputs-field";
+
+          const label = document.createElement("label");
+          label.innerHTML = esc(key) +
+            (type === "readonly" ? ' <span style="font-weight:400;text-transform:none;opacity:.5">(só leitura)</span>' : "") +
+            (type === "chips" ? ' <span style="font-weight:400;text-transform:none;opacity:.6">(Enter para adicionar)</span>' : "");
+          div.appendChild(label);
+
+          let el;
+          if (type === "chips") {
+            el = buildChipArea(String(value || "").split(";").map((s) => s.trim()).filter(Boolean));
+            el.dataset.fieldKey = key;
+          } else if (type === "textarea") {
+            el = document.createElement("textarea");
+            el.rows = 3;
+            el.value = String(value || "");
+            el.dataset.fieldKey = key;
+          } else if (type === "number") {
+            el = document.createElement("input");
+            el.type = "number";
+            el.value = value ?? "";
+            el.dataset.fieldKey = key;
+          } else if (type === "checkbox") {
+            el = document.createElement("input");
+            el.type = "checkbox";
+            el.checked = !!value;
+            el.dataset.fieldKey = key;
+          } else {
+            el = document.createElement("input");
+            el.type = "text";
+            el.value = String(value ?? "");
+            el.dataset.fieldKey = key;
+            if (type === "readonly") el.readOnly = true;
+          }
+
+          div.appendChild(el);
+          container.appendChild(div);
+        }
+      }
+
+      // Collect current form values back into a plain object.
+      function collectInputsForm() {
+        const result = {};
+        const container = $("inputsFormFields");
+
+        for (const [key, type] of Object.entries(_fieldConfigs)) {
+          if (type === "chips") {
+            const area = container.querySelector(`.chip-area[data-field-key="${key}"]`);
+            result[key] = area
+              ? [...area.querySelectorAll(".chip")].map((c) => c.dataset.value).join(";")
+              : (_currentInputsContent[key] ?? "");
+          } else {
+            const el = container.querySelector(`[data-field-key="${key}"]`);
+            if (!el) { result[key] = _currentInputsContent[key]; continue; }
+            if (type === "number") result[key] = el.value !== "" ? Number(el.value) : (_currentInputsContent[key] ?? 0);
+            else if (type === "checkbox") result[key] = el.checked;
+            else result[key] = el.value;
+          }
+        }
+        return result;
       }
 
       async function openInputsEditor() {
@@ -861,15 +899,7 @@
           const { content } = await api("/api/inputs?file=" + encodeURIComponent(file));
           _currentInputsFile = file;
           _currentInputsContent = content;
-          $("inp_group").value = content.group || "";
-          $("inp_topic").value = content.topic || "";
-          $("inp_language").value = content.language || "all";
-          $("inp_max_items").value = content.max_items ?? "";
-          $("inp_max_per_feed").value = content.max_per_feed ?? 0;
-          makeChipArea("patternsChipArea", (content.patterns || "").split(";").map((s) => s.trim()).filter(Boolean));
-          makeChipArea("excludeChipArea", (content.exclude_patterns || "").split(";").map((s) => s.trim()).filter(Boolean));
-          $("inp_ai_filter_prompt").value = content.ai_filter_prompt || "";
-          $("inp_feeds_js_file").value = content.feeds_js_file || "";
+          buildInputsForm(content);
           $("inputsFormArea").style.display = "block";
         } catch (e) {
           alert("Erro ao carregar arquivo: " + e.message);
@@ -878,20 +908,7 @@
 
       window.saveInputs = async function () {
         if (!_currentInputsFile) return;
-        const patterns = getChipValues("patternsChipArea").join(";");
-        const excludePatterns = getChipValues("excludeChipArea").join(";");
-        const updated = {
-          ..._currentInputsContent,
-          group: $("inp_group").value,
-          topic: $("inp_topic").value,
-          language: $("inp_language").value,
-          max_items: Number($("inp_max_items").value) || _currentInputsContent.max_items,
-          max_per_feed: Number($("inp_max_per_feed").value) || 0,
-          patterns,
-          exclude_patterns: excludePatterns,
-          ai_filter_prompt: $("inp_ai_filter_prompt").value.trim(),
-          feeds_js_file: $("inp_feeds_js_file").value.trim(),
-        };
+        const updated = collectInputsForm();
         const btn = $("inputsSaveBtn");
         btn.disabled = true;
         btn.textContent = "Salvando…";
