@@ -187,12 +187,34 @@
       </section>
 
       <section class="panel" id="aiCostsSection">
-        <h2>Custo de IA <span id="aiCostsPeriod" style="color:var(--muted);font-size:11px;font-weight:400;text-transform:none">(este mês)</span></h2>
-        <table>
+        <h2>Custo de IA
+          <span style="display:inline-flex;gap:6px;margin-left:10px;vertical-align:middle">
+            <select id="aiCostsPeriodSel" style="font-size:11px;padding:2px 6px">
+              <option value="day">Hoje</option>
+              <option value="week">7 dias</option>
+              <option value="month" selected>30 dias</option>
+              <option value="year">12 meses</option>
+              <option value="all">Tudo</option>
+            </select>
+            <select id="aiCostsGranSel" style="font-size:11px;padding:2px 6px">
+              <option value="day" selected>Por dia</option>
+              <option value="week">Por semana</option>
+              <option value="month">Por mês</option>
+            </select>
+          </span>
+        </h2>
+        <table style="margin-bottom:14px">
           <thead>
-            <tr><th>Grupo</th><th>Runs c/ IA</th><th>Enviados</th><th>Aprovados</th><th>Tokens entrada</th><th>Tokens saída</th><th>Custo (mês)</th></tr>
+            <tr><th>Grupo</th><th>Runs</th><th>Enviados</th><th>Aprovados</th><th>Tokens in</th><th>Tokens out</th><th>Custo total</th></tr>
           </thead>
           <tbody id="aiCostsBody"><tr><td colspan="7" class="muted">Carregando…</td></tr></tbody>
+        </table>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Histórico</div>
+        <table>
+          <thead>
+            <tr><th>Período</th><th>Grupo</th><th>Runs</th><th>Enviados</th><th>Aprovados</th><th>Custo</th></tr>
+          </thead>
+          <tbody id="aiCostsTimelineBody"><tr><td colspan="6" class="muted">Carregando…</td></tr></tbody>
         </table>
       </section>
 
@@ -733,22 +755,44 @@
       };
 
       async function loadAiCosts() {
-        const rows = await api("/api/ai-costs?period=month");
+        const period = ($("aiCostsPeriodSel") || {}).value || "month";
+        const gran   = ($("aiCostsGranSel")  || {}).value || "day";
+
+        const [rows, timeline] = await Promise.all([
+          api(`/api/ai-costs?period=${period}`),
+          api(`/api/ai-costs/timeline?granularity=${gran}&period=${period}`),
+        ]);
+
         const body = $("aiCostsBody");
         if (!rows.length) {
-          body.innerHTML = '<tr><td colspan="7" class="muted">Nenhum uso de IA registrado este mês.</td></tr>';
-          return;
+          body.innerHTML = '<tr><td colspan="7" class="muted">Nenhum uso de IA neste período.</td></tr>';
+        } else {
+          body.innerHTML = rows.map((r) => `
+            <tr>
+              <td><strong>${esc(r.grp || "—")}</strong></td>
+              <td class="muted">${r.runs ?? 0}</td>
+              <td class="muted">${r.total_input ?? 0}</td>
+              <td class="muted">${r.total_approved ?? 0}</td>
+              <td class="muted">${(r.total_prompt_tokens ?? 0).toLocaleString("pt-BR")}</td>
+              <td class="muted">${(r.total_completion_tokens ?? 0).toLocaleString("pt-BR")}</td>
+              <td><strong>$${(r.total_cost_usd ?? 0).toFixed(6)}</strong></td>
+            </tr>`).join("");
         }
-        body.innerHTML = rows.map((r) => `
-          <tr>
-            <td><strong>${esc(r.grp || "—")}</strong></td>
-            <td class="muted">${r.runs ?? 0}</td>
-            <td class="muted">${r.total_input ?? 0}</td>
-            <td class="muted">${r.total_approved ?? 0}</td>
-            <td class="muted">${(r.total_prompt_tokens ?? 0).toLocaleString("pt-BR")}</td>
-            <td class="muted">${(r.total_completion_tokens ?? 0).toLocaleString("pt-BR")}</td>
-            <td><strong>$${(r.total_cost_usd ?? 0).toFixed(6)}</strong></td>
-          </tr>`).join("");
+
+        const tBody = $("aiCostsTimelineBody");
+        if (!timeline.length) {
+          tBody.innerHTML = '<tr><td colspan="6" class="muted">Sem dados para este período.</td></tr>';
+        } else {
+          tBody.innerHTML = timeline.map((r) => `
+            <tr>
+              <td class="muted">${esc(r.bucket)}</td>
+              <td>${esc(r.grp || "—")}</td>
+              <td class="muted">${r.runs ?? 0}</td>
+              <td class="muted">${r.total_input ?? 0}</td>
+              <td class="muted">${r.total_approved ?? 0}</td>
+              <td><strong>$${(r.total_cost_usd ?? 0).toFixed(6)}</strong></td>
+            </tr>`).join("");
+        }
       }
 
       // ── Inputs editor ──────────────────────────────────────────────────────────
@@ -969,6 +1013,8 @@
       });
       $("inputsBtn").addEventListener("click", openInputsEditor);
       $("inputsFileSelect").addEventListener("change", (e) => loadInputsFile(e.target.value));
+      $("aiCostsPeriodSel").addEventListener("change", loadAiCosts);
+      $("aiCostsGranSel").addEventListener("change", loadAiCosts);
 
       $("wipeBtn").addEventListener("click", async () => {
         if (!confirm("Zerar TODO o banco de tracking (itens, eventos, estados e runs)?\n\nIsso apaga todo o histórico. Não dá pra desfazer.")) return;

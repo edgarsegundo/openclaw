@@ -6,6 +6,7 @@ import he from "he";
 import { initMonitoring } from "../../lib/monitoring.js";
 import { itemIdFromUrl } from "../../lib/url.js";
 import { writeFileAtomicSync } from "../../lib/atomic.js";
+import { recordAiCost } from "../../lib/db.js";
 
 initMonitoring();
 
@@ -641,6 +642,7 @@ function scoreAndFilterItems(
   sinceCutoff,
   seenHashes,
   aiMode = false,
+  aiMinScore = 0,
 ) {
   let titleLengthSkipped = 0,
     scoreSkipped = 0,
@@ -670,9 +672,9 @@ function scoreAndFilterItems(
         if (regex.test(title)) score -= 2;
       }
 
-      // In AI mode: threshold relaxed — only hard-exclude items, semantic filter comes later.
-      // pass_through feeds include all items not explicitly excluded.
-      const minScore = aiMode || feed.pass_through ? 0 : 2;
+      // pass_through feeds (curated) always score >= 0 so AI sees everything.
+      // Regular feeds: use aiMinScore in AI mode (configurable, default 0), else strict >= 2.
+      const minScore = feed.pass_through ? 0 : aiMode ? aiMinScore : 2;
       if (score < minScore) {
         console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
         scoreSkipped++;
@@ -838,6 +840,7 @@ export default async function (context) {
 
   const aiFilterPrompt = (inputs.ai_filter_prompt || "").trim();
   const maxPerFeed = Number(inputs.max_per_feed) || 0; // 0 = no cap
+  const aiMinScore = Number(inputs.ai_min_score ?? 0);
 
   // Dynamic import of feeds module
   let DEFAULT_FEEDS, parseCustomFeeds;
@@ -965,6 +968,7 @@ export default async function (context) {
           sinceCutoff,
           seenHashes,
           !!aiFilterPrompt,
+          aiMinScore,
         );
         totalRaw += feedStats.total_raw;
         totalScoreSkipped += feedStats.score_skipped;
@@ -1014,6 +1018,7 @@ export default async function (context) {
           sinceCutoff,
           seenHashes,
           !!aiFilterPrompt,
+          aiMinScore,
         );
         totalRaw += feedStats.total_raw;
         totalScoreSkipped += feedStats.score_skipped;
@@ -1152,6 +1157,16 @@ export default async function (context) {
         console.log(
           `[ai_filter] ${finalItems.length} → ${publishItems.length} approved (cost: $${costUsd.toFixed(6)})`,
         );
+        // Persist cost permanently (survives pruning)
+        recordAiCost({
+          group_name: group,
+          execution_id: executionId,
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+          cost_usd: costUsd,
+          input_count: finalItems.length,
+          approved_count: publishItems.length,
+        });
         flow?.("ai_filter", "ok", {
           input: finalItems.length,
           approved: publishItems.length,

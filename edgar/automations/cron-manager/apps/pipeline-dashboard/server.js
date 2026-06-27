@@ -16,6 +16,7 @@ import {
   getEventsByExecution,
   getBadFeeds,
   getAiCostsByGroup,
+  getAiCostsTimeline,
   wipeAll,
   pruneOlderThan,
 } from "../../lib/db.js";
@@ -190,7 +191,14 @@ const server = http.createServer(async (req, res) => {
 
     if (route === "/api/ai-costs") {
       const period = url.searchParams.get("period") || "month";
-      return sendJson(res, getAiCostsByGroup(period));
+      const group = url.searchParams.get("group") || null;
+      return sendJson(res, getAiCostsByGroup(period, group));
+    }
+    if (route === "/api/ai-costs/timeline") {
+      const granularity = url.searchParams.get("granularity") || "day";
+      const period = url.searchParams.get("period") || "month";
+      const group = url.searchParams.get("group") || null;
+      return sendJson(res, getAiCostsTimeline(granularity, period, group));
     }
 
     if (route === "/api/inputs") {

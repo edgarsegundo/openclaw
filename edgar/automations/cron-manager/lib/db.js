@@ -60,6 +60,20 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_step_events_exec ON step_events(execution_id);
     CREATE INDEX IF NOT EXISTS idx_step_events_created ON step_events(created_at);
 
+    CREATE TABLE IF NOT EXISTS ai_costs (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_name         TEXT NOT NULL,
+      execution_id       TEXT,
+      prompt_tokens      INTEGER NOT NULL DEFAULT 0,
+      completion_tokens  INTEGER NOT NULL DEFAULT 0,
+      cost_usd           REAL    NOT NULL DEFAULT 0,
+      input_count        INTEGER NOT NULL DEFAULT 0,
+      approved_count     INTEGER NOT NULL DEFAULT 0,
+      created_at         TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ai_costs_group   ON ai_costs(group_name);
+    CREATE INDEX IF NOT EXISTS idx_ai_costs_created ON ai_costs(created_at);
+
     CREATE TABLE IF NOT EXISTS item_state (
       item_id        TEXT NOT NULL,
       group_name     TEXT NOT NULL,
@@ -323,34 +337,106 @@ export function getBadFeeds() {
 }
 
 /**
- * Aggregate AI filter costs per group for a given period.
- * Reads cost/token data from flow.ai_filter step_events.
- * period: 'month' (current calendar month) | 'all' (all time)
+ * Append one AI filter cost record. Called by the rss-fetcher after each
+ * successful GPT call. Stored permanently — never pruned.
  */
-export function getAiCostsByGroup(period = "month") {
+export function recordAiCost({
+  group_name,
+  execution_id,
+  prompt_tokens,
+  completion_tokens,
+  cost_usd,
+  input_count,
+  approved_count,
+}) {
   const db = initDb();
-  let dateFilter = "";
-  if (period === "month") {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    dateFilter = `AND created_at >= '${monthStart}'`;
-  }
+  db.prepare(`
+    INSERT INTO ai_costs
+      (group_name, execution_id, prompt_tokens, completion_tokens, cost_usd, input_count, approved_count, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    group_name,
+    execution_id ?? null,
+    prompt_tokens ?? 0,
+    completion_tokens ?? 0,
+    cost_usd ?? 0,
+    input_count ?? 0,
+    approved_count ?? 0,
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * Aggregate AI costs per group.
+ * period: 'day' | 'week' | 'month' | 'all'
+ * group: optional filter
+ */
+export function getAiCostsByGroup(period = "month", group = null) {
+  const db = initDb();
+  const { filter, args } = _periodFilter(period, group);
   return db
     .prepare(`
       SELECT
-        group_name                                                  AS grp,
-        COUNT(*)                                                    AS runs,
-        SUM(json_extract(meta_json, '$.input'))                     AS total_input,
-        SUM(json_extract(meta_json, '$.approved'))                  AS total_approved,
-        SUM(json_extract(meta_json, '$.prompt_tokens'))             AS total_prompt_tokens,
-        SUM(json_extract(meta_json, '$.completion_tokens'))         AS total_completion_tokens,
-        SUM(json_extract(meta_json, '$.cost_usd'))                  AS total_cost_usd
-      FROM step_events
-      WHERE step = 'flow.ai_filter' AND status = 'ok' ${dateFilter}
+        group_name                  AS grp,
+        COUNT(*)                    AS runs,
+        SUM(input_count)            AS total_input,
+        SUM(approved_count)         AS total_approved,
+        SUM(prompt_tokens)          AS total_prompt_tokens,
+        SUM(completion_tokens)      AS total_completion_tokens,
+        SUM(cost_usd)               AS total_cost_usd
+      FROM ai_costs
+      ${filter}
       GROUP BY group_name
       ORDER BY total_cost_usd DESC
     `)
-    .all();
+    .all(...args);
+}
+
+/**
+ * Day-by-day or week-by-week cost timeline.
+ * granularity: 'day' | 'week' | 'month'
+ * period: 'week' (last 7d) | 'month' (last 30d) | 'year' (last 365d) | 'all'
+ * group: optional filter
+ */
+export function getAiCostsTimeline(granularity = "day", period = "month", group = null) {
+  const db = initDb();
+  const fmt = granularity === "month" ? "%Y-%m" : granularity === "week" ? "%Y-%W" : "%Y-%m-%d";
+  const { filter, args } = _periodFilter(period, group);
+  return db
+    .prepare(`
+      SELECT
+        strftime('${fmt}', created_at)  AS bucket,
+        group_name                      AS grp,
+        COUNT(*)                        AS runs,
+        SUM(input_count)                AS total_input,
+        SUM(approved_count)             AS total_approved,
+        SUM(cost_usd)                   AS total_cost_usd
+      FROM ai_costs
+      ${filter}
+      GROUP BY bucket, group_name
+      ORDER BY bucket DESC, group_name
+    `)
+    .all(...args);
+}
+
+function _periodFilter(period, group) {
+  const conditions = [];
+  const args = [];
+  if (period === "day") {
+    conditions.push("created_at >= datetime('now', '-1 day')");
+  } else if (period === "week") {
+    conditions.push("created_at >= datetime('now', '-7 days')");
+  } else if (period === "month") {
+    conditions.push("created_at >= datetime('now', '-30 days')");
+  } else if (period === "year") {
+    conditions.push("created_at >= datetime('now', '-365 days')");
+  }
+  if (group) {
+    conditions.push("group_name = ?");
+    args.push(group);
+  }
+  const filter = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+  return { filter, args };
 }
 
 /**
