@@ -61,13 +61,6 @@ export const DEFAULT_FEEDS = [
     type: "rss",
   },
   {
-    url: "https://exame.com/negocios/feed/",
-    name: "Exame — Negócios",
-    lang: "pt",
-    category: "saas_br",
-    type: "rss",
-  },
-  {
     url: "https://forbes.com.br/feed/",
     name: "Forbes Brasil",
     lang: "pt",
@@ -212,14 +205,6 @@ export const DEFAULT_FEEDS = [
     type: "rss",
     notes: "Inovação e design de produtos — perfis ricos de founders",
   },
-  {
-    url: "https://www.inc.com/rss.xml",
-    name: "Inc. Magazine",
-    lang: "en",
-    category: "saas_en",
-    type: "rss",
-    notes: "Clássico para histórias de origem e crescimento de empresas",
-  },
 
   // ─────────────────────────────────────────────────────────────────────────
   // CATEGORIA: vc_blogs — Blogs de Venture Capital (análises de oportunidades)
@@ -344,15 +329,6 @@ export const DEFAULT_FEEDS = [
   // ─────────────────────────────────────────────────────────────────────────
 
   {
-    url: "https://www.indiehackers.com/feed.rss",
-    name: "Indie Hackers",
-    lang: "en",
-    category: "indie",
-    type: "rss",
-    pass_through: true,
-    notes: "FUNDAMENTAL: founders compartilhando histórias de criação de produto e receita",
-  },
-  {
     url: "https://thebootstrappedfounder.com/feed/",
     name: "The Bootstrapped Founder",
     lang: "en",
@@ -369,23 +345,6 @@ export const DEFAULT_FEEDS = [
     type: "rss",
     pass_through: true,
     notes: "Autópsias de startups e histórias de sucesso — contexto rico sobre problema+solução",
-  },
-  {
-    url: "https://microconf.com/feed/",
-    name: "MicroConf",
-    lang: "en",
-    category: "indie",
-    type: "rss",
-    pass_through: true,
-    notes: "Comunidade de SaaS bootstrapped — casos práticos de negócios",
-  },
-  {
-    url: "https://www.swipefiles.com/feed",
-    name: "Swipe Files",
-    lang: "en",
-    category: "indie",
-    type: "rss",
-    pass_through: true,
   },
 
   // ─────────────────────────────────────────────────────────────────────────
