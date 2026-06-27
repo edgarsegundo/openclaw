@@ -1229,6 +1229,22 @@ export default async function (context) {
     }
   }
 
+  // ── 10b. Track items that entered the pipeline (observability) ────────────
+  // Uses publishItems (post-AI): only items that actually reach the artifact
+  // appear in the pipeline dashboard. Recorded here so the timeline shows
+  // fetch → save in the correct order.
+  for (const item of publishItems) {
+    track?.({
+      itemId: itemIdFromUrl(item.link),
+      group,
+      step: "fetch",
+      status: "ok",
+      title: item.title,
+      url: item.link,
+      meta: { score: item.score, source: item.source },
+    });
+  }
+
   // ── 10. Save artifact (merge with existing day file) ──────────────────────
   const today = new Date().toISOString().slice(0, 10);
   const artifactName = group ? `fetched-items-${group}-${today}` : `fetched-items-${today}`;
@@ -1283,19 +1299,6 @@ export default async function (context) {
       { artifact: `${artifactName}.json` },
       { reason: "no_new_items" },
     );
-  }
-
-  // ── 10b. Track items that entered the pipeline (observability) ────────────
-  for (const item of finalItems) {
-    track?.({
-      itemId: itemIdFromUrl(item.link),
-      group,
-      step: "fetch",
-      status: "ok",
-      title: item.title,
-      url: item.link,
-      meta: { score: item.score, source: item.source },
-    });
   }
 
   // ── 11. Update seen-hashes with this execution's items ───────────────────

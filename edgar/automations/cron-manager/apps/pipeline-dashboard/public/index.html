@@ -135,6 +135,12 @@
       .inputs-field input[type=text], .inputs-field input[type=number], .inputs-field select, .inputs-field textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; font-family: inherit; }
       .inputs-field textarea { resize: vertical; min-height: 80px; }
       .inputs-modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+      /* collapsible sections in flow detail */
+      details.expand summary { cursor: pointer; color: var(--accent); font-size: 11px; list-style: none; padding: 4px 0; user-select: none; display: inline-flex; align-items: center; gap: 4px; }
+      details.expand summary::-webkit-details-marker { display: none; }
+      details.expand summary::before { content: "▶"; font-size: 9px; }
+      details.expand[open] summary::before { content: "▼"; }
+      details.expand[open] summary { margin-bottom: 6px; }
     </style>
   </head>
   <body>
@@ -520,22 +526,23 @@
 
         if (step === "flow.rank_select") {
           const items = meta.items || [];
+          const table = items.length ? `<table style="font-size:11px;width:100%">
+            <thead><tr>
+              <th style="width:48px">Score</th>
+              <th style="width:110px">Fonte</th>
+              <th>Título</th>
+            </tr></thead>
+            <tbody>${items.map((it, i) => `<tr style="${i % 2 ? "background:#1c2029" : ""}">
+              <td style="font-weight:700;white-space:nowrap;color:var(--ok)">${it.score ?? ""}</td>
+              <td style="color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(it.source || "")}</td>
+              <td style="word-break:break-word">${esc(it.title || "")}</td>
+            </tr>`).join("")}</tbody>
+          </table>` : '<div class="muted" style="font-size:12px">Nenhum item selecionado.</div>';
           return `<div style="margin-top:8px">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
               <strong>${meta.selected ?? items.length}</strong> selecionados · max: ${meta.max_items ?? "—"} · score topo: <strong>${meta.top_score ?? "—"}</strong>
             </div>
-            ${items.length ? `<table style="font-size:11px;width:100%">
-              <thead><tr>
-                <th style="width:48px">Score</th>
-                <th style="width:110px">Fonte</th>
-                <th>Título</th>
-              </tr></thead>
-              <tbody>${items.map((it, i) => `<tr style="${i % 2 ? "background:#1c2029" : ""}">
-                <td style="font-weight:700;white-space:nowrap;color:var(--ok)">${it.score ?? ""}</td>
-                <td style="color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(it.source || "")}</td>
-                <td style="word-break:break-word">${esc(it.title || "")}</td>
-              </tr>`).join("")}</tbody>
-            </table>` : '<div class="muted" style="font-size:12px">Nenhum item selecionado.</div>'}
+            ${items.length ? `<details class="expand"><summary>${items.length} itens</summary>${table}</details>` : table}
           </div>`;
         }
 
@@ -550,11 +557,7 @@
             const pairs = Object.entries(meta).filter(([, v]) => !Array.isArray(v) && v != null);
             return `<div style="margin-top:6px;font-size:12px;color:var(--muted)">${pairs.map(([k, v]) => `<span style="margin-right:12px"><span style="opacity:.7">${esc(k)}:</span> ${esc(String(v))}</span>`).join("")}</div>`;
           }
-          return `<div style="margin-top:8px">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
-              <strong>${meta.approved ?? approvedTitles.length}</strong>/${meta.input ?? sent.length} aprovados${cost}${tokens}
-            </div>
-            <div style="font-size:11px;display:grid;gap:2px">
+          const titleList = `<div style="font-size:11px;display:grid;gap:2px;margin-top:2px">
               ${sent.map((t) => {
                 const ok = approvedSet.has(t);
                 return `<div style="padding:2px 0;display:flex;gap:6px;align-items:baseline;${ok ? "" : "opacity:.45"}">
@@ -562,7 +565,12 @@
                   <span style="word-break:break-word;${ok ? "" : "text-decoration:line-through"}">${esc(t)}</span>
                 </div>`;
               }).join("")}
+            </div>`;
+          return `<div style="margin-top:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px">
+              <strong>${meta.approved ?? approvedTitles.length}</strong>/${meta.input ?? sent.length} aprovados${cost}${tokens}
             </div>
+            <details class="expand"><summary>${sent.length} títulos avaliados</summary>${titleList}</details>
           </div>`;
         }
 
