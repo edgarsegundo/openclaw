@@ -349,6 +349,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "indie",
     type: "rss",
+    pass_through: true,
     notes: "FUNDAMENTAL: founders compartilhando histórias de criação de produto e receita",
   },
   {
@@ -357,6 +358,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "indie",
     type: "rss",
+    pass_through: true,
     notes: "Arvid Kahl — foco em construir SaaS resolvendo problemas reais sem VC",
   },
   {
@@ -365,6 +367,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "indie",
     type: "rss",
+    pass_through: true,
     notes: "Autópsias de startups e histórias de sucesso — contexto rico sobre problema+solução",
   },
   {
@@ -373,6 +376,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "indie",
     type: "rss",
+    pass_through: true,
     notes: "Comunidade de SaaS bootstrapped — casos práticos de negócios",
   },
   {
@@ -381,6 +385,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "indie",
     type: "rss",
+    pass_through: true,
   },
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -393,6 +398,7 @@ export const DEFAULT_FEEDS = [
     lang: "en",
     category: "product_hunt",
     type: "rss",
+    pass_through: true,
     notes: "Lançamentos diários de produtos — descrição sempre inclui problema que resolve",
   },
 

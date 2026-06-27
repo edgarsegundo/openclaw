@@ -140,16 +140,7 @@ inputs:
 #       from_task: rss-fetcher
 #       artifact: result          # matches "name" below
 #
-# artifacts:
-#   - name: result
-#     description: Main output of this task
-#     template: my-template
-#     path: result.json
-#
-#   # Dynamic example (one file per execution, named after a field):
-#   - name: article
-#     description: Generated article
-#     template: write-cluster-article
-#     path: "article-{slug}.json"
-#     dynamic: true
-#     path_key: title             # artifact.title is slugified → filename
+artifacts:
+  - name: fetched-items-
+    description: "Daily items per group: fetched-items-{group}-{YYYY-MM-DD}.json"
+    dynamic: true

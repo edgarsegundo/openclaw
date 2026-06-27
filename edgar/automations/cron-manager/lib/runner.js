@@ -102,15 +102,20 @@ function resolveArtifactInputs(inputs) {
  */
 function saveArtifactFn(taskName, config) {
   return function saveArtifact(name, data) {
-    const decl = (config.artifacts || []).find((a) => a.name === name);
+    // Exact match first; fall back to a dynamic declaration whose name is a prefix of `name`.
+    const decl =
+      (config.artifacts || []).find((a) => a.name === name) ||
+      (config.artifacts || []).find((a) => a.dynamic && name.startsWith(a.name));
     if (!decl) {
       logger.warn(
         `saveArtifact: "${name}" is not declared in artifacts config. Saving to ${name}.json.`,
       );
     }
-    const savePath = decl
-      ? path.join(ARTIFACTS_DIR, taskName, decl.path)
-      : path.join(ARTIFACTS_DIR, taskName, `${name}.json`);
+    // Dynamic declarations use the caller-supplied name as the filename (not decl.path).
+    const savePath =
+      decl && !decl.dynamic
+        ? path.join(ARTIFACTS_DIR, taskName, decl.path)
+        : path.join(ARTIFACTS_DIR, taskName, `${name}.json`);
 
     fs.mkdirSync(path.dirname(savePath), { recursive: true });
     writeFileAtomicSync(savePath, JSON.stringify(data, null, 2));

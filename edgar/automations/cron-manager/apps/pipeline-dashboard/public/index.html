@@ -236,7 +236,17 @@
           .map(
             (it) => `
           <tr class="clickable" onclick="showTimeline('${esc(it.item_id)}','${esc(it.title)}')">
-            <td>${esc(it.title || it.item_id)}<div class="muted">${esc(it.item_id)}</div></td>
+            <td>
+              ${it.url
+                ? `<a href="${esc(it.url)}" target="_blank" rel="noopener noreferrer"
+                      onclick="event.stopPropagation()"
+                      style="color:inherit;text-decoration:none"
+                      onmouseover="this.style.textDecoration='underline'"
+                      onmouseout="this.style.textDecoration='none'"
+                    >${esc(it.title || it.item_id)} ↗</a>`
+                : esc(it.title || it.item_id)}
+              <div class="muted">${esc(it.item_id)}</div>
+            </td>
             <td>${esc(it.current_step)}</td>
             <td>${badge(it.current_status)}</td>
             <td class="err" title="${esc(it.last_error || "")}">${esc(it.last_error || "")}</td>

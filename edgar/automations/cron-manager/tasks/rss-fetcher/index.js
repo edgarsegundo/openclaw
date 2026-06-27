@@ -650,7 +650,9 @@ function scoreAndFilterItems(
         if (regex.test(title)) score -= 2;
       }
 
-      if (score < 2) {
+      // pass_through feeds (e.g. Product Hunt, indie) include all items not explicitly excluded
+      const minScore = feed.pass_through ? 0 : 2;
+      if (score < minScore) {
         console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
         return null;
       }
