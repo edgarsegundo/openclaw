@@ -1,5 +1,6 @@
 {
   "group": "radar-saas",
+  "language": "all",
   "topic": "radar oportunidades saas",
   "patterns": "fundou startup;criou empresa;empreendedor percebeu;nasceu para resolver;dor do mercado;i built;show hn;scratching;pain point;we built;founded the company;bootstrapped;saas launched;built in public",
   "exclude_patterns": "patrocinado;publicidade;promoção;sponsored;advertisement;crypto;nft",

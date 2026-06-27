@@ -772,7 +772,7 @@ export default async function (context) {
     console.log(`Using ${feedList.length} custom feed(s) provided via input.`);
   } else {
     feedList = DEFAULT_FEEDS.filter((f) => {
-      const langMatch = f.lang === language || f.lang === "unknown";
+      const langMatch = language === "all" || f.lang === language || f.lang === "unknown";
       const categoryMatch = category ? f.category === category : true;
       return langMatch && categoryMatch;
     });
