@@ -823,6 +823,7 @@ export default async function (context) {
 
   const collectedItems = [];
   const errors = [];
+  const badFeeds = [];
 
   // ── 5. Fetch all feeds (RSS + scraper) ────────────────────────────────────
   const todayIso = new Date().toISOString();
@@ -904,22 +905,51 @@ export default async function (context) {
         }
       }
     } catch (err) {
-      console.log(`ERROR — ${err.message}`);
-      errors.push({ feed: feed.name, url: feed.url, error: err.message });
-      track?.({
-        group,
-        step: "fetch",
-        status: "failed",
-        reason: "feed_error",
-        error: err,
-        meta: { feed: feed.name, url: feed.url },
-      });
+      const isInvalidFeed =
+        /feed not recognized/i.test(err.message) ||
+        /non-whitespace before first tag/i.test(err.message) ||
+        /unexpected close tag/i.test(err.message) ||
+        /unexpected end/i.test(err.message) ||
+        /invalid character in entity/i.test(err.message);
+
+      if (isInvalidFeed) {
+        console.log(`[bad_feed] "${feed.name}" — not a valid RSS feed`);
+        badFeeds.push({ feed: feed.name, url: feed.url, error: err.message });
+        track?.({
+          group,
+          step: "bad_feed",
+          status: "failed",
+          reason: "invalid_rss",
+          meta: {
+            feed: feed.name,
+            url: feed.url,
+            feeds_js_path: `tasks/rss-fetcher/${feedJsFile}`,
+          },
+        });
+      } else {
+        console.log(`ERROR — ${err.message}`);
+        errors.push({ feed: feed.name, url: feed.url, error: err.message });
+        track?.({
+          group,
+          step: "fetch",
+          status: "failed",
+          reason: "feed_error",
+          error: err,
+          meta: { feed: feed.name, url: feed.url },
+        });
+      }
     }
+  }
+
+  if (badFeeds.length > 0) {
+    console.log(`\n[bad_feeds] ${badFeeds.length} feed(s) não retornaram RSS válido:`);
+    for (const bf of badFeeds) console.log(`  • ${bf.feed} — ${bf.url}`);
   }
 
   flow?.("fetch_feeds", "ok", {
     feeds_attempted: feedList.length,
     feeds_failed: errors.length,
+    feeds_bad: badFeeds.length,
     collected: collectedItems.length,
   });
 
@@ -973,9 +1003,11 @@ export default async function (context) {
     fetched_at: new Date().toISOString(),
     total_feeds_attempted: feedList.length,
     total_feeds_failed: errors.length,
+    total_feeds_bad: badFeeds.length,
     total_items_collected: finalItems.length,
     items: finalItems,
     errors: errors.length > 0 ? errors : undefined,
+    bad_feeds: badFeeds.length > 0 ? badFeeds : undefined,
   };
 
   // ── 9. Print summary ──────────────────────────────────────────────────────
@@ -986,6 +1018,7 @@ export default async function (context) {
   console.log(`Since hours:    ${artifact.since_hours}`);
   console.log(`Feeds fetched:  ${artifact.total_feeds_attempted}`);
   console.log(`Feeds failed:   ${artifact.total_feeds_failed}`);
+  console.log(`Feeds bad RSS:  ${artifact.total_feeds_bad}`);
   console.log(`Items found:    ${artifact.total_items_collected}`);
   console.log("─────────────────────────────────────────────────────────\n");
 

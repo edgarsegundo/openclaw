@@ -160,6 +160,16 @@
       </section>
 
       <section class="panel">
+        <h2>Feeds com problema <span id="badFeedsCount" style="color:var(--muted);font-size:11px;font-weight:400;text-transform:none"></span></h2>
+        <table>
+          <thead>
+            <tr><th>Feed</th><th>URL</th><th>Última vez</th><th style="text-align:center">Ocorrências</th><th></th></tr>
+          </thead>
+          <tbody id="badFeedsBody"><tr><td colspan="5" class="muted">Carregando…</td></tr></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
         <h2>Execuções recentes (runs)</h2>
         <div style="margin-bottom:10px">
           <input type="search" id="runsFilter" placeholder="filtrar por task… ex: write"
@@ -532,9 +542,64 @@
         }
       };
 
+      async function loadBadFeeds() {
+        const feeds = await api("/api/bad-feeds");
+        const body = $("badFeedsBody");
+        const count = $("badFeedsCount");
+        if (!feeds.length) {
+          body.innerHTML = '<tr><td colspan="5" class="muted">Nenhum feed com problema detectado 🎉</td></tr>';
+          count.textContent = "";
+          return;
+        }
+        count.textContent = `— ${feeds.length} feed(s)`;
+        body.innerHTML = feeds.map((f) => `
+          <tr>
+            <td><strong>${esc(f.name || "—")}</strong></td>
+            <td class="muted" style="font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.url || "")}">${esc(f.url || "—")}</td>
+            <td class="muted">${fmt(f.last_seen)}</td>
+            <td class="muted" style="text-align:center">${f.occurrences}</td>
+            <td>
+              ${f.feeds_js_path
+                ? `<button class="danger" style="font-size:11px;padding:3px 8px"
+                     data-url="${esc(f.url)}" data-path="${esc(f.feeds_js_path)}"
+                     onclick="deleteFeed(this)">🗑️ Remover do arquivo</button>`
+                : `<span class="muted" style="font-size:11px" title="Execute o rss-fetcher uma vez para registrar o caminho do arquivo">sem caminho</span>`}
+            </td>
+          </tr>`).join("");
+      }
+
+      window.deleteFeed = async function (btn) {
+        const url = btn.dataset.url;
+        const feedsJsPath = btn.dataset.path;
+        if (!confirm(`Remover permanentemente do arquivo de feeds?\n\n${url}\n\nArquivo: ${feedsJsPath}`)) return;
+        btn.disabled = true;
+        btn.textContent = "Removendo…";
+        try {
+          const r = await fetch("api/feed/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, feeds_js_path: feedsJsPath }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || r.statusText);
+          btn.closest("tr").remove();
+          const remaining = $("badFeedsBody").querySelectorAll("tr").length;
+          if (!remaining) {
+            $("badFeedsBody").innerHTML = '<tr><td colspan="5" class="muted">Nenhum feed com problema detectado 🎉</td></tr>';
+            $("badFeedsCount").textContent = "";
+          } else {
+            $("badFeedsCount").textContent = `— ${remaining} feed(s)`;
+          }
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = "🗑️ Remover do arquivo";
+          alert("Erro ao remover: " + e.message);
+        }
+      };
+
       async function refresh() {
         try {
-          await Promise.all([loadGroups(), loadFunnel(), loadItems(), loadErrors(), loadRuns()]);
+          await Promise.all([loadGroups(), loadFunnel(), loadItems(), loadErrors(), loadBadFeeds(), loadRuns()]);
           $("lastUpdate").textContent = "atualizado " + new Date().toLocaleTimeString("pt-BR");
         } catch (e) {
           $("lastUpdate").textContent = "erro: " + e.message;

@@ -14,20 +14,57 @@ import {
   getRecentRuns,
   getRunByExecutionId,
   getEventsByExecution,
+  getBadFeeds,
   wipeAll,
   pruneOlderThan,
 } from "../../lib/db.js";
 import { getFlow, FLOWS } from "../../lib/flows.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Two levels up from apps/pipeline-dashboard → cron-manager root.
+const CRON_MANAGER_ROOT = path.resolve(__dirname, "../..");
 const PORT = Number(process.env.DASHBOARD_PORT) || 4500;
 // Bind to loopback by default so the dashboard is only reachable via the local
 // reverse proxy (nginx), never directly from the public internet. Override with
 // DASHBOARD_HOST=0.0.0.0 only if you intentionally want it exposed.
 const HOST = process.env.DASHBOARD_HOST || "127.0.0.1";
 
-// Read-only: we only ever SELECT from the existing cron-manager.db.
 initDb();
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+/**
+ * Remove a feed entry (one JS object block) from a feeds JS file.
+ * Finds the object whose `url:` property matches feedUrl, then removes
+ * the entire block from the opening `{` to the closing `},`.
+ */
+function removeFeedEntry(filePath, feedUrl) {
+  const content = fs.readFileSync(filePath, "utf8");
+  const lines = content.split("\n");
+  const escaped = feedUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const urlLine = lines.findIndex((l) =>
+    new RegExp(`url:\\s*["']${escaped}["']`).test(l),
+  );
+  if (urlLine === -1) throw new Error("URL not found in feeds file");
+
+  // Walk up from the url: line to the opening {
+  let start = urlLine;
+  while (start > 0 && !lines[start].trim().startsWith("{")) start--;
+
+  // Walk down to the closing },
+  let end = urlLine;
+  while (end < lines.length - 1 && !lines[end].trim().startsWith("},")) end++;
+
+  const newLines = [...lines.slice(0, start), ...lines.slice(end + 1)];
+  fs.writeFileSync(filePath, newLines.join("\n"), "utf8");
+}
 
 const STEPS = ["fetch", "pick", "write", "publish", "index"];
 
@@ -60,7 +97,7 @@ function buildFunnel(group) {
   return STEPS.map((s) => byStep[s]);
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     const route = url.pathname;
@@ -113,6 +150,24 @@ const server = http.createServer((req, res) => {
       const events = getEventsByExecution(executionId);
       const flow = getFlow(run.task);
       return sendJson(res, { run, flow, events });
+    }
+
+    if (route === "/api/bad-feeds") {
+      return sendJson(res, getBadFeeds());
+    }
+    if (route === "/api/feed/delete" && req.method === "POST") {
+      const body = JSON.parse(await readBody(req));
+      const { url, feeds_js_path } = body;
+      if (!url || !feeds_js_path) return sendError(res, 400, "url and feeds_js_path required");
+      // Security: only allow edits inside tasks/
+      if (!feeds_js_path.startsWith("tasks/") || feeds_js_path.includes(".."))
+        return sendError(res, 400, "invalid feeds_js_path");
+      const fullPath = path.resolve(CRON_MANAGER_ROOT, feeds_js_path);
+      if (!fullPath.startsWith(path.resolve(CRON_MANAGER_ROOT, "tasks")))
+        return sendError(res, 400, "path outside tasks directory");
+      removeFeedEntry(fullPath, url);
+      console.log(`[dashboard] removed feed "${url}" from ${feeds_js_path}`);
+      return sendJson(res, { ok: true });
     }
 
     // ── Destructive maintenance (POST only) ────────────────────────────────────

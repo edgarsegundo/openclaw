@@ -286,17 +286,40 @@ export function getStepEventById(id) {
 
 /**
  * Recent failure events across all steps (with stack), newest first.
+ * Excludes bad_feed events — those have their own dedicated query / UI section.
  */
 export function getRecentErrors(limit = 50) {
   const db = initDb();
   return db
     .prepare(`
       SELECT * FROM step_events
-      WHERE status = 'failed'
+      WHERE status = 'failed' AND step != 'bad_feed'
       ORDER BY id DESC
       LIMIT ?
     `)
     .all(limit);
+}
+
+/**
+ * Distinct feeds that have failed with invalid_rss, deduplicated by URL.
+ * Returns the latest observation and total occurrence count per feed.
+ */
+export function getBadFeeds() {
+  const db = initDb();
+  return db
+    .prepare(`
+      SELECT
+        json_extract(meta_json, '$.feed')           AS name,
+        json_extract(meta_json, '$.url')            AS url,
+        json_extract(meta_json, '$.feeds_js_path')  AS feeds_js_path,
+        MAX(created_at)                             AS last_seen,
+        COUNT(*)                                    AS occurrences
+      FROM step_events
+      WHERE step = 'bad_feed'
+      GROUP BY json_extract(meta_json, '$.url')
+      ORDER BY last_seen DESC
+    `)
+    .all();
 }
 
 /**
