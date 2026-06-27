@@ -28,7 +28,11 @@ function sanitizeXml(str) {
   // 1. Fix bare &
   str = str.replace(/&(?!(?:[a-zA-Z][a-zA-Z0-9]*|#[0-9]+|#x[0-9a-fA-F]+);)/g, "&amp;");
 
-  // 2. Fix boolean attributes — only in opening start tags (< followed by a letter)
+  // 2. Fix semicolons immediately after a tag name, e.g. <br;/> or <p; class="…">
+  // sax.js in strict mode throws "Invalid character in tag name" when it sees ; in OPEN_TAG state.
+  str = str.replace(/<([a-zA-Z][a-zA-Z0-9_:-]*);/g, "<$1 ");
+
+  // 3. Fix boolean attributes — only in opening start tags (< followed by a letter)
   str = str.replace(/<[a-zA-Z][^<>]*>/g, (tag) => {
     const out = [];
     let i = 0;
