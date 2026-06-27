@@ -4,7 +4,9 @@ import Database from "better-sqlite3";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const DB_PATH = path.join(__dirname, "..", "cron-manager.db");
+// Default to the repo DB, but allow an override so the dashboard/tests can point
+// at a copy or temp DB instead of the live one (CRON_MANAGER_DB=/path/to.db).
+const DB_PATH = process.env.CRON_MANAGER_DB || path.join(__dirname, "..", "cron-manager.db");
 
 let _db = null;
 
@@ -330,6 +332,50 @@ export function getItemStepStatus(item_id, group_name, step) {
 export function getRecentRuns(limit = 50) {
   const db = initDb();
   return db.prepare("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?").all(limit);
+}
+
+// ── Maintenance: wipe / prune ────────────────────────────────────────────────
+
+/**
+ * Delete ALL rows from every tracking table and the run history.
+ * Schema (CREATE TABLE) is preserved — only the data is cleared.
+ * Returns the number of rows removed per table.
+ */
+export function wipeAll() {
+  const db = initDb();
+  const tables = ["step_events", "item_state", "pipeline_items", "runs"];
+  const counts = {};
+  const tx = db.transaction(() => {
+    for (const t of tables) {
+      counts[t] = db.prepare(`DELETE FROM ${t}`).run().changes;
+    }
+  });
+  tx();
+  return counts;
+}
+
+/**
+ * Delete tracking/run rows older than `days` days (by their own timestamp).
+ * pipeline_items are pruned by first_seen. Returns rows removed per table.
+ */
+export function pruneOlderThan(days = 7) {
+  const db = initDb();
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const counts = {};
+  const tx = db.transaction(() => {
+    counts.step_events = db
+      .prepare("DELETE FROM step_events WHERE created_at < ?")
+      .run(cutoff).changes;
+    counts.item_state = db
+      .prepare("DELETE FROM item_state WHERE updated_at < ?")
+      .run(cutoff).changes;
+    counts.pipeline_items = db
+      .prepare("DELETE FROM pipeline_items WHERE first_seen < ?")
+      .run(cutoff).changes;
+    counts.runs = db.prepare("DELETE FROM runs WHERE started_at < ?").run(cutoff).changes;
+  });
+  tx();
+  return { cutoff, counts };
 }
 
 /**

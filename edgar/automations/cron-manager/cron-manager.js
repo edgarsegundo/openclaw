@@ -17,6 +17,8 @@ import {
   getStepFunnel,
   getStuckItems,
   getRecentErrors,
+  wipeAll,
+  pruneOlderThan,
 } from "./lib/db.js";
 import { runTask, listTaskNames, getTaskDir, taskExists } from "./lib/runner.js";
 import {
@@ -398,6 +400,90 @@ program
     }
 
     logger.step("\nFull timeline + auto-refresh: node apps/pipeline-dashboard/server.js");
+  });
+
+// ── prune-tracking ─────────────────────────────────────────────────────────────
+
+/** Delete log files under logs/<task>/ older than `days` days. Returns count removed. */
+function pruneOldLogs(days) {
+  const logsDir = path.join(ROOT, "logs");
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  let removed = 0;
+  let taskDirs;
+  try {
+    taskDirs = fs.readdirSync(logsDir);
+  } catch {
+    return 0;
+  }
+  for (const td of taskDirs) {
+    const dir = path.join(logsDir, td);
+    let files;
+    try {
+      if (!fs.statSync(dir).isDirectory()) continue;
+      files = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const f of files) {
+      const fp = path.join(dir, f);
+      try {
+        if (fs.statSync(fp).mtimeMs < cutoff) {
+          fs.unlinkSync(fp);
+          removed++;
+        }
+      } catch {
+        // skip unreadable/locked files
+      }
+    }
+  }
+  return removed;
+}
+
+program
+  .command("prune-tracking")
+  .description("Delete tracking rows (and log files) older than N days. For the weekly cron.")
+  .option("-d, --days <n>", "Age threshold in days", "7")
+  .action((opts) => {
+    const days = parseInt(opts.days, 10) || 7;
+    initDb();
+    const { cutoff, counts } = pruneOlderThan(days);
+    const logsRemoved = pruneOldLogs(days);
+    logger.success(`Pruned tracking older than ${days}d (cutoff ${cutoff}).`);
+    logger.step(
+      `rows → step_events: ${counts.step_events}, item_state: ${counts.item_state}, ` +
+        `pipeline_items: ${counts.pipeline_items}, runs: ${counts.runs}`,
+    );
+    logger.step(`log files removed: ${logsRemoved}`);
+  });
+
+// ── wipe-tracking ──────────────────────────────────────────────────────────────
+
+program
+  .command("wipe-tracking")
+  .description("Delete ALL tracking rows and run history (schema preserved). Irreversible.")
+  .option("-y, --yes", "Skip the confirmation prompt", false)
+  .action(async (opts) => {
+    if (!opts.yes) {
+      const { confirm } = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "confirm",
+          message: "Wipe ALL tracking rows and run history? This cannot be undone.",
+          default: false,
+        },
+      ]);
+      if (!confirm) {
+        logger.info("Aborted.");
+        return;
+      }
+    }
+    initDb();
+    const counts = wipeAll();
+    logger.success("Tracking database wiped.");
+    logger.step(
+      `removed → step_events: ${counts.step_events}, item_state: ${counts.item_state}, ` +
+        `pipeline_items: ${counts.pipeline_items}, runs: ${counts.runs}`,
+    );
   });
 
 // ── inspect ──────────────────────────────────────────────────────────────────

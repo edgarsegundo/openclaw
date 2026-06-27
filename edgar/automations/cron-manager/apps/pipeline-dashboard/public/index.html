@@ -45,6 +45,10 @@
         font-size: 13px;
         cursor: pointer;
       }
+      button.danger { border-color: var(--fail); color: var(--fail); }
+      button.danger:hover { background: rgba(231,76,60,.15); }
+      button.danger-soft { border-color: var(--skip); color: var(--skip); }
+      button.danger-soft:hover { background: rgba(241,196,15,.12); }
       main { padding: 20px; display: grid; gap: 20px; }
       .panel {
         background: var(--panel);
@@ -101,6 +105,8 @@
       <label class="muted"><input type="checkbox" id="autoRefresh" checked /> auto 10s</label>
       <div class="spacer"></div>
       <span class="muted" id="lastUpdate"></span>
+      <button id="pruneBtn" class="danger-soft" title="Remove eventos/runs com mais de 7 dias">🧹 Limpar &gt;7d</button>
+      <button id="wipeBtn" class="danger">🗑️ Zerar banco</button>
     </header>
 
     <main>
@@ -286,6 +292,19 @@
         }
       }
 
+      async function postAction(p) {
+        const r = await fetch(p.replace(/^\//, ""), { method: "POST" });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || r.statusText);
+        return data;
+      }
+
+      function summarizeCounts(counts) {
+        return Object.entries(counts || {})
+          .map(([t, n]) => `${t}: ${n}`)
+          .join(", ");
+      }
+
       $("groupSelect").addEventListener("change", (e) => {
         currentGroup = e.target.value;
         refresh();
@@ -293,6 +312,30 @@
       $("refreshBtn").addEventListener("click", refresh);
       $("overlay").addEventListener("click", (e) => {
         if (e.target.id === "overlay") closeModal();
+      });
+
+      $("wipeBtn").addEventListener("click", async () => {
+        if (!confirm("Zerar TODO o banco de tracking (itens, eventos, estados e runs)?\n\nIsso apaga todo o histórico. Não dá pra desfazer.")) return;
+        if (!confirm("Tem certeza absoluta? Esta ação é IRREVERSÍVEL.")) return;
+        try {
+          const res = await postAction("/api/wipe");
+          alert("Banco zerado.\n" + summarizeCounts(res.counts) + " linha(s) removida(s).");
+          currentGroup = "";
+          refresh();
+        } catch (e) {
+          alert("Falha ao zerar: " + e.message);
+        }
+      });
+
+      $("pruneBtn").addEventListener("click", async () => {
+        if (!confirm("Remover eventos/estados/runs com mais de 7 dias?")) return;
+        try {
+          const res = await postAction("/api/prune?days=7");
+          alert("Limpeza concluída (corte: " + res.cutoff + ").\n" + summarizeCounts(res.counts) + " linha(s) removida(s).");
+          refresh();
+        } catch (e) {
+          alert("Falha na limpeza: " + e.message);
+        }
       });
 
       let timer = setInterval(() => $("autoRefresh").checked && refresh(), 10000);

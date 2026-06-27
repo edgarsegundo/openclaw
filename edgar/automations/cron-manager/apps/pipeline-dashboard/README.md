@@ -1,8 +1,10 @@
 # Pipeline Dashboard
 
-Read-only web dashboard for the news pipeline (rss-fetcher → rss-picker → write-article → publish-article).
+Web dashboard for the news pipeline (rss-fetcher → rss-picker → write-article → publish-article).
 
-It reads the existing `cron-manager.db` (SQLite) observability tables and never writes to them, so it is safe to run alongside the cron jobs.
+It reads the existing `cron-manager.db` (SQLite) observability tables. Browsing is read-only and safe to run alongside the cron jobs. There are two **destructive admin actions** exposed as POST-only endpoints (buttons in the header): **🧹 Limpar &gt;7d** (prune old rows) and **🗑️ Zerar banco** (wipe everything). Put the dashboard behind auth (e.g. nginx basic auth) before exposing it.
+
+By default it binds to `127.0.0.1` only (set `DASHBOARD_HOST=0.0.0.0` to expose directly, not recommended). Point it at a different DB file with `CRON_MANAGER_DB=/path/to.db`.
 
 ## Run
 
@@ -43,4 +45,20 @@ artifacts remain the source of truth for the data itself.
 
 ## API (JSON)
 
-`/api/groups`, `/api/funnel?group=`, `/api/items?group=`, `/api/item?id=`, `/api/stuck`, `/api/errors`, `/api/runs`.
+Read: `/api/groups`, `/api/funnel?group=`, `/api/items?group=`, `/api/item?id=`, `/api/stuck`, `/api/errors`, `/api/runs`.
+Write (POST only): `/api/prune?days=7`, `/api/wipe`.
+
+## Maintenance & weekly cleanup
+
+Prune rows + log files older than N days (also a CLI command, for the cron):
+
+```bash
+node cron-manager.js prune-tracking --days 7   # delete tracking rows + logs >7d
+node cron-manager.js wipe-tracking             # wipe everything (asks to confirm; -y to skip)
+```
+
+Weekly cron (Sundays 04:00), with flock so it never overlaps a running task:
+
+```cron
+0 4 * * 0 cd /home/edgar/Repos/openclaw/edgar/automations/cron-manager && flock -n /tmp/prune-tracking.lock node cron-manager.js prune-tracking --days 7 >> /tmp/prune-tracking.log 2>&1
+```

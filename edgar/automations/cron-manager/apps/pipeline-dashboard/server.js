@@ -11,6 +11,8 @@ import {
   getRecentErrors,
   getStepFunnel,
   getRecentRuns,
+  wipeAll,
+  pruneOlderThan,
 } from "../../lib/db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -85,6 +87,21 @@ const server = http.createServer((req, res) => {
     }
     if (route === "/api/runs") {
       return sendJson(res, getRecentRuns(100));
+    }
+
+    // ── Destructive maintenance (POST only) ────────────────────────────────────
+    if (route === "/api/wipe") {
+      if (req.method !== "POST") return sendError(res, 405, "use POST");
+      const counts = wipeAll();
+      console.log("[dashboard] wipeAll:", JSON.stringify(counts));
+      return sendJson(res, { ok: true, counts });
+    }
+    if (route === "/api/prune") {
+      if (req.method !== "POST") return sendError(res, 405, "use POST");
+      const days = Number(url.searchParams.get("days")) || 7;
+      const result = pruneOlderThan(days);
+      console.log("[dashboard] prune:", JSON.stringify(result));
+      return sendJson(res, { ok: true, ...result });
     }
 
     // ── Static index.html ──────────────────────────────────────────────────────
