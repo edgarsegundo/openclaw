@@ -1,0 +1,10 @@
+{
+  "group": "radar-saas",
+  "topic": "radar oportunidades saas",
+  "patterns": "fundou startup;criou empresa;empreendedor percebeu;nasceu para resolver;dor do mercado;i built;show hn;scratching;pain point;we built;founded the company;bootstrapped;saas launched;built in public",
+  "exclude_patterns": "patrocinado;publicidade;promoção;sponsored;advertisement;crypto;nft",
+  "feeds": "",
+  "max_items": 20,
+  "feeds_js_file": "feeds-radar-saas.js",
+  "discord_webhook_url": "https://discord.com/api/webhooks/1520454669338546336/la9xqIz5fMkerG7xfAZztub6SslSZSMFZgbGAMsmgOuxjeyIlOEju0x2ZhQVIqczT_iS"
+}
