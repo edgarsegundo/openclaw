@@ -54,35 +54,12 @@ export const DEFAULT_FEEDS = [
     notes: "Feed geral da Exame — filtrar pelo scoring de patterns",
   },
   {
-    url: "https://exame.com/tecnologia/feed/",
-    name: "Exame — Tecnologia",
-    lang: "pt",
-    category: "saas_br",
-    type: "rss",
-  },
-  {
     url: "https://forbes.com.br/feed/",
     name: "Forbes Brasil",
     lang: "pt",
     category: "saas_br",
     type: "rss",
     notes: "Perfis de empreendedores, histórias de criação de empresas",
-  },
-  {
-    url: "https://revistapegn.globo.com/feed/",
-    name: "Pequenas Empresas & Grandes Negócios",
-    lang: "pt",
-    category: "saas_br",
-    type: "rss",
-    notes: "Casos de negócios, empreendedorismo brasileiro — excelente para histórias de origem",
-  },
-  {
-    url: "https://www.startse.com/feed/",
-    name: "StartSe",
-    lang: "pt",
-    category: "saas_br",
-    type: "rss",
-    notes: "Ecossistema de startups e inovação corporativa no Brasil",
   },
   {
     url: "https://canaltech.com.br/rss/",
@@ -211,14 +188,6 @@ export const DEFAULT_FEEDS = [
   // ─────────────────────────────────────────────────────────────────────────
 
   {
-    url: "https://a16z.com/feed/",
-    name: "Andreessen Horowitz (a16z)",
-    lang: "en",
-    category: "vc_blogs",
-    type: "rss",
-    notes: "Teses de investimento e análises de mercado — gold mine para padrões de oportunidade",
-  },
-  {
     url: "https://www.sequoiacap.com/feed/",
     name: "Sequoia Capital",
     lang: "en",
@@ -226,27 +195,11 @@ export const DEFAULT_FEEDS = [
     type: "rss",
   },
   {
-    url: "https://bothsidesofthetable.com/feed",
-    name: "Both Sides of the Table (Mark Suster)",
-    lang: "en",
-    category: "vc_blogs",
-    type: "rss",
-    notes: "VC com foco em early-stage — perspectiva de quais problemas merecem empresas",
-  },
-  {
     url: "https://hunterwalk.com/feed/",
     name: "Hunter Walk (Homebrew VC)",
     lang: "en",
     category: "vc_blogs",
     type: "rss",
-  },
-  {
-    url: "https://cdixon.org/feed",
-    name: "Chris Dixon (a16z)",
-    lang: "en",
-    category: "vc_blogs",
-    type: "rss",
-    notes: "Ensaios sobre oportunidades tecnológicas emergentes",
   },
   {
     url: "https://avc.com/feed/",
@@ -292,37 +245,6 @@ export const DEFAULT_FEEDS = [
     type: "rss",
     notes: "Melhores posts — inclui muitos 'Show HN: I built X to solve Y'",
   },
-  {
-    url: "https://hnrss.org/newest?q=Show+HN",
-    name: "Hacker News — Show HN",
-    lang: "en",
-    category: "hacker_news",
-    type: "rss",
-    notes: "FUNDAMENTAL: founders mostrando produtos novos com contexto de problema resolvido",
-  },
-  {
-    url: "https://hnrss.org/newest?q=Ask+HN",
-    name: "Hacker News — Ask HN",
-    lang: "en",
-    category: "hacker_news",
-    type: "rss",
-    notes: "Perguntas sobre problemas reais — ouro para detectar dores de mercado",
-  },
-  {
-    url: "https://hnrss.org/newest?q=SaaS",
-    name: "Hacker News — SaaS mentions",
-    lang: "en",
-    category: "hacker_news",
-    type: "rss",
-  },
-  {
-    url: "https://hnrss.org/newest?q=I+built",
-    name: "Hacker News — 'I built'",
-    lang: "en",
-    category: "hacker_news",
-    type: "rss",
-    notes: "Posts de founders descrevendo o que construíram e por quê",
-  },
 
   // ─────────────────────────────────────────────────────────────────────────
   // CATEGORIA: indie — Indie Hackers e Bootstrapped Founders
@@ -336,15 +258,6 @@ export const DEFAULT_FEEDS = [
     type: "rss",
     pass_through: true,
     notes: "Arvid Kahl — foco em construir SaaS resolvendo problemas reais sem VC",
-  },
-  {
-    url: "https://www.failory.com/feed.rss",
-    name: "Failory",
-    lang: "en",
-    category: "indie",
-    type: "rss",
-    pass_through: true,
-    notes: "Autópsias de startups e histórias de sucesso — contexto rico sobre problema+solução",
   },
 
   // ─────────────────────────────────────────────────────────────────────────
