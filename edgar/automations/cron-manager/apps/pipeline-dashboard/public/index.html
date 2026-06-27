@@ -137,6 +137,10 @@
 
       <section class="panel">
         <h2>Execuções recentes (runs)</h2>
+        <div style="margin-bottom:10px">
+          <input type="search" id="runsFilter" placeholder="filtrar por task… ex: write"
+            style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:13px;width:280px" />
+        </div>
         <table>
           <thead>
             <tr><th>Task</th><th>Status</th><th>Início</th><th>Duração</th><th>Erro</th></tr>
@@ -178,6 +182,15 @@
         if (!ts) return "—";
         const d = new Date(ts);
         return isNaN(d) ? ts : d.toLocaleString("pt-BR");
+      }
+
+      function taskEmoji(name) {
+        if (!name) return "⚙️";
+        if (name.includes("publish-article")) return "🚀";
+        if (name.includes("write-article"))   return "✍️";
+        if (name.includes("rss-picker"))      return "🎯";
+        if (name.includes("rss-fetcher"))     return "📡";
+        return "⚙️";
       }
 
       async function loadGroups() {
@@ -247,17 +260,27 @@
           : '<tr><td colspan="4" class="muted">Sem erros recentes 🎉</td></tr>';
       }
 
-      async function loadRuns() {
-        const runs = await api("/api/runs");
-        $("runsBody").innerHTML = runs
-          .map(
-            (r) => `
-          <tr><td>${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
+      let runsData = [];
+
+      function renderRuns() {
+        const q = ($("runsFilter").value || "").toLowerCase().trim();
+        const rows = q ? runsData.filter((r) => (r.task || "").toLowerCase().includes(q)) : runsData;
+        $("runsBody").innerHTML = rows.length
+          ? rows
+              .map(
+                (r) => `
+          <tr><td>${taskEmoji(r.task)} ${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
           <td class="muted">${fmt(r.started_at)}</td>
           <td class="muted">${r.duration_ms != null ? (r.duration_ms / 1000).toFixed(1) + "s" : "—"}</td>
           <td class="err" title="${esc(r.error_message || "")}">${esc(r.error_message || "")}</td></tr>`,
-          )
-          .join("");
+              )
+              .join("")
+          : '<tr><td colspan="5" class="muted">Nenhum resultado.</td></tr>';
+      }
+
+      async function loadRuns() {
+        runsData = await api("/api/runs");
+        renderRuns();
       }
 
       window.showTimeline = async function (id, title) {
@@ -310,6 +333,7 @@
         refresh();
       });
       $("refreshBtn").addEventListener("click", refresh);
+      $("runsFilter").addEventListener("input", renderRuns);
       $("overlay").addEventListener("click", (e) => {
         if (e.target.id === "overlay") closeModal();
       });

@@ -355,23 +355,50 @@ export function wipeAll() {
 }
 
 /**
- * Delete tracking/run rows older than `days` days (by their own timestamp).
- * pipeline_items are pruned by first_seen. Returns rows removed per table.
+ * Delete tracking/run rows older than `days` days, BUT preserve records for
+ * items that completed the full pipeline (have at least one publish:ok event).
+ * Those items are kept indefinitely regardless of age.
+ * Task-level run records (not tied to an item) are always pruned by age.
  */
 export function pruneOlderThan(days = 7) {
   const db = initDb();
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
   const counts = {};
+
+  // Subquery: item_ids that successfully completed the publish step — keep forever.
+  const published = `
+    SELECT DISTINCT item_id FROM step_events
+    WHERE step = 'publish' AND status = 'ok'
+  `;
+
   const tx = db.transaction(() => {
+    // step_events: prune old rows, but never touch events belonging to published items.
+    // task-level events have item_id = NULL, so they are always eligible for pruning.
     counts.step_events = db
-      .prepare("DELETE FROM step_events WHERE created_at < ?")
+      .prepare(
+        `DELETE FROM step_events
+         WHERE created_at < ?
+         AND (item_id IS NULL OR item_id NOT IN (${published}))`,
+      )
       .run(cutoff).changes;
+
     counts.item_state = db
-      .prepare("DELETE FROM item_state WHERE updated_at < ?")
+      .prepare(
+        `DELETE FROM item_state
+         WHERE updated_at < ?
+         AND item_id NOT IN (${published})`,
+      )
       .run(cutoff).changes;
+
     counts.pipeline_items = db
-      .prepare("DELETE FROM pipeline_items WHERE first_seen < ?")
+      .prepare(
+        `DELETE FROM pipeline_items
+         WHERE first_seen < ?
+         AND item_id NOT IN (${published})`,
+      )
       .run(cutoff).changes;
+
+    // Runs are task-level (not tied to individual items) — prune by age.
     counts.runs = db.prepare("DELETE FROM runs WHERE started_at < ?").run(cutoff).changes;
   });
   tx();
