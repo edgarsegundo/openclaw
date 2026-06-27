@@ -628,6 +628,11 @@ async function fetchFromScraper(feed) {
  * @param {Date|null} sinceCutoff
  * @param {object} seenHashes
  */
+/**
+ * Returns { items: Item[], stats } where stats counts how many items were dropped
+ * at each filter stage. Callers accumulate stats across all feeds for the
+ * fetch_feeds checkpoint.
+ */
 function scoreAndFilterItems(
   rawItems,
   feed,
@@ -637,14 +642,22 @@ function scoreAndFilterItems(
   seenHashes,
   aiMode = false,
 ) {
-  return rawItems
+  let titleLengthSkipped = 0,
+    scoreSkipped = 0,
+    dateSkipped = 0,
+    dedupCrossSkipped = 0;
+
+  const items = rawItems
     .map((raw) => {
       const title = stripHtml(raw.title || "").toLowerCase();
 
       // In AI mode: drop titles that are clearly too short/long to be real articles
       if (aiMode) {
         const len = title.length;
-        if (len < 15 || len > 300) return null;
+        if (len < 15 || len > 300) {
+          titleLengthSkipped++;
+          return null;
+        }
       }
 
       let score = 0;
@@ -662,12 +675,16 @@ function scoreAndFilterItems(
       const minScore = aiMode || feed.pass_through ? 0 : 2;
       if (score < minScore) {
         console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
+        scoreSkipped++;
         return null;
       }
 
       if (sinceCutoff && raw.published) {
         const parsedDate = new Date(raw.published);
-        if (!isNaN(parsedDate.getTime()) && parsedDate < sinceCutoff) return null;
+        if (!isNaN(parsedDate.getTime()) && parsedDate < sinceCutoff) {
+          dateSkipped++;
+          return null;
+        }
       }
 
       // Cross-execution deduplication
@@ -679,6 +696,7 @@ function scoreAndFilterItems(
           ? "exact"
           : `jaccard=${jaccardSimilarity(fp, matchedKey).toFixed(2)}`;
         console.log(`  [skip][dup:${simLabel}] score=${score} "${(raw.title || "").slice(0, 80)}"`);
+        dedupCrossSkipped++;
         return null;
       }
 
@@ -698,6 +716,18 @@ function scoreAndFilterItems(
     })
     .filter(Boolean)
     .sort((a, b) => b.score - a.score);
+
+  return {
+    items,
+    stats: {
+      total_raw: rawItems.length,
+      passed: items.length,
+      title_length_skipped: titleLengthSkipped,
+      score_skipped: scoreSkipped,
+      date_skipped: dateSkipped,
+      dedup_cross_skipped: dedupCrossSkipped,
+    },
+  };
 }
 
 /**
@@ -901,6 +931,11 @@ export default async function (context) {
   const collectedItems = [];
   const errors = [];
   const badFeeds = [];
+  // Accumulated across all feeds for the fetch_feeds checkpoint
+  let totalRaw = 0,
+    totalScoreSkipped = 0,
+    totalDateSkipped = 0,
+    totalDedupCrossSkipped = 0;
 
   // ── 5. Fetch all feeds (RSS + scraper) ────────────────────────────────────
   const todayIso = new Date().toISOString();
@@ -922,7 +957,7 @@ export default async function (context) {
           published: todayIso,
         }));
 
-        const relevant = scoreAndFilterItems(
+        const { items: relevant, stats: feedStats } = scoreAndFilterItems(
           shaped,
           feed,
           topicPatterns,
@@ -931,6 +966,10 @@ export default async function (context) {
           seenHashes,
           !!aiFilterPrompt,
         );
+        totalRaw += feedStats.total_raw;
+        totalScoreSkipped += feedStats.score_skipped;
+        totalDateSkipped += feedStats.date_skipped;
+        totalDedupCrossSkipped += feedStats.dedup_cross_skipped;
 
         const capped = maxPerFeed > 0 ? relevant.slice(0, maxPerFeed) : relevant;
         console.log(`${rawItems.length} itens extraídos, ${capped.length} relevantes.`);
@@ -967,7 +1006,7 @@ export default async function (context) {
           summary: item.contentSnippet || item.summary || "",
         }));
 
-        const relevant = scoreAndFilterItems(
+        const { items: relevant, stats: feedStats } = scoreAndFilterItems(
           shaped,
           feed,
           topicPatterns,
@@ -976,6 +1015,10 @@ export default async function (context) {
           seenHashes,
           !!aiFilterPrompt,
         );
+        totalRaw += feedStats.total_raw;
+        totalScoreSkipped += feedStats.score_skipped;
+        totalDateSkipped += feedStats.date_skipped;
+        totalDedupCrossSkipped += feedStats.dedup_cross_skipped;
 
         const capped = maxPerFeed > 0 ? relevant.slice(0, maxPerFeed) : relevant;
         console.log(`${items.length} items found, ${capped.length} relevant.`);
@@ -1031,6 +1074,10 @@ export default async function (context) {
     feeds_attempted: feedList.length,
     feeds_failed: errors.length,
     feeds_bad: badFeeds.length,
+    total_raw: totalRaw,
+    score_skipped: totalScoreSkipped,
+    date_skipped: totalDateSkipped,
+    dedup_cross_skipped: totalDedupCrossSkipped,
     collected: collectedItems.length,
   });
 
@@ -1071,6 +1118,7 @@ export default async function (context) {
     selected: finalItems.length,
     max_items: maxItems,
     top_score: finalItems[0]?.score ?? null,
+    items: finalItems.map((it) => ({ title: it.title, score: it.score, source: it.source })),
   });
 
   // ── 7b. AI semantic filter (optional) ────────────────────────────────────
@@ -1110,6 +1158,8 @@ export default async function (context) {
           prompt_tokens: promptTokens,
           completion_tokens: completionTokens,
           cost_usd: costUsd,
+          sent_titles: finalItems.map((it) => it.title),
+          approved_titles: publishItems.map((it) => it.title),
         });
       }
     }

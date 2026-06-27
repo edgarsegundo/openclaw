@@ -513,6 +513,90 @@
       // ── Per-run flow modal ─────────────────────────────────────────────────
       const STATUS_ICON = { ok: "✅", skipped: "⏭️", failed: "❌", started: "⏳", retrying: "🔁", idle: "○" };
 
+      // Rich meta renderer per checkpoint step (replaces raw <pre>).
+      function renderEventMeta(e) {
+        const meta = parseMeta(e.meta_json);
+        if (!meta) return "";
+        const step = e.step || "";
+
+        if (step === "flow.fetch_feeds") {
+          const scoreSkipped = meta.score_skipped ?? 0;
+          const dateSkipped = meta.date_skipped ?? 0;
+          const dedupCross = meta.dedup_cross_skipped ?? 0;
+          return `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">
+            <div><span class="muted">Feeds:</span> <strong>${meta.feeds_attempted ?? "—"}</strong> tentados · ${meta.feeds_failed ?? 0} falha · ${meta.feeds_bad ?? 0} inválidos</div>
+            <div><span class="muted">Bruto (todos os feeds):</span> ${meta.total_raw ?? "—"} artigos</div>
+            <div>✅ <strong>${meta.collected ?? "—"}</strong> coletados &nbsp;|&nbsp; ✗ ${scoreSkipped} descartados por score &nbsp;·&nbsp; ${dateSkipped} por data &nbsp;·&nbsp; 🔄 ${dedupCross} já vistos</div>
+          </div>`;
+        }
+
+        if (step === "flow.dedup") {
+          const removed = meta.removed ?? (meta.before - meta.after);
+          return `<div style="margin-top:6px;font-size:12px;display:grid;gap:3px">
+            <div><span class="muted">Antes:</span> ${meta.before ?? "—"} &nbsp;→&nbsp; <span class="muted">Depois:</span> <strong>${meta.after ?? "—"}</strong></div>
+            ${removed ? `<div>✗ ${removed} duplicata(s) intra-execução removida(s)</div>` : "<div class='muted'>Nenhuma duplicata intra-execução</div>"}
+          </div>`;
+        }
+
+        if (step === "flow.rank_select") {
+          const items = meta.items || [];
+          return `<div style="margin-top:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+              <strong>${meta.selected ?? items.length}</strong> selecionados · max: ${meta.max_items ?? "—"} · score topo: <strong>${meta.top_score ?? "—"}</strong>
+            </div>
+            ${items.length ? `<table style="font-size:11px;width:100%">
+              <thead><tr>
+                <th style="width:48px">Score</th>
+                <th style="width:110px">Fonte</th>
+                <th>Título</th>
+              </tr></thead>
+              <tbody>${items.map((it, i) => `<tr style="${i % 2 ? "background:#1c2029" : ""}">
+                <td style="font-weight:700;white-space:nowrap;color:var(--ok)">${it.score ?? ""}</td>
+                <td style="color:var(--muted);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px">${esc(it.source || "")}</td>
+                <td style="word-break:break-word">${esc(it.title || "")}</td>
+              </tr>`).join("")}</tbody>
+            </table>` : '<div class="muted" style="font-size:12px">Nenhum item selecionado.</div>'}
+          </div>`;
+        }
+
+        if (step === "flow.ai_filter") {
+          const sent = meta.sent_titles || [];
+          const approvedTitles = meta.approved_titles || [];
+          const approvedSet = new Set(approvedTitles);
+          const cost = meta.cost_usd != null ? ` · custo: <strong>$${Number(meta.cost_usd).toFixed(6)}</strong>` : "";
+          const tokens = meta.prompt_tokens ? ` · ${(meta.prompt_tokens ?? 0).toLocaleString("pt-BR")} tokens` : "";
+          if (!sent.length) {
+            // No titles stored (older event) — fall through to default
+            const pairs = Object.entries(meta).filter(([, v]) => !Array.isArray(v) && v != null);
+            return `<div style="margin-top:6px;font-size:12px;color:var(--muted)">${pairs.map(([k, v]) => `<span style="margin-right:12px"><span style="opacity:.7">${esc(k)}:</span> ${esc(String(v))}</span>`).join("")}</div>`;
+          }
+          return `<div style="margin-top:8px">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+              <strong>${meta.approved ?? approvedTitles.length}</strong>/${meta.input ?? sent.length} aprovados${cost}${tokens}
+            </div>
+            <div style="font-size:11px;display:grid;gap:2px">
+              ${sent.map((t) => {
+                const ok = approvedSet.has(t);
+                return `<div style="padding:2px 0;display:flex;gap:6px;align-items:baseline;${ok ? "" : "opacity:.45"}">
+                  <span style="flex-shrink:0">${ok ? "✅" : "✗"}</span>
+                  <span style="word-break:break-word;${ok ? "" : "text-decoration:line-through"}">${esc(t)}</span>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        }
+
+        // Default: compact key-value pairs (skip arrays/objects)
+        const pairs = Object.entries(meta).filter(([, v]) => v != null && !Array.isArray(v) && typeof v !== "object");
+        if (!pairs.length) return "";
+        return `<div style="margin-top:6px;font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px">
+          ${pairs.map(([k, v]) => {
+            const display = typeof v === "number" && !Number.isInteger(v) ? Number(v).toFixed(6) : String(v);
+            return `<span><span style="opacity:.7">${esc(k)}:</span> ${esc(display)}</span>`;
+          }).join("")}
+        </div>`;
+      }
+
       function humanize(s) {
         return String(s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       }
@@ -580,8 +664,9 @@
               const status = e ? e.status : "idle";
               const icon = STATUS_ICON[status] || "○";
               const summary = e ? metaSummary(e.meta_json, e.reason) : (s.desc || "");
+              const evtAnchor = e ? `onclick="document.getElementById('evt-${e.id}')?.scrollIntoView({behavior:'smooth',block:'nearest'})" style="cursor:pointer" title="Clique para ver detalhes ↓"` : `title="${esc(s.desc || s.label)}"`;
               return `
-                <div class="flow-node ${status}" title="${esc(s.desc || s.label)}">
+                <div class="flow-node ${status}" ${evtAnchor}>
                   <div class="fn-top">${icon} ${esc(status)}</div>
                   <div class="fn-label">${esc(s.label)}</div>
                   ${summary ? `<div class="fn-meta">${esc(summary)}</div>` : ""}
@@ -610,7 +695,7 @@
             ? events
                 .map(
                   (e) => `
-            <div class="timeline-step">
+            <div class="timeline-step" id="evt-${e.id}">
               <div class="when">${fmt(e.created_at)}</div>
               <div style="flex:1">
                 <strong>${esc(prettyStep(e.step, flow))}</strong> ${badge(e.status)}
@@ -618,7 +703,7 @@
                 ${e.reason ? `<span class="muted"> — ${esc(e.reason)}</span>` : ""}
                 ${e.error_message ? `<pre>${esc(e.error_message)}</pre>` : ""}
                 ${e.error_stack ? `<pre style="font-size:11px;opacity:.85">${esc(e.error_stack)}</pre>` : ""}
-                ${e.meta_json && e.meta_json !== "null" ? `<pre>${esc(e.meta_json)}</pre>` : ""}
+                ${renderEventMeta(e)}
               </div>
             </div>`,
                 )
