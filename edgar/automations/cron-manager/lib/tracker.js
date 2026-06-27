@@ -76,6 +76,33 @@ export function createTracker({ taskName, executionId }) {
   }
 
   /**
+   * Record one EXECUTION-LEVEL flow checkpoint (a fundamental phase of the task,
+   * not tied to a single news item). These power the per-run flow modal in the
+   * dashboard.
+   *
+   * Stored in the same `step_events` table but under a `flow.<key>` step name so
+   * they never pollute the item funnel (which only counts fetch/pick/write/...).
+   * Ordering in the modal is by insert order (step_events.id), so just call this
+   * in the order the phases actually run.
+   *
+   * @param {string} key     Flow step key — must match lib/flows.js (e.g. "ai_triage")
+   * @param {string} [status] 'ok'|'skipped'|'failed'|'started' (default 'ok')
+   * @param {object} [meta]   Relevant context vars to surface (counts, cost, ids…)
+   * @param {object} [opts]
+   * @param {string} [opts.reason]      Human reason (e.g. "below_min_items")
+   * @param {Error|string} [opts.error] Error to capture (message + stack)
+   */
+  function flow(key, status = "ok", meta = null, opts = {}) {
+    track({
+      step: `flow.${key}`,
+      status,
+      meta: meta ?? undefined,
+      reason: opts.reason,
+      error: opts.error,
+    });
+  }
+
+  /**
    * Idempotency helper: has this item already completed the given step OK?
    * Best-effort — returns false if the lookup fails for any reason.
    */
@@ -88,7 +115,7 @@ export function createTracker({ taskName, executionId }) {
     }
   }
 
-  return { track, hasCompleted };
+  return { track, flow, hasCompleted };
 }
 
 function safeStringify(obj) {

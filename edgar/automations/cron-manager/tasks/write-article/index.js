@@ -37,7 +37,7 @@ initMonitoring();
  *   artifacts/write-article/{slug}.md    — raw markdown file
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, runPrompt, saveArtifact, track } = context;
+  const { taskName, mode, executionId, inputs, runPrompt, saveArtifact, track, flow } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -92,8 +92,11 @@ export default async function (context) {
       reason: "approved_list_missing",
       meta: { expected: listPath },
     });
+    flow?.("resolve_list", "skipped", { expected: listPath }, { reason: "approved_list_missing" });
     return { status: "no_articles", message: "No articles to process today." };
   }
+
+  flow?.("resolve_list", "ok", { date: listFile.date, path: listPath });
 
   let articles;
   try {
@@ -115,6 +118,8 @@ export default async function (context) {
   }
 
   console.log(`  Articles in list: ${articles.length}`);
+
+  flow?.("load_articles", "ok", { articles: articles.length });
 
   // ─── Read or initialize index ───────────────────────────────────────────────
   let currentIndex = 0;
@@ -141,8 +146,16 @@ export default async function (context) {
       `   Current index (${currentIndex}) reached end of list (${articles.length} articles)`,
     );
     console.log(`   Run again tomorrow or reset the index file to restart the cycle.`);
+    flow?.(
+      "read_index",
+      "skipped",
+      { index: currentIndex, articles: articles.length },
+      { reason: "all_processed" },
+    );
     return { status: "all_articles_processed", message: "All articles processed!" };
   }
+
+  flow?.("read_index", "ok", { index: currentIndex, articles: articles.length });
 
   const article = articles[currentIndex];
   if (!article.title || !article.link) {
@@ -158,6 +171,8 @@ export default async function (context) {
     title: article.title,
     url: article.link,
   });
+
+  flow?.("select_article", "ok", { index: currentIndex, title: article.title, url: article.link });
 
   console.log(`\n✓ Article selected from list:`);
   console.log(`  Index: ${currentIndex}`);
@@ -187,6 +202,7 @@ export default async function (context) {
     runResult = await runPrompt(promptInputs);
   } catch (err) {
     track?.({ itemId, group, step: "write", status: "failed", reason: "run_prompt", error: err });
+    flow?.("generate", "failed", null, { reason: "run_prompt", error: err });
     throw new Error(`runPrompt failed (index NOT advanced, will retry): ${err.message}`, {
       cause: err,
     });
@@ -209,11 +225,19 @@ export default async function (context) {
       reason: "incomplete_artifact",
       error: err,
     });
+    flow?.("generate", "failed", null, { reason: "incomplete_artifact", error: err });
     throw err;
   }
 
   // ── Print summary ─────────────────────────────────────────────────────────
   const wordCount = (artifact.markdownText ?? "").split(/\s+/).length;
+
+  flow?.("generate", "ok", {
+    words: wordCount,
+    model: model ?? null,
+    sources: citations?.length ?? 0,
+    cost_usd: usage?.cost?.total_cost ?? null,
+  });
 
   console.log("\n─── Article Generated ───────────────────────────────────");
   console.log(`Title:       ${artifact.title}`);
@@ -248,8 +272,11 @@ export default async function (context) {
     }));
   } catch (err) {
     track?.({ itemId, group, step: "write", status: "failed", reason: "enrich", error: err });
+    flow?.("enrich", "failed", null, { reason: "enrich", error: err });
     throw new Error(`enrichArticle failed (index NOT advanced): ${err.message}`, { cause: err });
   }
+
+  flow?.("enrich", "ok", { slug: artifact.slug });
 
   // ── Save JSON artifact (ENRICHED) ───────────────────────────────────────────
 
@@ -275,6 +302,7 @@ export default async function (context) {
     );
   } catch (err) {
     track?.({ itemId, group, step: "write", status: "failed", reason: "save_json", error: err });
+    flow?.("save_artifact", "failed", { slug: artifact.slug }, { reason: "save_json", error: err });
     throw new Error(`Failed to save JSON artifact (index NOT advanced): ${err.message}`, {
       cause: err,
     });
@@ -291,6 +319,7 @@ export default async function (context) {
   } catch (err) {
     // JSON já foi salvo — loga com contexto para não deixar inconsistência passar em silêncio
     track?.({ itemId, group, step: "write", status: "failed", reason: "save_md", error: err });
+    flow?.("save_artifact", "failed", { slug: artifact.slug }, { reason: "save_md", error: err });
     throw new Error(
       `Failed to save Markdown (JSON was saved, index NOT advanced): ${err.message}`,
       {
@@ -298,6 +327,8 @@ export default async function (context) {
       },
     );
   }
+
+  flow?.("save_artifact", "ok", { slug: artifact.slug, words: wordCount });
 
   // ─── Track successful write (observability) ───────────────────────────────
   track?.({
@@ -325,11 +356,13 @@ export default async function (context) {
     try {
       writeFileAtomicSync(indexPath, nextIndex.toString());
       console.log(`\n📊 Index advanced: ${currentIndex} → ${nextIndex}`);
+      flow?.("advance_index", "ok", { from: currentIndex, to: nextIndex });
     } catch (err) {
       console.warn(`⚠️  Article saved but index update FAILED: ${err.message}`);
       console.warn(
         `   Next run will regenerate "${artifact.slug}" — remove duplicate manually if needed.`,
       );
+      flow?.("advance_index", "failed", { from: currentIndex, to: nextIndex }, { error: err });
     }
   }
 

@@ -563,6 +563,7 @@ export async function runTask(taskName, options = {}) {
     runPrompt: runPrompt, // undefined if no template selected
     saveArtifact: saveArtifactFn(taskName, config),
     track: tracker.track,
+    flow: tracker.flow,
     hasCompleted: tracker.hasCompleted,
   };
 

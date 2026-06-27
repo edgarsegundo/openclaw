@@ -355,6 +355,26 @@ export function getRecentRuns(limit = 50) {
   return db.prepare("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?").all(limit);
 }
 
+/**
+ * One run row by execution_id (used by the per-run flow modal).
+ */
+export function getRunByExecutionId(execution_id) {
+  const db = initDb();
+  return db.prepare("SELECT * FROM runs WHERE execution_id = ? LIMIT 1").get(execution_id) ?? null;
+}
+
+/**
+ * All step_events for a single execution, in insert order (= execution order).
+ * Includes both the `flow.*` checkpoints, the runner's `task:*` wrapper events,
+ * and any item-level events that happened during this run.
+ */
+export function getEventsByExecution(execution_id) {
+  const db = initDb();
+  return db
+    .prepare("SELECT * FROM step_events WHERE execution_id = ? ORDER BY id ASC")
+    .all(execution_id);
+}
+
 // ── Maintenance: wipe / prune ────────────────────────────────────────────────
 
 /**

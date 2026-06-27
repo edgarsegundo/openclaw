@@ -12,9 +12,12 @@ import {
   getRecentErrors,
   getStepFunnel,
   getRecentRuns,
+  getRunByExecutionId,
+  getEventsByExecution,
   wipeAll,
   pruneOlderThan,
 } from "../../lib/db.js";
+import { getFlow, FLOWS } from "../../lib/flows.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DASHBOARD_PORT) || 4500;
@@ -95,6 +98,21 @@ const server = http.createServer((req, res) => {
     }
     if (route === "/api/runs") {
       return sendJson(res, getRecentRuns(100));
+    }
+    if (route === "/api/flows") {
+      return sendJson(res, FLOWS);
+    }
+    // Per-run flow detail: the canonical flow definition for the task + every
+    // event recorded during this execution, so the UI can draw the diagram and
+    // the detailed checkpoint list for one clicked run.
+    if (route === "/api/run") {
+      const executionId = url.searchParams.get("execution_id");
+      if (!executionId) return sendError(res, 400, "execution_id query param required");
+      const run = getRunByExecutionId(executionId);
+      if (!run) return sendError(res, 404, "run not found");
+      const events = getEventsByExecution(executionId);
+      const flow = getFlow(run.task);
+      return sendJson(res, { run, flow, events });
     }
 
     // ── Destructive maintenance (POST only) ────────────────────────────────────

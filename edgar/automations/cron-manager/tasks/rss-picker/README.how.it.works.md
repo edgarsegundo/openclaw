@@ -1,33 +1,63 @@
-# rss-picker — How it works (ultra conciso)
+# rss-picker — How it works
 
+Lê o artifact do dia do rss-fetcher e decide entre dois caminhos:
+**IA** (quando há itens novos suficientes → triagem por score) ou **humano**
+(quando há poucos → notifica o Discord e espera aprovação manual `.apr`/`.del`).
+O estado do dia fica em `status-<group>-<YYYY-MM-DD>.json`.
 
-1. Lê o arquivo de notícias do dia (ex: `artifacts/rss-fetcher/rss-artifact-<topic>-{YYYY-MM-DD}.json`).
-2. Filtra apenas itens publicados após a última execução (por tópico).
-3. (min_items) Se houver menos que o mínimo (default: 3), **não roda IA** e notifica o Discord com a lista de novos itens.
-    - Salva a lista de novos itens em `artifacts/rss-picker/pending-approval-<topicSlug>.json` para aprovação manual.
-    - O parâmetro `force` permite rodar IA mesmo com menos que o mínimo.
-4. Se o parâmetro `item_index` for definido, processa apenas o item de índice correspondente na lista de pendências (`pending-approval-<topicSlug>.json`), ignora o mínimo de itens, **não roda IA** e grava direto o arquivo aprovado no formato do schema.js.
-    - O índice informado pelo usuário é **1-based** (começa em 1).
-    - Após aprovação manual, o arquivo de pendências é apagado.
-    - Se não existir item nesse índice, a execução termina com aviso.
-5. Remove duplicados por URL real.
-6. Se IA for rodada, envia os itens novos para triagem via IA (Perplexity Sonar Small).
-    - Após rodar a IA, o arquivo de pendências é apagado (se existir).
-7. Aprova apenas os itens com score >= min_score (default: 7).
-8. Acrescenta os aprovados ao arquivo diário `approved-<topic>-{YYYY-MM-DD}.json` (sem duplicar links).
-9. Apaga arquivos diários com mais de 7 dias.
-10. Atualiza o registro de última execução (`last_run.json`).
+## Diagrama do fluxo (caminho normal / IA)
 
+```
+[load_input] → [load_status] → [filter_unresolved] → [threshold_check] → [dedup] → [ai_triage] → [approve] → [save_approved] → [cleanup]
+```
+
+Cada caixa é um _checkpoint_ (`flow.*`) ligado ao `execution_id`. No dashboard,
+clique na linha da execução para ver o diagrama colorido por status. Execuções de
+comando manual acendem checkpoints extras (`manual_approve`, `manual_delete`,
+`list`) em vez do caminho de IA — isso é esperado.
+
+## Passo a passo (código real)
+
+1. **load_input** — Resolve o arquivo do rss-fetcher
+   (`fetched-items-<group>-<date>.json`), tolerando a virada de meia-noite (tenta
+   hoje, cai para ontem). Se não existir, `skipped` (reason `fetcher_file_missing`).
+   - meta: `total_items`, `topic`, `date`.
+2. **load_status** — Carrega o status do dia: `resolvedSet` (já aprovados/deletados)
+   e `sentSet` (já enviados ao Discord).
+   - meta: `resolved`, `sent`.
+   - **Comandos manuais** (interceptados aqui, antes do caminho normal):
+     - `l1` → envia a lista completa ao Discord (`flow.list`).
+     - `.apr N` → aprova o item N direto (sem IA), grava no approved (`flow.manual_approve`).
+     - `.del N` → marca N como deletado (`flow.manual_delete`).
+3. **filter_unresolved** — Mantém só os itens ainda não resolvidos (anexando o
+   `fetcherIndex` original).
+   - meta: `unresolved`, `resolved`.
+4. **threshold_check** — Compara `unresolved` com `min_items` (default 3). Se
+   abaixo: envia ao Discord só os itens **novos** (ainda não enviados) e encerra
+   (`skipped`, reason `below_min_items`). Se atinge: segue para a IA.
+   - meta: `unresolved`, `min_items`.
+5. **dedup** — Remove duplicados por URL real (desfaz redirect do Google Alerts).
+   - meta: `before`, `after`, `removed`.
+6. **ai_triage** — Envia os itens deduplicados à IA (Perplexity Sonar via
+   `runPrompt`) para pontuar cada um.
+   - meta: `evaluated`, `cost_usd`.
+7. **approve** — Aprova os itens com `score >= min_score` (default 7); o resto é
+   rejeitado. Todos os avaliados são marcados como resolvidos no status (não
+   voltam à IA nem ao Discord). Eventos item-level `pick/ok|skipped` são gravados.
+   - meta: `evaluated`, `approved`, `min_score`.
+8. **save_approved** — Acrescenta os aprovados a `approved-<group>-<date>.json`
+   (sem duplicar links) e persiste o status atualizado.
+   - meta: `saved`, `approved`.
+9. **cleanup** — Apaga `approved-*`/`status-*` com mais de 7 dias.
+   - meta: `deleted`.
 
 ---
 
-**Resumo dos fluxos:**
+**Resumo dos fluxos**
 
-- Execução normal: só processa se houver pelo menos `min_items` novos, envia para IA, aprova por score, grava arquivo. Se não atingir o mínimo, notifica o Discord e salva a lista de pendências para aprovação manual.
-- Com `force: true`: ignora mínimo de itens, mas segue fluxo normal (com IA).
-- Com `item_index` definido: processa só o item escolhido na lista de pendências (`pending-approval-<topicSlug>.json`), ignora mínimo de itens, **não roda IA**, grava direto o arquivo aprovado no formato do schema.js. O índice é 1-based.
+- **Normal (IA):** só roda IA se houver `>= min_items` novos; aprova por score.
+- **Abaixo do mínimo:** notifica o Discord com os novos e espera comando manual.
+- **`force: true`:** ignora o mínimo, segue o fluxo de IA.
+- **`.apr`/`.del N`:** resolve só o item escolhido, sem IA. Índice 0-based (fetcher).
 
-- Cada execução só processa notícias novas do dia.
-- Não reprocessa itens antigos.
-- Sempre mantém apenas 7 dias de backlog.
-- Próxima etapa: rodar o article-writer com o arquivo aprovado do dia.
+Próxima etapa: **write-article** com o `approved-<group>-<date>.json`.

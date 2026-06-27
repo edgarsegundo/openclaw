@@ -61,7 +61,7 @@ function cmsBaseUrl() {
  *   POST {CMS_BASE_URL}/execute-publish-script
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, track, hasCompleted } = context;
+  const { taskName, mode, executionId, inputs, track, flow, hasCompleted } = context;
   const apiKey = process.env.MYSITESAPP_API_KEY || process.env["x-api-key"] || "";
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
 
@@ -108,6 +108,7 @@ export default async function (context) {
     await sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl, group, apiKey);
 
     console.log("✅ List sent to Discord!");
+    flow?.("list", "ok", { articles: statusData.articles.length });
     return;
   }
 
@@ -148,10 +149,12 @@ export default async function (context) {
         `❌ Falha ao executar o script de publicação para o site '${targetSiteId}'.`,
         discordWebhookUrl,
       );
+      flow?.("publish_script", "failed", { site_id: targetSiteId });
       return;
     }
 
     console.log("Publish script executed successfully!");
+    flow?.("publish_script", "ok", { site_id: targetSiteId, pending: pendingArticles.length });
 
     // Process each article: Google Indexing + status update + Discord notification
     let updatedStatusData = statusData;
@@ -208,6 +211,7 @@ export default async function (context) {
     }
 
     console.log(`\n✅ Part 2 done! Processed ${pendingArticles.length} article(s).`);
+    flow?.("index_articles", "ok", { site_id: targetSiteId, processed: pendingArticles.length });
     return;
   }
 
@@ -230,6 +234,7 @@ export default async function (context) {
       reason: "no_articles_to_publish",
       meta: { articles_dir: articlesDir },
     });
+    flow?.("scan_articles", "skipped", { articles_dir: articlesDir }, { reason: "no_articles" });
     return;
   }
 
@@ -237,6 +242,8 @@ export default async function (context) {
   const slug = oldest.replace(/\.json$/, "");
 
   console.log(`\nSelected article: ${slug}`);
+
+  flow?.("scan_articles", "ok", { candidates: jsonFiles.length, selected: slug });
 
   // ── 2. Load JSON and Markdown ─────────────────────────────────────────────
   const jsonPath = path.join(articlesDir, `${slug}.json`);
@@ -246,18 +253,24 @@ export default async function (context) {
   if (!json) {
     console.error(`Failed to parse JSON: ${jsonPath}. Skipping.`);
     track?.({ group, step: "publish", status: "failed", reason: "json_parse", meta: { slug } });
+    flow?.("load_article", "failed", { slug }, { reason: "json_parse" });
     return;
   }
 
   const itemId = resolveItemId(json);
+
+  flow?.("load_article", "ok", { slug });
 
   // Idempotency: never re-POST an item that already published OK (avoids
   // duplicate CMS articles on retries / re-created files).
   if (itemId && hasCompleted?.(itemId, group, "publish")) {
     console.log(`Item ${itemId} (${slug}) already published. Skipping re-publish.`);
     track?.({ itemId, group, step: "publish", status: "skipped", reason: "already_published" });
+    flow?.("idempotency_check", "skipped", { slug }, { reason: "already_published" });
     return;
   }
+
+  flow?.("idempotency_check", "ok", { slug });
 
   const contentMd = (await readFileSafe(mdPath)) ?? json.markdownText ?? "";
 
@@ -274,8 +287,16 @@ export default async function (context) {
       error: new Error(`Missing required fields: ${missingFields.join(", ")}`),
       meta: { slug },
     });
+    flow?.(
+      "validate_fields",
+      "failed",
+      { slug, missing: missingFields },
+      { reason: "missing_fields" },
+    );
     return;
   }
+
+  flow?.("validate_fields", "ok", { slug });
 
   // ── 4. Resolve destination via round-robin ────────────────────────────────
   const roundRobinPath = path.join(articlesDir, "publish-article.roundrobin.json");
@@ -289,6 +310,12 @@ export default async function (context) {
       : destination.business_id;
 
   await writeFileAtomic(roundRobinPath, JSON.stringify({ lastIdx: nextIdx }, null, 2));
+
+  flow?.("resolve_destination", "ok", {
+    site_id: destination.site_id ?? null,
+    blog_topic_slug: destination.blog_topic_slug,
+    round_robin_idx: nextIdx,
+  });
 
   // ── 5. Build and POST article payload ─────────────────────────────────────
   const payload = {
@@ -321,6 +348,12 @@ export default async function (context) {
       error: new Error(`CMS POST failed (status ${apiResult ? apiResult.status : "N/A"})`),
       meta: { slug, site_id: destination.site_id ?? null },
     });
+    flow?.(
+      "post_cms",
+      "failed",
+      { slug, site_id: destination.site_id ?? null, status: apiResult ? apiResult.status : null },
+      { reason: "cms_post" },
+    );
     return;
   }
 
@@ -330,6 +363,8 @@ export default async function (context) {
   console.log(`** Article posted successfully with ID: ${blog_article_id}`);
 
   console.log("Saved successfully!");
+
+  flow?.("post_cms", "ok", { slug, blog_article_id, site_id: destination.site_id ?? null });
 
   // ── 6. Enrich JSON with destination metadata and move to published/ ───────
   const sitemapUrl = destination.sitemap_url ?? null;
@@ -351,6 +386,8 @@ export default async function (context) {
   }
 
   console.log(`Moved to published/${slug}-${today}.[json|md]`);
+
+  flow?.("move_published", "ok", { slug: `${slug}-${today}` });
 
   // ── 7. Register article in today's status file ────────────────────────────
   const statusData = await loadStatus(articlesDir, today);
@@ -380,15 +417,21 @@ export default async function (context) {
     meta: { slug: newSlug, site_id: siteId, blog_article_id },
   });
 
+  flow?.("register_status", "ok", { index: newIndex, slug: newSlug, site_id: siteId });
+
   // ── 8. Send Discord notification ──────────────────────────────────────────
   // Only reached when Part 1 succeeds. Shows ALL today's articles with status.
   // The article just saved is highlighted as 🆕.
   await sendPublishedList(statusData, articlesDir, newIndex, discordWebhookUrl, group, apiKey);
 
+  flow?.("notify", "ok", { highlighted_index: newIndex });
+
   // ── 9. Clean up old files ─────────────────────────────────────────────────
   await cleanOldFiles(publishedDir, 7);
   // Also clean up old status files in groupDir
   await cleanOldStatusFiles(groupDir, 7);
+
+  flow?.("cleanup", "ok");
 
   console.log("\n✅ Done!");
 }

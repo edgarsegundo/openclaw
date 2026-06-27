@@ -712,7 +712,7 @@ function scoreAndFilterItems(
  *   category         - filter default feeds by category (default: all)
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, saveArtifact, track } = context;
+  const { taskName, mode, executionId, inputs, saveArtifact, track, flow } = context;
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
 
@@ -783,6 +783,14 @@ export default async function (context) {
       `Using ${feedList.length} default feed(s) for ${categoryLabel}language '${language}'.`,
     );
   }
+
+  flow?.("resolve_feeds", "ok", {
+    feeds: feedList.length,
+    source: customFeedsRaw ? "custom" : "default",
+    language,
+    category: category || "all",
+    max_items: maxItems,
+  });
 
   // ── 2. Compute date cutoff ────────────────────────────────────────────────
   const sinceCutoff = sinceHours > 0 ? new Date(Date.now() - sinceHours * 60 * 60 * 1000) : null;
@@ -909,6 +917,12 @@ export default async function (context) {
     }
   }
 
+  flow?.("fetch_feeds", "ok", {
+    feeds_attempted: feedList.length,
+    feeds_failed: errors.length,
+    collected: collectedItems.length,
+  });
+
   // ── 6. Remove intra-execution duplicates (title fingerprint + Jaccard) ────
   const uniqueItems = [];
   const seenFps = [];
@@ -925,6 +939,12 @@ export default async function (context) {
     }
   }
 
+  flow?.("dedup", "ok", {
+    before: collectedItems.length,
+    after: uniqueItems.length,
+    removed: collectedItems.length - uniqueItems.length,
+  });
+
   // Strip internal _fp field and apply max_items cap
   const finalItems = uniqueItems.slice(0, maxItems).map(({ _fp, ...rest }) => rest);
 
@@ -934,6 +954,12 @@ export default async function (context) {
     const da = a.published ? new Date(a.published) : 0;
     const db = b.published ? new Date(b.published) : 0;
     return db - da;
+  });
+
+  flow?.("rank_select", "ok", {
+    selected: finalItems.length,
+    max_items: maxItems,
+    top_score: finalItems[0]?.score ?? null,
   });
 
   // ── 8. Build artifact ─────────────────────────────────────────────────────
@@ -1018,8 +1044,19 @@ export default async function (context) {
     console.log(
       `\nArtifact saved: ${artifactName}.json (${mergedItems.length} itens acumulados no dia, ${finalItems.length} novos)`,
     );
+    flow?.("save_artifact", "ok", {
+      artifact: `${artifactName}.json`,
+      new_items: trulyNewItems.length,
+      total_day: mergedItems.length,
+    });
   } else {
     console.log(`\nNo new items — artifact not overwritten (${artifactName}.json preserved).`);
+    flow?.(
+      "save_artifact",
+      "skipped",
+      { artifact: `${artifactName}.json` },
+      { reason: "no_new_items" },
+    );
   }
 
   // ── 10b. Track items that entered the pipeline (observability) ────────────
@@ -1039,9 +1076,11 @@ export default async function (context) {
   appendToSeenHashes(seenHashes, finalItems);
   saveSeenHashes(artifactsDir, seenHashes, group);
   console.log(`[seen_hashes] Updated with ${finalItems.length} new fingerprint(s).`);
+  flow?.("update_history", "ok", { fingerprints: finalItems.length });
 
   // ── 12. Cleanup ───────────────────────────────────────────────────────────
   const now = new Date();
+  let deletedArtifacts = 0;
 
   // 12a. Delete old dated artifact files by date in filename
   try {
@@ -1053,11 +1092,14 @@ export default async function (context) {
         const diffDays = (now - fileDate) / (1000 * 60 * 60 * 24);
         if (diffDays > keepDays) {
           fs.unlinkSync(path.join(artifactsDir, file));
+          deletedArtifacts++;
           console.log("Deleted old artifact:", file);
         }
       }
     }
+    flow?.("cleanup", "ok", { deleted: deletedArtifacts });
   } catch (err) {
     console.warn("[cleanup] Failed to delete old artifacts:", err.message);
+    flow?.("cleanup", "failed", null, { error: err });
   }
 }

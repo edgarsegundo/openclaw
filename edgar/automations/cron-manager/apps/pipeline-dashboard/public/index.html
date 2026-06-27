@@ -95,6 +95,30 @@
       .timeline-step { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
       .timeline-step .when { color: var(--muted); font-size: 12px; min-width: 160px; }
       .close { float: right; }
+      /* run flow diagram */
+      .flow-diagram {
+        display: flex; flex-wrap: wrap; align-items: stretch; gap: 0;
+        margin: 4px 0 18px;
+      }
+      .flow-node {
+        position: relative;
+        flex: 1 1 110px; min-width: 110px; max-width: 170px;
+        border: 1px solid var(--border); border-left-width: 3px;
+        border-radius: 8px; padding: 8px 10px; background: #1c2029;
+      }
+      .flow-node.ok       { border-left-color: var(--ok); }
+      .flow-node.skipped  { border-left-color: var(--skip); }
+      .flow-node.failed   { border-left-color: var(--fail); }
+      .flow-node.started, .flow-node.retrying { border-left-color: var(--accent); }
+      .flow-node.idle     { border-left-color: var(--border); opacity: .45; }
+      .flow-node .fn-top { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+      .flow-node .fn-label { font-weight: 600; font-size: 12.5px; margin: 3px 0 2px; line-height: 1.25; }
+      .flow-node .fn-meta { font-size: 11px; color: var(--muted); word-break: break-word; }
+      .flow-arrow { align-self: center; color: var(--muted); padding: 0 6px; font-size: 16px; user-select: none; }
+      .flow-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: -6px 0 14px; }
+      .flow-extra { margin: 6px 0 16px; font-size: 12px; color: var(--muted); }
+      .run-meta { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+      .run-meta strong { color: var(--text); font-weight: 600; }
     </style>
   </head>
   <body>
@@ -346,7 +370,8 @@
           ? rows
               .map(
                 (r) => `
-          <tr><td>${taskEmoji(r.task)} ${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
+          <tr class="clickable" onclick="showRunFlow('${esc(r.execution_id)}')" title="Ver o fluxo desta execução">
+          <td>${taskEmoji(r.task)} ${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
           <td class="muted">${fmt(r.started_at)}</td>
           <td class="muted">${r.duration_ms != null ? (r.duration_ms / 1000).toFixed(1) + "s" : "—"}</td>
           <td class="err" title="${esc(r.error_message || "")}">${esc(r.error_message || "")}</td></tr>`,
@@ -382,6 +407,130 @@
         $("overlay").classList.add("open");
       };
       window.closeModal = () => $("overlay").classList.remove("open");
+
+      // ── Per-run flow modal ─────────────────────────────────────────────────
+      const STATUS_ICON = { ok: "✅", skipped: "⏭️", failed: "❌", started: "⏳", retrying: "🔁", idle: "○" };
+
+      function humanize(s) {
+        return String(s || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+
+      // Compact one-line summary of a meta object for the diagram node.
+      function metaSummary(metaRaw, reason) {
+        const m = parseMeta(metaRaw);
+        const parts = [];
+        if (reason) parts.push(reason);
+        if (m) {
+          for (const [k, v] of Object.entries(m)) {
+            if (v == null || v === "") continue;
+            let val = typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(4)) : String(v);
+            if (val.length > 28) val = val.slice(0, 27) + "…";
+            parts.push(`${k}: ${val}`);
+            if (parts.length >= 3) break;
+          }
+        }
+        return parts.join(" · ");
+      }
+
+      // Pretty step name for the detailed list, using the flow def when available.
+      function prettyStep(step, flow) {
+        if (step && step.startsWith("flow.")) {
+          const key = step.slice(5);
+          const def = flow?.steps?.find((s) => s.key === key);
+          return def ? def.label : humanize(key);
+        }
+        if (step && step.startsWith("task:")) return "▶ execução da task";
+        return humanize(step);
+      }
+
+      window.showRunFlow = async function (executionId) {
+        $("modalTitle").textContent = "Fluxo da execução";
+        $("timeline").innerHTML = '<p class="muted">Carregando…</p>';
+        $("overlay").classList.add("open");
+        try {
+          const { run, flow, events } = await api(`/api/run?execution_id=${encodeURIComponent(executionId)}`);
+
+          // Latest event per flow.<key> (last write wins — reflects final state).
+          const flowByKey = {};
+          for (const e of events) {
+            if (e.step && e.step.startsWith("flow.")) flowByKey[e.step.slice(5)] = e;
+          }
+          const canonicalKeys = new Set((flow?.steps || []).map((s) => s.key));
+
+          // Title + run header.
+          const runStatus = run.status === "success" ? "ok" : "failed";
+          $("modalTitle").innerHTML =
+            `${(flow && flow.emoji) || taskEmoji(run.task)} ${esc(run.task)} ${badge(runStatus)}`;
+
+          const header = `
+            <div class="run-meta">
+              <span>Início: <strong>${fmt(run.started_at)}</strong></span>
+              <span>Duração: <strong>${run.duration_ms != null ? (run.duration_ms / 1000).toFixed(1) + "s" : "—"}</strong></span>
+              <span>Execução: <strong>${esc((run.execution_id || "").slice(0, 8))}</strong></span>
+            </div>
+            ${run.error_message ? `<pre style="color:var(--fail);margin:0 0 14px">${esc(run.error_message)}</pre>` : ""}`;
+
+          // Diagram (canonical pieces, colored by what happened this run).
+          let diagram = "";
+          if (flow && flow.steps?.length) {
+            const nodes = flow.steps.map((s) => {
+              const e = flowByKey[s.key];
+              const status = e ? e.status : "idle";
+              const icon = STATUS_ICON[status] || "○";
+              const summary = e ? metaSummary(e.meta_json, e.reason) : (s.desc || "");
+              return `
+                <div class="flow-node ${status}" title="${esc(s.desc || s.label)}">
+                  <div class="fn-top">${icon} ${esc(status)}</div>
+                  <div class="fn-label">${esc(s.label)}</div>
+                  ${summary ? `<div class="fn-meta">${esc(summary)}</div>` : ""}
+                </div>`;
+            });
+            diagram = `
+              <div class="flow-diagram">${nodes.join('<div class="flow-arrow">→</div>')}</div>
+              <div class="flow-legend">
+                <span>✅ ok</span><span>⏭️ pulado</span><span>❌ falhou</span><span>○ não executado</span>
+              </div>`;
+
+            // Flow checkpoints emitted by this run that aren't in the canonical
+            // diagram (manual commands like .apr/.del/.pub, list, etc.).
+            const extras = Object.keys(flowByKey).filter((k) => !canonicalKeys.has(k));
+            if (extras.length) {
+              diagram += `<div class="flow-extra">Outros checkpoints nesta execução: ${extras
+                .map((k) => `${STATUS_ICON[flowByKey[k].status] || "•"} ${esc(humanize(k))}`)
+                .join(" · ")}</div>`;
+            }
+          } else {
+            diagram = `<p class="muted">Sem diagrama de fluxo definido para esta task — veja os eventos abaixo.</p>`;
+          }
+
+          // Detailed, ordered checkpoint list (everything recorded this run).
+          const list = events.length
+            ? events
+                .map(
+                  (e) => `
+            <div class="timeline-step">
+              <div class="when">${fmt(e.created_at)}</div>
+              <div style="flex:1">
+                <strong>${esc(prettyStep(e.step, flow))}</strong> ${badge(e.status)}
+                ${e.attempt > 1 ? `<span class="muted">(tentativa ${e.attempt})</span>` : ""}
+                ${e.reason ? `<span class="muted"> — ${esc(e.reason)}</span>` : ""}
+                ${e.error_message ? `<pre>${esc(e.error_message)}</pre>` : ""}
+                ${e.error_stack ? `<pre style="font-size:11px;opacity:.85">${esc(e.error_stack)}</pre>` : ""}
+                ${e.meta_json && e.meta_json !== "null" ? `<pre>${esc(e.meta_json)}</pre>` : ""}
+              </div>
+            </div>`,
+                )
+                .join("")
+            : '<p class="muted">Nenhum evento registrado nesta execução.</p>';
+
+          $("timeline").innerHTML =
+            header + diagram +
+            `<h2 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:8px 0 4px">Checkpoints detalhados</h2>` +
+            list;
+        } catch (err) {
+          $("timeline").innerHTML = `<pre style="color:var(--fail)">${esc(err.message)}</pre>`;
+        }
+      };
 
       async function refresh() {
         try {

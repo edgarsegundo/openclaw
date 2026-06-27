@@ -36,7 +36,7 @@ import { resolveDatedPath } from "../../lib/dates.js";
  *   Both are deleted automatically after 7 days.
  */
 export default async function (context) {
-  const { taskName, mode, executionId, inputs, runPrompt, track } = context;
+  const { taskName, mode, executionId, inputs, runPrompt, track, flow } = context;
   const itemIndex = inputs.item_index ?? null;
   const action = inputs.action ?? null;
   const discordWebhookUrl = inputs.discord_webhook_url ?? null;
@@ -80,6 +80,12 @@ export default async function (context) {
       reason: "fetcher_file_missing",
       meta: { expected: fetcherArtifactFilePath },
     });
+    flow?.(
+      "load_input",
+      "skipped",
+      { expected: fetcherArtifactFilePath },
+      { reason: "fetcher_file_missing" },
+    );
     return;
   }
 
@@ -94,8 +100,12 @@ export default async function (context) {
   console.log(`Topic: ${topic}`);
   console.log(`Found ${allItems.length} total item(s) in today's fetcher file.`);
 
+  flow?.("load_input", "ok", { total_items: allItems.length, topic, date: fetcherFile.date });
+
   // ── 2. Load today's status file ──────────────────────────────────────────
   let { statusData, resolvedSet, sentSet } = loadStatus(group, today);
+
+  flow?.("load_status", "ok", { resolved: resolvedSet.size, sent: sentSet.size });
 
   // ── Command: list ─────────────────────────────────────────────
   if (action === "l1") {
@@ -104,6 +114,7 @@ export default async function (context) {
     const sent = await sendFullRssList(allItems, resolvedSet, statusData, topic, discordWebhookUrl);
 
     console.log(`✅ RSS list sent (${sent} message(s))`);
+    flow?.("list", "ok", { messages: sent, items: allItems.length });
     return;
   }
 
@@ -161,6 +172,7 @@ export default async function (context) {
       });
 
       console.log(`✅ Item ${itemIndex} manually approved and added to approved file.`);
+      flow?.("manual_approve", "ok", { index: fetcherIndex, title: stripHtmlTags(item.title) });
       return;
     }
 
@@ -172,6 +184,7 @@ export default async function (context) {
       saveStatus(group, today, statusData);
 
       console.log(`🗑️  Item ${itemIndex} marked as deleted. Will not appear again.`);
+      flow?.("manual_delete", "ok", { index: fetcherIndex, title: stripHtmlTags(item.title) });
       return;
     }
 
@@ -186,6 +199,11 @@ export default async function (context) {
     .filter((item) => !resolvedSet.has(item.fetcherIndex));
 
   console.log(`Unresolved items: ${unresolvedItems.length} (resolved: ${resolvedSet.size})`);
+
+  flow?.("filter_unresolved", "ok", {
+    unresolved: unresolvedItems.length,
+    resolved: resolvedSet.size,
+  });
 
   // ── 5. Check minimum threshold ───────────────────────────────────────────
   console.log(`Minimum items required to run AI triage: ${minItems}`);
@@ -214,8 +232,16 @@ export default async function (context) {
       `Below minimum threshold (${unresolvedItems.length} < ${minItems}). ` +
         `Waiting for more items or manual commands. Exiting.`,
     );
+    flow?.(
+      "threshold_check",
+      "skipped",
+      { unresolved: unresolvedItems.length, min_items: minItems },
+      { reason: "below_min_items" },
+    );
     return;
   }
+
+  flow?.("threshold_check", "ok", { unresolved: unresolvedItems.length, min_items: minItems });
 
   // ── 6. Deduplicate by real URL ───────────────────────────────────────────
   const seen = new Set();
@@ -232,6 +258,12 @@ export default async function (context) {
   if (removedDupes > 0) {
     console.log(`Removed ${removedDupes} duplicate(s) before AI triage.`);
   }
+
+  flow?.("dedup", "ok", {
+    before: unresolvedItems.length,
+    after: deduplicated.length,
+    removed: removedDupes,
+  });
 
   // Build link → fetcherIndex map (array para cobrir duplicatas de URL real).
   // Inclui tanto os itens que passaram na deduplicação quanto os descartados,
@@ -263,8 +295,19 @@ export default async function (context) {
     total_items: itemsForAI.length,
   });
 
+  flow?.("ai_triage", "ok", {
+    evaluated: itemsForAI.length,
+    cost_usd: usage?.cost?.total_cost ?? null,
+  });
+
   // ── 9. Print triage results ──────────────────────────────────────────────
   const approvedItems = artifact.results.filter((r) => r.score >= minScore);
+
+  flow?.("approve", "ok", {
+    evaluated: itemsForAI.length,
+    approved: approvedItems.length,
+    min_score: minScore,
+  });
 
   console.log("\n─── Triage Results ──────────────────────────────────────");
   console.log(`Total evaluated: ${itemsForAI.length}`);
@@ -328,6 +371,8 @@ export default async function (context) {
   saveStatus(group, today, statusData);
   console.log(`Updated status file for group "${group}".`);
 
+  flow?.("save_approved", "ok", { saved: savedCount, approved: approvedItems.length });
+
   // ── 12. Delete files older than 7 days ───────────────────────────────────
   const pickerDir = path.resolve("artifacts/rss-picker");
   const cutoffDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -350,6 +395,8 @@ export default async function (context) {
     console.log(`\nCleaned up ${deletedFiles.length} file(s) older than 7 days:`);
     deletedFiles.forEach((f) => console.log(`  - ${f}`));
   }
+
+  flow?.("cleanup", "ok", { deleted: deletedFiles.length });
 
   // ── 13. Final summary ────────────────────────────────────────────────────
   console.log("─────────────────────────────────────────────────────────");
