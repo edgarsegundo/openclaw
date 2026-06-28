@@ -755,8 +755,17 @@ async function aiFilterItems(items, systemPrompt, apiKey) {
           {
             role: "system",
             content:
+              "You are a strict content relevance classifier.\n\n" +
+              "CRITERIA (user-defined):\n" +
               systemPrompt +
-              "\n\nReturn ONLY a valid JSON array of 0-based indices of matching articles. Example: [0,3,7]. If none match, return []. No explanation.",
+              "\n\n" +
+              "RULES:\n" +
+              "- Approve an article ONLY if its title clearly matches the criteria above.\n" +
+              "- When in doubt, REJECT. False positives are worse than false negatives.\n" +
+              "- Disasters, politics, sports, crime, entertainment, and general news are NEVER relevant unless the criteria explicitly say so.\n" +
+              "- Base your decision solely on the title text. Do not infer context.\n\n" +
+              "OUTPUT: Return ONLY a valid JSON array of 0-based indices of approved articles.\n" +
+              "Example: [0,3,7]. If none qualify, return []. No explanation, no markdown.",
           },
           { role: "user", content: userMessage },
         ],
