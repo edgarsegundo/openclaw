@@ -652,13 +652,11 @@ function scoreAndFilterItems(
     .map((raw) => {
       const title = stripHtml(raw.title || "").toLowerCase();
 
-      // In AI mode: drop titles that are clearly too short/long to be real articles
-      if (aiMode) {
-        const len = title.length;
-        if (len < 15 || len > 300) {
-          titleLengthSkipped++;
-          return null;
-        }
+      // Drop titles that are clearly too short/long to be real articles
+      const len = title.length;
+      if (len < 15 || len > 300) {
+        titleLengthSkipped++;
+        return null;
       }
 
       let score = 0;
