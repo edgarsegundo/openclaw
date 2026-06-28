@@ -641,8 +641,7 @@ function scoreAndFilterItems(
   excludePatterns,
   sinceCutoff,
   seenHashes,
-  aiMode = false,
-  aiMinScore = 0,
+  minScore = 2,
 ) {
   let titleLengthSkipped = 0,
     scoreSkipped = 0,
@@ -673,9 +672,9 @@ function scoreAndFilterItems(
       }
 
       // pass_through feeds (curated) always score >= 0 so AI sees everything.
-      // Regular feeds: use aiMinScore in AI mode (configurable, default 0), else strict >= 2.
-      const minScore = feed.pass_through ? 0 : aiMode ? aiMinScore : 2;
-      if (score < minScore) {
+      // pass_through feeds always threshold 0; others use caller-supplied minScore.
+      const effectiveMinScore = feed.pass_through ? 0 : minScore;
+      if (score < effectiveMinScore) {
         console.log(`  [skip] score=${score} "${(raw.title || "").slice(0, 80)}"`);
         scoreSkipped++;
         return null;
@@ -840,7 +839,10 @@ export default async function (context) {
 
   const aiFilterPrompt = (inputs.ai_filter_prompt || "").trim();
   const maxPerFeed = Number(inputs.max_per_feed) || 0; // 0 = no cap
-  const aiMinScore = Number(inputs.ai_min_score ?? 0);
+  // min_score: minimum keyword score for non-pass_through feeds to enter the pipeline.
+  // Applies with or without AI mode. Default 2 (requires at least one pattern match).
+  // Set to 0 to let everything reach the AI filter (or the artifact if no AI configured).
+  const minScoreInput = Number(inputs.min_score ?? inputs.ai_min_score ?? 2);
 
   // Dynamic import of feeds module
   let DEFAULT_FEEDS, parseCustomFeeds;
@@ -967,8 +969,7 @@ export default async function (context) {
           excludePatterns,
           sinceCutoff,
           seenHashes,
-          !!aiFilterPrompt,
-          aiMinScore,
+          minScoreInput,
         );
         totalRaw += feedStats.total_raw;
         totalScoreSkipped += feedStats.score_skipped;
@@ -1017,8 +1018,7 @@ export default async function (context) {
           excludePatterns,
           sinceCutoff,
           seenHashes,
-          !!aiFilterPrompt,
-          aiMinScore,
+          minScoreInput,
         );
         totalRaw += feedStats.total_raw;
         totalScoreSkipped += feedStats.score_skipped;
