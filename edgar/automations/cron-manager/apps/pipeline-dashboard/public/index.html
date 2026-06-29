@@ -95,6 +95,9 @@
       .icon-btn:disabled { opacity: .4; cursor: default; }
       .star { color: var(--muted); }
       .star.on { color: var(--skip); }
+      .icon-btn.comment-btn { filter: grayscale(1); opacity: .45; }
+      .icon-btn.comment-btn.has-comment { filter: none; opacity: 1; }
+      .item-comment { color: var(--skip); font-size: 12px; margin-top: 4px; max-width: 420px; white-space: pre-wrap; word-break: break-word; }
       .pager { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
       .pager button { padding: 4px 8px; font-size: 12px; }
       .pager button:disabled { opacity: .4; cursor: default; }
@@ -292,6 +295,22 @@
       </div>
     </div>
 
+    <div class="inputs-overlay" id="commentOverlay">
+      <div class="inputs-modal" style="max-width:560px">
+        <button class="close" onclick="closeCommentModal()">✕ fechar</button>
+        <h2 style="margin:0 0 4px;font-size:15px">💬 Comentário</h2>
+        <div class="muted" id="commentItemTitle" style="font-size:12px;margin-bottom:14px"></div>
+        <div class="inputs-field">
+          <textarea id="commentText" rows="6" placeholder="Escreva uma anotação sobre esta notícia…"></textarea>
+        </div>
+        <div id="commentSaveMsg" style="font-size:12px;color:var(--ok);display:none;margin-bottom:8px">✓ Salvo!</div>
+        <div class="inputs-modal-footer">
+          <button onclick="closeCommentModal()">Cancelar</button>
+          <button id="commentSaveBtn" onclick="saveComment()" style="background:var(--accent);border-color:var(--accent);color:#fff">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+
     <script>
       const $ = (id) => document.getElementById(id);
       let currentGroup = "";
@@ -359,6 +378,7 @@
       let itemsSearch = "";
       let itemsFavOnly = false;
       let itemsSearchTimer = null;
+      let itemsCache = {};
 
       async function loadItems() {
         const body = $("itemsBody");
@@ -386,9 +406,12 @@
           renderItemsPager(0, page, pageSize);
           return;
         }
+        itemsCache = Object.fromEntries(items.map((it) => [it.item_id, it]));
         body.innerHTML = items
           .map((it) => {
             const fav = !!it.favorite;
+            const cmt = (it.comment || "").trim();
+            const cmtPreview = cmt.length > 90 ? cmt.slice(0, 90) + "…" : cmt;
             return `
           <tr class="clickable" onclick="showTimeline('${esc(it.item_id)}','${esc(it.title)}')">
             <td>
@@ -401,12 +424,18 @@
                     >${esc(it.title || it.item_id)} ↗</a>`
                 : esc(it.title || it.item_id)}
               <div class="muted">${esc(it.item_id)}</div>
+              ${cmt ? `<div class="item-comment">💬 ${esc(cmtPreview)}</div>` : ""}
             </td>
             <td>${esc(it.current_step)}</td>
             <td>${badge(it.current_status)}</td>
             <td class="err" title="${esc(it.last_error || "")}">${esc(it.last_error || "")}</td>
             <td class="muted">${fmt(it.updated_at)}</td>
             <td class="row-actions">
+              ${it.url ? `<button class="icon-btn" title="Copiar prompt + texto do artigo (para colar numa IA)"
+                onclick="event.stopPropagation(); copyPrompt('${esc(it.item_id)}', this)">📋</button>` : ""}
+              <button class="icon-btn comment-btn ${cmt ? "has-comment" : ""}"
+                title="${cmt ? "Editar comentário" : "Adicionar comentário"}"
+                onclick="event.stopPropagation(); openCommentModal('${esc(it.item_id)}')">💬</button>
               <button class="icon-btn" title="${fav ? "Desfavoritar" : "Favoritar"}"
                 onclick="event.stopPropagation(); toggleFavorite('${esc(it.item_id)}', this)">
                 <span class="star ${fav ? "on" : ""}">${fav ? "★" : "☆"}</span>
@@ -483,6 +512,84 @@
         } catch (e) {
           btn.disabled = false;
           alert("Erro ao remover: " + e.message);
+        }
+      };
+
+      const SUCCESS_PROMPT =
+        "Resuma este artigo em um único parágrafo destacando apenas os fatores que explicam seu sucesso: o problema resolvido, as principais estratégias, decisões, vantagens competitivas e aprendizados práticos. Ignore detalhes secundários.";
+
+      async function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return;
+        }
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+
+      window.copyPrompt = async (itemId, btn) => {
+        const it = itemsCache[itemId];
+        if (!it || !it.url) {
+          alert("Este item não tem link para extrair.");
+          return;
+        }
+        const orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = "⏳";
+        try {
+          const data = await api(`/api/item/extract?url=${encodeURIComponent(it.url)}`);
+          await copyToClipboard(`${SUCCESS_PROMPT}\n\n---\n\n${data.text}`);
+          btn.textContent = "✓";
+          setTimeout(() => {
+            btn.textContent = orig;
+            btn.disabled = false;
+          }, 1500);
+        } catch (e) {
+          btn.textContent = orig;
+          btn.disabled = false;
+          alert("Erro ao extrair/copiar: " + e.message);
+        }
+      };
+
+      let commentItemId = null;
+      window.openCommentModal = (itemId) => {
+        const it = itemsCache[itemId];
+        if (!it) return;
+        commentItemId = itemId;
+        $("commentItemTitle").textContent = it.title || itemId;
+        $("commentText").value = it.comment || "";
+        $("commentSaveMsg").style.display = "none";
+        $("commentOverlay").classList.add("open");
+        $("commentText").focus();
+      };
+      window.closeCommentModal = () => $("commentOverlay").classList.remove("open");
+      window.saveComment = async () => {
+        if (!commentItemId) return;
+        const comment = $("commentText").value;
+        const btn = $("commentSaveBtn");
+        btn.disabled = true;
+        try {
+          const r = await fetch("api/item/comment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: commentItemId, group: currentGroup, comment }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || r.statusText);
+          if (itemsCache[commentItemId]) itemsCache[commentItemId].comment = comment.trim() ? comment : null;
+          $("commentSaveMsg").style.display = "block";
+          loadItems();
+          setTimeout(closeCommentModal, 600);
+        } catch (e) {
+          alert("Erro ao salvar comentário: " + e.message);
+        } finally {
+          btn.disabled = false;
         }
       };
 
@@ -1157,6 +1264,9 @@
       });
       $("inputsOverlay").addEventListener("click", (e) => {
         if (e.target.id === "inputsOverlay") closeInputsModal();
+      });
+      $("commentOverlay").addEventListener("click", (e) => {
+        if (e.target.id === "commentOverlay") closeCommentModal();
       });
       $("inputsBtn").addEventListener("click", openInputsEditor);
       $("inputsFileSelect").addEventListener("change", (e) => loadInputsFile(e.target.value));

@@ -7,6 +7,7 @@ import {
   getAllGroups,
   getItemsByGroup,
   setItemFavorite,
+  setItemComment,
   deleteItem,
   getItemTimeline,
   getStepEventById,
@@ -23,6 +24,7 @@ import {
   pruneOlderThan,
 } from "../../lib/db.js";
 import { getFlow, FLOWS } from "../../lib/flows.js";
+import * as cheerio from "cheerio";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Two levels up from apps/pipeline-dashboard → cron-manager root.
@@ -89,6 +91,26 @@ function scanInputsFiles() {
 
 const STEPS = ["fetch", "pick", "write", "publish", "index"];
 
+/**
+ * Strip an HTML page down to readable article text. Removes non-content
+ * elements, prefers <article>/<main>, then joins block-level text so the
+ * paragraphs survive. Falls back to the whole body text if no blocks match.
+ */
+function extractArticleText(html) {
+  const $ = cheerio.load(html);
+  $("script, style, noscript, nav, header, footer, aside, form, iframe, svg, button, figure").remove();
+  const article = $("article").first();
+  const main = $("main").first();
+  const root = article.length ? article : main.length ? main : $("body");
+  const parts = [];
+  root.find("h1, h2, h3, h4, p, li, blockquote").each((_, el) => {
+    const t = $(el).text().replace(/\s+/g, " ").trim();
+    if (t) parts.push(t);
+  });
+  const text = parts.join("\n\n");
+  return text || root.text().replace(/\s+/g, " ").trim();
+}
+
 function sendJson(res, data) {
   const body = JSON.stringify(data);
   res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
@@ -151,6 +173,37 @@ const server = http.createServer(async (req, res) => {
       const { item_id, group, favorite } = body;
       if (!item_id || !group) return sendError(res, 400, "item_id and group required");
       const ok = setItemFavorite(item_id, group, !!favorite);
+      return sendJson(res, { ok });
+    }
+    // Fetch the article behind an item link and return its plain text, so the
+    // UI can build a copy-to-clipboard prompt for an external AI chat. Nothing
+    // is persisted — this is a one-shot extraction.
+    if (route === "/api/item/extract") {
+      const target = url.searchParams.get("url");
+      if (!target) return sendError(res, 400, "url query param required");
+      let parsed;
+      try {
+        parsed = new URL(target);
+      } catch {
+        return sendError(res, 400, "invalid url");
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+        return sendError(res, 400, "only http(s) urls allowed");
+      const r = await fetch(target, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; pipeline-dashboard/1.0)" },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!r.ok) return sendError(res, 502, `fetch failed: HTTP ${r.status}`);
+      const html = await r.text();
+      const text = extractArticleText(html);
+      if (!text) return sendError(res, 422, "no readable text extracted");
+      return sendJson(res, { text, url: target });
+    }
+    if (route === "/api/item/comment" && req.method === "POST") {
+      const body = JSON.parse(await readBody(req));
+      const { item_id, group, comment } = body;
+      if (!item_id || !group) return sendError(res, 400, "item_id and group required");
+      const ok = setItemComment(item_id, group, typeof comment === "string" ? comment : "");
       return sendJson(res, { ok });
     }
     if (route === "/api/item/delete" && req.method === "POST") {

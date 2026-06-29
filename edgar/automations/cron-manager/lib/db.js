@@ -93,6 +93,9 @@ export function initDb() {
   if (!itemStateCols.some((c) => c.name === "favorite")) {
     _db.exec("ALTER TABLE item_state ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
   }
+  if (!itemStateCols.some((c) => c.name === "comment")) {
+    _db.exec("ALTER TABLE item_state ADD COLUMN comment TEXT");
+  }
 
   return _db;
 }
@@ -273,7 +276,7 @@ export function getItemsByGroup(
     .get(...params).n;
   const items = db
     .prepare(`
-      SELECT s.item_id, s.group_name, s.current_step, s.current_status, s.last_error, s.updated_at, s.favorite,
+      SELECT s.item_id, s.group_name, s.current_step, s.current_status, s.last_error, s.updated_at, s.favorite, s.comment,
              i.title, i.url, i.first_seen
       FROM item_state s
       LEFT JOIN pipeline_items i ON i.item_id = s.item_id AND i.group_name = s.group_name
@@ -294,6 +297,19 @@ export function setItemFavorite(item_id, group_name, favorite) {
   const info = db
     .prepare("UPDATE item_state SET favorite = ? WHERE item_id = ? AND group_name = ?")
     .run(favorite ? 1 : 0, item_id, group_name);
+  return info.changes > 0;
+}
+
+/**
+ * Set (or clear) the free-text comment on a single item's state row.
+ * An empty/blank string clears it back to NULL. Returns true if a row matched.
+ */
+export function setItemComment(item_id, group_name, comment) {
+  const db = initDb();
+  const value = comment && comment.trim() ? comment : null;
+  const info = db
+    .prepare("UPDATE item_state SET comment = ? WHERE item_id = ? AND group_name = ?")
+    .run(value, item_id, group_name);
   return info.changes > 0;
 }
 
