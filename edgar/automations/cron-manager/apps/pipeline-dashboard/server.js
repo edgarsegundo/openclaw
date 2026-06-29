@@ -6,6 +6,8 @@ import {
   initDb,
   getAllGroups,
   getItemsByGroup,
+  setItemFavorite,
+  deleteItem,
   getItemTimeline,
   getStepEventById,
   getStuckItems,
@@ -132,7 +134,32 @@ const server = http.createServer(async (req, res) => {
     if (route === "/api/items") {
       const group = url.searchParams.get("group");
       if (!group) return sendError(res, 400, "group query param required");
-      return sendJson(res, getItemsByGroup(group, 500));
+      const pageSize = 20;
+      const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+      const search = (url.searchParams.get("search") || "").trim();
+      const favoritesOnly = url.searchParams.get("favorites") === "1";
+      const { items, total } = getItemsByGroup(group, {
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        search,
+        favoritesOnly,
+      });
+      return sendJson(res, { items, total, page, pageSize });
+    }
+    if (route === "/api/item/favorite" && req.method === "POST") {
+      const body = JSON.parse(await readBody(req));
+      const { item_id, group, favorite } = body;
+      if (!item_id || !group) return sendError(res, 400, "item_id and group required");
+      const ok = setItemFavorite(item_id, group, !!favorite);
+      return sendJson(res, { ok });
+    }
+    if (route === "/api/item/delete" && req.method === "POST") {
+      const body = JSON.parse(await readBody(req));
+      const { item_id, group } = body;
+      if (!item_id || !group) return sendError(res, 400, "item_id and group required");
+      const counts = deleteItem(item_id, group);
+      console.log(`[dashboard] deleted item ${item_id} (${group}):`, JSON.stringify(counts));
+      return sendJson(res, { ok: true, counts });
     }
     if (route === "/api/item") {
       const id = url.searchParams.get("id");

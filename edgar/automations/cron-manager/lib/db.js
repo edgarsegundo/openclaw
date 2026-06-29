@@ -85,6 +85,15 @@ export function initDb() {
     );
   `);
 
+  // ── Migrations (additive, idempotent) ──────────────────────────────────────
+  // `favorite` was added to item_state after the initial release, so existing
+  // DBs need an ALTER. SQLite has no "ADD COLUMN IF NOT EXISTS", so guard on
+  // the current column list.
+  const itemStateCols = _db.prepare("PRAGMA table_info(item_state)").all();
+  if (!itemStateCols.some((c) => c.name === "favorite")) {
+    _db.exec("ALTER TABLE item_state ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0");
+  }
+
   return _db;
 }
 
@@ -235,21 +244,78 @@ export function upsertItemState({
 }
 
 /**
- * Get the latest known state of every item in a group, newest first.
+ * Get a page of items for a group, newest first, with optional title search
+ * and a favorites-only filter. Returns the page plus the total row count for
+ * the same filter so the dashboard can paginate. Search matches the item title
+ * (or item_id as a fallback for items without a stored title).
  */
-export function getItemsByGroup(group_name, limit = 200) {
+export function getItemsByGroup(
+  group_name,
+  { limit = 20, offset = 0, search = "", favoritesOnly = false } = {},
+) {
   const db = initDb();
-  return db
+  const where = ["s.group_name = ?"];
+  const params = [group_name];
+  if (favoritesOnly) where.push("s.favorite = 1");
+  if (search) {
+    where.push("(i.title LIKE ? OR s.item_id LIKE ?)");
+    const like = `%${search}%`;
+    params.push(like, like);
+  }
+  const whereSql = where.join(" AND ");
+  const total = db
     .prepare(`
-      SELECT s.item_id, s.group_name, s.current_step, s.current_status, s.last_error, s.updated_at,
+      SELECT COUNT(*) AS n
+      FROM item_state s
+      LEFT JOIN pipeline_items i ON i.item_id = s.item_id AND i.group_name = s.group_name
+      WHERE ${whereSql}
+    `)
+    .get(...params).n;
+  const items = db
+    .prepare(`
+      SELECT s.item_id, s.group_name, s.current_step, s.current_status, s.last_error, s.updated_at, s.favorite,
              i.title, i.url, i.first_seen
       FROM item_state s
       LEFT JOIN pipeline_items i ON i.item_id = s.item_id AND i.group_name = s.group_name
-      WHERE s.group_name = ?
+      WHERE ${whereSql}
       ORDER BY s.updated_at DESC
-      LIMIT ?
+      LIMIT ? OFFSET ?
     `)
-    .all(group_name, limit);
+    .all(...params, limit, offset);
+  return { items, total };
+}
+
+/**
+ * Set (or clear) the favorite flag on a single item's state row.
+ * Returns true if a row was updated.
+ */
+export function setItemFavorite(item_id, group_name, favorite) {
+  const db = initDb();
+  const info = db
+    .prepare("UPDATE item_state SET favorite = ? WHERE item_id = ? AND group_name = ?")
+    .run(favorite ? 1 : 0, item_id, group_name);
+  return info.changes > 0;
+}
+
+/**
+ * Hard-delete a single item and all of its history (step_events, item_state,
+ * pipeline_items) within one group. Irreversible. Returns rows removed per
+ * table.
+ */
+export function deleteItem(item_id, group_name) {
+  const db = initDb();
+  const tx = db.transaction(() => ({
+    step_events: db
+      .prepare("DELETE FROM step_events WHERE item_id = ? AND group_name = ?")
+      .run(item_id, group_name).changes,
+    item_state: db
+      .prepare("DELETE FROM item_state WHERE item_id = ? AND group_name = ?")
+      .run(item_id, group_name).changes,
+    pipeline_items: db
+      .prepare("DELETE FROM pipeline_items WHERE item_id = ? AND group_name = ?")
+      .run(item_id, group_name).changes,
+  }));
+  return tx();
 }
 
 /**

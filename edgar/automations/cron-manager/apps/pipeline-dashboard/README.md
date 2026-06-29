@@ -27,7 +27,7 @@ node cron-manager.js pipeline -g visto-americano
 ## What it shows
 
 - **Funil** — how many items reached each step (`fetch`/`pick`/`write`/`publish`/`index`) and how many are `ok` / `skipped` / `failed`. This answers "where does the pipeline get stuck".
-- **Itens** — current state of every tracked item per group; click a row for the full **timeline** (every step attempt, with error stack and metadata).
+- **Itens** — current state of every tracked item per group (paginated, 20 per page), with title search and a favorites-only toggle, all scoped to the selected group. Click a row for the full **timeline** (every step attempt, with error stack and metadata). Each row has a ★ favorite toggle and a 🗑️ remove button (hard-delete: drops the item from `pipeline_items`, `item_state` and `step_events` — irreversible).
 - **Erros recentes** — latest failure events across all steps, with message.
 - **Execuções recentes** — task-level run history from the `runs` table.
 
@@ -38,15 +38,15 @@ persisted to three tables created by `lib/db.js`:
 
 - `pipeline_items` — one row per news item (`item_id` = sha1 of the real URL, stable across all stages).
 - `step_events` — append-only event log (one row per step attempt/outcome, with `error_stack` + `meta_json`).
-- `item_state` — latest step/status snapshot per item (drives the items table).
+- `item_state` — latest step/status snapshot per item (drives the items table); also holds the `favorite` flag set from the dashboard.
 
 Tracking is best-effort: if the DB is unavailable, stages log a warning and keep running — the JSON
 artifacts remain the source of truth for the data itself.
 
 ## API (JSON)
 
-Read: `/api/groups`, `/api/funnel?group=`, `/api/items?group=`, `/api/item?id=`, `/api/stuck`, `/api/errors`, `/api/runs`.
-Write (POST only): `/api/prune?days=7`, `/api/wipe`.
+Read: `/api/groups`, `/api/funnel?group=`, `/api/items?group=&page=&search=&favorites=1` (returns `{ items, total, page, pageSize }`), `/api/item?id=`, `/api/stuck`, `/api/errors`, `/api/runs`.
+Write (POST only): `/api/item/favorite` (`{item_id, group, favorite}`), `/api/item/delete` (`{item_id, group}`), `/api/prune?days=7`, `/api/wipe`.
 
 ## Maintenance & weekly cleanup
 

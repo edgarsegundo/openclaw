@@ -84,6 +84,20 @@
       .badge.pending, .badge.started, .badge.retrying { background: rgba(91,141,239,.15); color: var(--accent); }
       .muted { color: var(--muted); }
       .err { color: var(--fail); font-size: 12px; max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* items panel: search / favorites / pagination */
+      .items-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+      .items-toolbar input[type=search] { flex: 0 1 280px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; }
+      .items-toolbar .spacer { flex: 1; }
+      button.toggle-on { border-color: var(--accent); color: var(--accent); background: rgba(91,141,239,.15); }
+      .row-actions { white-space: nowrap; text-align: right; }
+      .icon-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 5px; line-height: 1; border-radius: 4px; }
+      .icon-btn:hover { background: #1c2029; }
+      .icon-btn:disabled { opacity: .4; cursor: default; }
+      .star { color: var(--muted); }
+      .star.on { color: var(--skip); }
+      .pager { display: flex; gap: 6px; align-items: center; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+      .pager button:disabled { opacity: .4; cursor: default; }
+      .pager .page-info { color: var(--muted); font-size: 12px; margin: 0 6px; }
       pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; color: var(--muted); margin: 4px 0 0; }
       /* modal */
       .overlay {
@@ -164,12 +178,19 @@
 
       <section class="panel">
         <h2>Itens (estado atual)</h2>
+        <div class="items-toolbar">
+          <input type="search" id="itemsSearch" placeholder="buscar no título…" />
+          <button id="itemsFavBtn" title="Mostrar só favoritos">☆ Favoritos</button>
+          <span class="spacer"></span>
+          <span class="muted" id="itemsCount"></span>
+        </div>
         <table>
           <thead>
-            <tr><th>Item</th><th>Etapa</th><th>Status</th><th>Último erro</th><th>Atualizado</th></tr>
+            <tr><th>Item</th><th>Etapa</th><th>Status</th><th>Último erro</th><th>Atualizado</th><th style="text-align:right">Ações</th></tr>
           </thead>
-          <tbody id="itemsBody"><tr><td colspan="5" class="muted">Selecione um grupo…</td></tr></tbody>
+          <tbody id="itemsBody"><tr><td colspan="6" class="muted">Selecione um grupo…</td></tr></tbody>
         </table>
+        <div class="pager" id="itemsPager"></div>
       </section>
 
       <section class="panel">
@@ -333,20 +354,41 @@
           .join("");
       }
 
+      let itemsPage = 1;
+      let itemsSearch = "";
+      let itemsFavOnly = false;
+      let itemsSearchTimer = null;
+
       async function loadItems() {
         const body = $("itemsBody");
+        const count = $("itemsCount");
         if (!currentGroup) {
-          body.innerHTML = '<tr><td colspan="5" class="muted">Selecione um grupo para ver os itens.</td></tr>';
+          body.innerHTML = '<tr><td colspan="6" class="muted">Selecione um grupo para ver os itens.</td></tr>';
+          $("itemsPager").innerHTML = "";
+          count.textContent = "";
           return;
         }
-        const items = await api(`/api/items?group=${encodeURIComponent(currentGroup)}`);
+        const params = new URLSearchParams({ group: currentGroup, page: String(itemsPage) });
+        if (itemsSearch) params.set("search", itemsSearch);
+        if (itemsFavOnly) params.set("favorites", "1");
+        const { items, total, page, pageSize } = await api(`/api/items?${params.toString()}`);
+        count.textContent = total ? `${total} item(ns)` : "";
+        // After a delete the current page can fall past the end; clamp & reload.
+        if (!items.length && total > 0 && itemsPage > 1) {
+          itemsPage = Math.max(1, Math.ceil(total / pageSize));
+          return loadItems();
+        }
         if (!items.length) {
-          body.innerHTML = '<tr><td colspan="5" class="muted">Nenhum item ainda.</td></tr>';
+          body.innerHTML = `<tr><td colspan="6" class="muted">${
+            itemsSearch || itemsFavOnly ? "Nenhum item para este filtro." : "Nenhum item ainda."
+          }</td></tr>`;
+          renderItemsPager(0, page, pageSize);
           return;
         }
         body.innerHTML = items
-          .map(
-            (it) => `
+          .map((it) => {
+            const fav = !!it.favorite;
+            return `
           <tr class="clickable" onclick="showTimeline('${esc(it.item_id)}','${esc(it.title)}')">
             <td>
               ${it.url
@@ -363,10 +405,85 @@
             <td>${badge(it.current_status)}</td>
             <td class="err" title="${esc(it.last_error || "")}">${esc(it.last_error || "")}</td>
             <td class="muted">${fmt(it.updated_at)}</td>
-          </tr>`,
-          )
+            <td class="row-actions">
+              <button class="icon-btn" title="${fav ? "Desfavoritar" : "Favoritar"}"
+                onclick="event.stopPropagation(); toggleFavorite('${esc(it.item_id)}', this)">
+                <span class="star ${fav ? "on" : ""}">${fav ? "★" : "☆"}</span>
+              </button>
+              <button class="icon-btn" title="Remover permanentemente"
+                onclick="event.stopPropagation(); removeItem('${esc(it.item_id)}', '${esc(it.title)}', this)">🗑️</button>
+            </td>
+          </tr>`;
+          })
           .join("");
+        renderItemsPager(total, page, pageSize);
       }
+
+      function renderItemsPager(total, page, pageSize) {
+        const pager = $("itemsPager");
+        if (total <= pageSize) {
+          pager.innerHTML = "";
+          return;
+        }
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const btn = (label, target, disabled) =>
+          `<button ${disabled ? "disabled" : ""} onclick="gotoItemsPage(${target})">${label}</button>`;
+        pager.innerHTML =
+          btn("« Primeira", 1, page <= 1) +
+          btn("‹ Anterior", page - 1, page <= 1) +
+          `<span class="page-info">Página ${page} de ${totalPages}</span>` +
+          btn("Próxima ›", page + 1, page >= totalPages) +
+          btn("Última »", totalPages, page >= totalPages);
+      }
+
+      window.gotoItemsPage = (p) => {
+        itemsPage = p;
+        loadItems();
+      };
+
+      window.toggleFavorite = async (itemId, btn) => {
+        const star = btn.querySelector(".star");
+        const newFav = !star.classList.contains("on");
+        btn.disabled = true;
+        try {
+          const r = await fetch("api/item/favorite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: itemId, group: currentGroup, favorite: newFav }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || r.statusText);
+          star.classList.toggle("on", newFav);
+          star.textContent = newFav ? "★" : "☆";
+          btn.title = newFav ? "Desfavoritar" : "Favoritar";
+          // When viewing favorites-only, unfavoriting should drop the row.
+          if (itemsFavOnly && !newFav) loadItems();
+        } catch (e) {
+          alert("Erro ao favoritar: " + e.message);
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      window.removeItem = async (itemId, title, btn) => {
+        if (!confirm(`Remover permanentemente este item e todo o histórico?\n\n${title || itemId}\n\nNão dá pra desfazer.`)) return;
+        btn.disabled = true;
+        try {
+          const r = await fetch("api/item/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_id: itemId, group: currentGroup }),
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || r.statusText);
+          // Page may have shrunk past the last page; clamp before reloading.
+          await loadItems();
+          loadFunnel();
+        } catch (e) {
+          btn.disabled = false;
+          alert("Erro ao remover: " + e.message);
+        }
+      };
 
       function parseMeta(raw) {
         try { return raw ? JSON.parse(raw) : null; } catch { return null; }
@@ -1009,10 +1126,31 @@
 
       $("groupSelect").addEventListener("change", (e) => {
         currentGroup = e.target.value;
+        // Reset the items view (page / search / favorites) when switching group.
+        itemsPage = 1;
+        itemsSearch = "";
+        itemsFavOnly = false;
+        $("itemsSearch").value = "";
+        $("itemsFavBtn").classList.remove("toggle-on");
+        $("itemsFavBtn").textContent = "☆ Favoritos";
         refresh();
       });
       $("refreshBtn").addEventListener("click", refresh);
       $("runsFilter").addEventListener("input", renderRuns);
+      $("itemsSearch").addEventListener("input", (e) => {
+        itemsSearch = e.target.value.trim();
+        itemsPage = 1;
+        clearTimeout(itemsSearchTimer);
+        itemsSearchTimer = setTimeout(loadItems, 300);
+      });
+      $("itemsFavBtn").addEventListener("click", () => {
+        itemsFavOnly = !itemsFavOnly;
+        itemsPage = 1;
+        const btn = $("itemsFavBtn");
+        btn.classList.toggle("toggle-on", itemsFavOnly);
+        btn.textContent = itemsFavOnly ? "★ Favoritos" : "☆ Favoritos";
+        loadItems();
+      });
       $("overlay").addEventListener("click", (e) => {
         if (e.target.id === "overlay") closeModal();
       });
