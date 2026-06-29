@@ -441,7 +441,7 @@
                 <span class="star ${fav ? "on" : ""}">${fav ? "★" : "☆"}</span>
               </button>
               <button class="icon-btn" title="Remover permanentemente"
-                onclick="event.stopPropagation(); removeItem('${esc(it.item_id)}', '${esc(it.title)}', this)">🗑️</button>
+                onclick="event.stopPropagation(); removeItem('${esc(it.item_id)}', this)">🗑️</button>
             </td>
           </tr>`;
           })
@@ -495,8 +495,9 @@
         }
       };
 
-      window.removeItem = async (itemId, title, btn) => {
-        if (!confirm(`Remover permanentemente este item e todo o histórico?\n\n${title || itemId}\n\nNão dá pra desfazer.`)) return;
+      window.removeItem = async (itemId, btn) => {
+        const title = itemsCache[itemId]?.title || itemId;
+        if (!confirm(`Remover permanentemente este item e todo o histórico?\n\n${title}\n\nNão dá pra desfazer.`)) return;
         btn.disabled = true;
         try {
           const r = await fetch("api/item/delete", {
