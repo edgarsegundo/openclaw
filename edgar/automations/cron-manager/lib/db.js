@@ -574,7 +574,21 @@ export function getItemStepStatus(item_id, group_name, step) {
  */
 export function getRecentRuns(limit = 50) {
   const db = initDb();
-  return db.prepare("SELECT * FROM runs ORDER BY started_at DESC LIMIT ?").all(limit);
+  // Pull the distinct non-null group_names seen in step_events for each run
+  // and collapse them into a comma-separated string (almost always just one).
+  return db
+    .prepare(`
+      SELECT r.*,
+             GROUP_CONCAT(DISTINCT e.group_name) AS groups
+      FROM runs r
+      LEFT JOIN step_events e
+        ON e.execution_id = r.execution_id
+        AND e.group_name IS NOT NULL
+      GROUP BY r.id
+      ORDER BY r.started_at DESC
+      LIMIT ?
+    `)
+    .all(limit);
 }
 
 /**

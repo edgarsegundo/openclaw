@@ -685,7 +685,7 @@
               .map(
                 (r) => `
           <tr class="clickable" onclick="showRunFlow('${esc(r.execution_id)}')" title="Ver o fluxo desta execução">
-          <td>${taskEmoji(r.task)} ${esc(r.task)}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
+          <td>${taskEmoji(r.task)} ${esc(r.task)}${r.groups ? ` <span class="muted">(${esc(r.groups)})</span>` : ""}</td><td>${badge(r.status === "success" ? "ok" : "failed")}</td>
           <td class="muted">${fmt(r.started_at)}</td>
           <td class="muted">${r.duration_ms != null ? (r.duration_ms / 1000).toFixed(1) + "s" : "—"}</td>
           <td class="err" title="${esc(r.error_message || "")}">${esc(r.error_message || "")}</td></tr>`,
