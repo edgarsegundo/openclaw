@@ -48,13 +48,14 @@ export default {
       try {
         await new Promise((resolve, reject) => {
           exec(cmd, { cwd }, (error, stdout, stderr) => {
-            if (error) {
-              console.error(stderr);
-              reject(error);
-            } else {
-              console.log(stdout);
-              resolve();
-            }
+            // publish-article can fail an internal step (e.g. the CMS publish
+            // script) and still exit 0 — it catches that failure and returns
+            // instead of throwing. So stderr must be logged regardless of exit
+            // code, or the real reason stays invisible in the bot's own log.
+            if (stdout) console.log(stdout);
+            if (stderr) console.error(stderr);
+            if (error) reject(error);
+            else resolve();
           });
         });
       } finally {

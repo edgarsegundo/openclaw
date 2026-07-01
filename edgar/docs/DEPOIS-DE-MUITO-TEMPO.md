@@ -1,0 +1,3 @@
+# Depois de muito tempo...
+
+Eu esqueci que para debugar o comando `.pub` do Discord (ex: `.pub fastvistos`) eu preciso olhar o log do PM2 do processo `discord-bot` (`pm2 logs discord-bot`, arquivos em `~/.pm2/logs/discord-bot-out.log` e `discord-bot-error.log`), porque o comando em `edgar/channels/discord/commands/pub.js` só dispara `node cron-manager.js run publish-article --input-file <temp>.json` via `child_process.exec` e joga todo o stdout/stderr desse processo filho no console do bot — a mensagem que aparece no canal do Discord é sempre genérica ("✅ sucesso" ou "❌ erro, verifique os logs"), o erro real só aparece nesse log do PM2.
