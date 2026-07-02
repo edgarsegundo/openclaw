@@ -2,7 +2,7 @@
   "group": "emprego-campinas",
   "rss_fetcher_output_artifact_file_name_pattern": "artifacts/rss-fetcher/fetched-items-{group}-{date}.json",
   "blog_context": "Blog do EmpregoAqui (https://empregoaqui.com.br/), plataforma de vagas de emprego via WhatsApp focada na Região Metropolitana de Campinas (Campinas, Sumaré, Hortolândia, Valinhos, Vinhedo, Paulínia, Indaiatuba, Americana e cidades vizinhas). O público busca vagas de emprego, mutirões de contratação, notícias sobre SINE/PAT, CAGED regional e movimentações de fábricas e empresas que impactam o mercado de trabalho local.",
-  "min_items": 10,
+  "min_items": 999,
   "min_score": 6,
-  "discord_webhook_url": ""
+  "discord_webhook_url": "https://discord.com/api/webhooks/1522058737827975290/l0iL6FhSyliQt1Tl2rueUQzhF-40Qf1u5KXLjesXoXFDZE1y9qu1fXdkuwf9TopQQ4iI"
 }

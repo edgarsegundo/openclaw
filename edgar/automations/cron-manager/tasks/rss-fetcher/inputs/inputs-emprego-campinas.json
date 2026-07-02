@@ -9,6 +9,6 @@
   "max_per_feed": 20,
   "min_score": 0,
   "feeds_js_file": "feeds-emprego-campinas.js",
-  "discord_webhook_url": "https://discord.com/api/webhooks/1522058743251210244/qZh6xZzMlfdXAc6YRijK7Ae2Ol6XZnD4oRtNuDDFDnhaFneoYH6jweip1hvbsZw7u7nF",
+  "discord_webhook_url": "https://discord.com/api/webhooks/1522058737827975290/l0iL6FhSyliQt1Tl2rueUQzhF-40Qf1u5KXLjesXoXFDZE1y9qu1fXdkuwf9TopQQ4iI",
   "ai_filter_prompt": ""
 }
