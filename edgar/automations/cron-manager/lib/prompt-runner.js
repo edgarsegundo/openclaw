@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import { jsonrepair } from "jsonrepair";
 import inquirer from "inquirer";
 import {
   listTemplateNames,
@@ -15,12 +16,16 @@ import logger from "./logger.js";
 function buildClient(provider) {
   if (provider === "openai") {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {throw new Error("OPENAI_API_KEY is not set.");}
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not set.");
+    }
     return new OpenAI({ apiKey });
   }
   if (provider === "perplexity") {
     const apiKey = process.env.PERPLEXITY_API_KEY;
-    if (!apiKey) {throw new Error("PERPLEXITY_API_KEY is not set.");}
+    if (!apiKey) {
+      throw new Error("PERPLEXITY_API_KEY is not set.");
+    }
     return new OpenAI({ apiKey, baseURL: "https://api.perplexity.ai" });
   }
   throw new Error(`Unknown provider: "${provider}". Supported: openai, perplexity.`);
@@ -39,7 +44,37 @@ function buildClient(provider) {
  * Only necessary for modes 'json_object' and 'none'.
  */
 function stripCodeFences(text) {
-  return text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  return text
+    .replace(/^```(?:json)?\s*\n?/i, "")
+    .replace(/\n?```\s*$/i, "")
+    .trim();
+}
+
+/**
+ * Parse JSON from a model response, tolerating the malformed output that
+ * Perplexity sonar/sonar-pro produces in response_format: 'none' mode
+ * (unescaped quotes/newlines inside long string fields like markdownText,
+ * trailing commas, stray code fences).
+ *
+ * Fast path: plain JSON.parse. On failure, retry once through jsonrepair,
+ * which fixes the vast majority of these cases. If repair still fails, the
+ * ORIGINAL parse error is thrown (it points at the real offending position);
+ * the caller logs the full raw response for diagnosis.
+ *
+ * @returns {{ value: unknown, repaired: boolean }}
+ */
+function parseJsonTolerant(text) {
+  try {
+    return { value: JSON.parse(text), repaired: false };
+  } catch (parseErr) {
+    try {
+      return { value: JSON.parse(jsonrepair(text)), repaired: true };
+    } catch {
+      // Surface the original parse error — its position is meaningful for the
+      // raw text; jsonrepair's position refers to a rewritten buffer.
+      throw parseErr;
+    }
+  }
 }
 
 /**
@@ -60,9 +95,18 @@ function resolveResponseFormatMode(options) {
   return "schema";
 }
 const PERPLEXITY_ALLOWED_SCHEMA_KEYS = new Set([
-  "type", "properties", "required", "items",
-  "anyOf", "oneOf", "allOf", "not",
-  "enum", "const", "description", "title",
+  "type",
+  "properties",
+  "required",
+  "items",
+  "anyOf",
+  "oneOf",
+  "allOf",
+  "not",
+  "enum",
+  "const",
+  "description",
+  "title",
 ]);
 
 function sanitizeSchemaForPerplexity(schema) {
@@ -96,17 +140,18 @@ function buildResponseFormat(provider, jsonSchema, mode) {
     if (provider === "perplexity") {
       logger.warn(
         "[prompt-runner] response_format: json_object is not supported by Perplexity " +
-        "(accepted types: text, json_schema, regex). Falling back to 'none'. " +
-        "Update your template config to response_format: none."
+          "(accepted types: text, json_schema, regex). Falling back to 'none'. " +
+          "Update your template config to response_format: none.",
       );
       return null;
     }
     return { type: "json_object" };
   }
   if (mode === "schema" && jsonSchema) {
-    const schema = provider === "perplexity"
-      ? sanitizeSchemaForPerplexity(jsonSchema.schema)
-      : jsonSchema.schema;
+    const schema =
+      provider === "perplexity"
+        ? sanitizeSchemaForPerplexity(jsonSchema.schema)
+        : jsonSchema.schema;
     return {
       type: "json_schema",
       json_schema: { name: jsonSchema.name, schema },
@@ -119,12 +164,25 @@ function buildResponseFormat(provider, jsonSchema, mode) {
  * Call the AI API with optional response_format enforcement.
  * Retries with linear backoff on failure.
  */
-async function callApi({ provider, model, messages, responseFormat, temperature, maxTokens, maxRetries, timeoutMs }) {
+async function callApi({
+  provider,
+  model,
+  messages,
+  responseFormat,
+  temperature,
+  maxTokens,
+  maxRetries,
+  timeoutMs,
+}) {
   const client = buildClient(provider);
   const params = { model, temperature, messages };
   // Only pass max_tokens if explicitly set — omitting lets the model use its full default limit.
-  if (maxTokens != null) {params.max_tokens = maxTokens;}
-  if (responseFormat) {params.response_format = responseFormat;}
+  if (maxTokens != null) {
+    params.max_tokens = maxTokens;
+  }
+  if (responseFormat) {
+    params.response_format = responseFormat;
+  }
 
   let lastErr;
   for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
@@ -147,7 +205,9 @@ async function callApi({ provider, model, messages, responseFormat, temperature,
       lastErr = err;
       if (attempt <= maxRetries) {
         const wait = 1000 * attempt;
-        logger.warn(`[prompt-runner] Attempt ${attempt} failed: ${err.message}. Retrying in ${wait}ms…`);
+        logger.warn(
+          `[prompt-runner] Attempt ${attempt} failed: ${err.message}. Retrying in ${wait}ms…`,
+        );
         await new Promise((r) => setTimeout(r, wait));
       }
     }
@@ -174,7 +234,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (templateNames.length === 0) {
     if (templateOption) {
       throw new Error(
-        `No prompt_templates/ folder found in this task, but --template "${templateOption}" was specified.`
+        `No prompt_templates/ folder found in this task, but --template "${templateOption}" was specified.`,
       );
     }
     return null;
@@ -183,7 +243,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (templateOption) {
     if (!templateNames.includes(templateOption)) {
       throw new Error(
-        `Template "${templateOption}" not found. Available: ${templateNames.join(", ")}`
+        `Template "${templateOption}" not found. Available: ${templateNames.join(", ")}`,
       );
     }
     return templateOption;
@@ -193,7 +253,7 @@ export async function selectTemplate(taskDir, templateOption, mode) {
   if (mode === "cron") {
     throw new Error(
       `Task has prompt templates but --template was not specified. ` +
-        `In cron mode, --template is required. Available: ${templateNames.join(", ")}`
+        `In cron mode, --template is required. Available: ${templateNames.join(", ")}`,
     );
   }
 
@@ -236,15 +296,15 @@ export async function prepareTemplateInputs(templateConfig, mode) {
       }
     }
     if (missing.length > 0) {
-      throw new Error(
-        `Template inputs missing defaults in cron mode: ${missing.join(", ")}`
-      );
+      throw new Error(`Template inputs missing defaults in cron mode: ${missing.join(", ")}`);
     }
     return result;
   }
 
   // Manual mode — no inputs declared
-  if (inputs.length === 0) {return result;}
+  if (inputs.length === 0) {
+    return result;
+  }
 
   const questions = inputs.map((input) => {
     const base = {
@@ -259,8 +319,12 @@ export async function prepareTemplateInputs(templateConfig, mode) {
       ...base,
       type: "input",
       validate(val) {
-        if (!val && input.required) {return "This field is required";}
-        if (input.type === "number" && val && isNaN(Number(val))) {return "Must be a number";}
+        if (!val && input.required) {
+          return "This field is required";
+        }
+        if (input.type === "number" && val && isNaN(Number(val))) {
+          return "Must be a number";
+        }
         return true;
       },
     };
@@ -297,32 +361,31 @@ export async function buildRunPromptFn(
   templateConfig,
   taskInputs,
   preparedTemplateInputs,
-  contextFields
+  contextFields,
 ) {
   const zodSchema = await loadZodSchema(taskDir, templateName);
   const mode = resolveResponseFormatMode(templateConfig.options);
   // jsonSchema is only built for mode='schema'; in other modes Zod still validates after parse.
-  const jsonSchemaForApi = (zodSchema && mode === "schema")
-    ? { name: templateName.replace(/[^a-zA-Z0-9_]/g, "_"), schema: z.toJSONSchema(zodSchema) }
-    : null;
+  const jsonSchemaForApi =
+    zodSchema && mode === "schema"
+      ? { name: templateName.replace(/[^a-zA-Z0-9_]/g, "_"), schema: z.toJSONSchema(zodSchema) }
+      : null;
   const responseFormat = buildResponseFormat(templateConfig.provider, jsonSchemaForApi, mode);
   logger.info(`[prompt-runner] response_format mode: ${mode}`);
 
-  const userPromptText = loadUserPrompt(
-    taskDir,
-    templateName,
-    templateConfig.user_prompt_file
-  );
+  const userPromptText = loadUserPrompt(taskDir, templateName, templateConfig.user_prompt_file);
   const systemPromptRaw = loadSystemPrompt(
     taskDir,
     templateName,
-    templateConfig.system_prompt_file
+    templateConfig.system_prompt_file,
   );
 
   // Collect declared default values from template inputs
   const templateInputDefaults = {};
   for (const input of templateConfig.inputs || []) {
-    if (input.default != null) {templateInputDefaults[input.name] = input.default;}
+    if (input.default != null) {
+      templateInputDefaults[input.name] = input.default;
+    }
   }
 
   return async function runPrompt(extraVars = {}) {
@@ -331,7 +394,7 @@ export async function buildRunPromptFn(
       { ...taskInputs, ...templateInputDefaults, ...contextFields, ...preparedTemplateInputs },
       {},
       {},
-      extraVars
+      extraVars,
     );
 
     const renderedPrompt = renderPrompt(userPromptText, vars);
@@ -340,10 +403,17 @@ export async function buildRunPromptFn(
     const renderedSystem = systemPromptRaw ? renderPrompt(systemPromptRaw, vars) : null;
 
     const messages = [];
-    if (renderedSystem) {messages.push({ role: "system", content: renderedSystem });}
+    if (renderedSystem) {
+      messages.push({ role: "system", content: renderedSystem });
+    }
     messages.push({ role: "user", content: renderedPrompt });
 
-    const { content: rawText, citations, searchResults, usage } = await callApi({
+    const {
+      content: rawText,
+      citations,
+      searchResults,
+      usage,
+    } = await callApi({
       provider: templateConfig.provider,
       model: templateConfig.model,
       messages,
@@ -364,11 +434,19 @@ export async function buildRunPromptFn(
     if (zodSchema) {
       let parsed;
       try {
-        parsed = JSON.parse(textToParse);
+        const { value, repaired } = parseJsonTolerant(textToParse);
+        parsed = value;
+        if (repaired) {
+          logger.warn("[prompt-runner] Response was not valid JSON; recovered via jsonrepair.");
+        }
       } catch (err) {
         // Log full raw text to help diagnose the issue
-        logger.warn(`[prompt-runner] JSON parse failed. Full raw response:\n${rawText}`);
-        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, { cause: err });
+        logger.warn(
+          `[prompt-runner] JSON parse failed (even after repair). Full raw response:\n${rawText}`,
+        );
+        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, {
+          cause: err,
+        });
       }
       artifact = zodSchema.parse(parsed);
     } else {
@@ -376,22 +454,28 @@ export async function buildRunPromptFn(
       const match = textToParse.match(/\{[\s\S]*\}/);
       if (!match) {
         throw new Error(
-          `runPrompt: AI response contained no JSON object. Raw response:\n${rawText.slice(0, 500)}`
+          `runPrompt: AI response contained no JSON object. Raw response:\n${rawText.slice(0, 500)}`,
         );
       }
       try {
-        artifact = JSON.parse(match[0]);
+        const { value, repaired } = parseJsonTolerant(match[0]);
+        artifact = value;
+        if (repaired) {
+          logger.warn("[prompt-runner] Response was not valid JSON; recovered via jsonrepair.");
+        }
       } catch (err) {
-        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, { cause: err });
+        throw new Error(`runPrompt: Failed to parse AI response as JSON: ${err.message}`, {
+          cause: err,
+        });
       }
     }
 
     return {
       artifact,
       // Perplexity (sonar models) only — empty arrays / null for OpenAI
-      citations,      // string[] — URLs das fontes consultadas; [1] no texto → citations[0]
-      searchResults,  // SearchResult[] — { title, url, snippet, date } alinhado 1:1 com citations
-      usage,          // { prompt_tokens, completion_tokens, ... } + cost (Perplexity: usage.cost.total_cost)
+      citations, // string[] — URLs das fontes consultadas; [1] no texto → citations[0]
+      searchResults, // SearchResult[] — { title, url, snippet, date } alinhado 1:1 com citations
+      usage, // { prompt_tokens, completion_tokens, ... } + cost (Perplexity: usage.cost.total_cost)
       template: templateName,
       model: templateConfig.model,
     };
@@ -404,11 +488,7 @@ export async function buildRunPromptFn(
  */
 export function buildDryRunPromptPreview(taskDir, templateName, templateConfig) {
   try {
-    const userPromptText = loadUserPrompt(
-      taskDir,
-      templateName,
-      templateConfig.user_prompt_file
-    );
+    const userPromptText = loadUserPrompt(taskDir, templateName, templateConfig.user_prompt_file);
     // Replace all {{var}} with [var] for readable preview
     const preview = userPromptText.replace(/\{\{(\s*[\w.]+\s*)\}\}/g, (_, k) => `[${k.trim()}]`);
     return preview;
