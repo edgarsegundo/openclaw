@@ -1,15 +1,16 @@
-# ✅ Checklist — novo grupo (canal Discord → RSS → artigo)
+# ✅ Checklist — novo grupo (canal Discord → RSS → artigo publicado)
 
 ## 🎯 Objetivo
 
-Ligar um novo "grupo" (ex: `emprego-campinas`) ponta a ponta: canal no Discord,
-captura de feeds, triagem por IA, comandos `.apr`/`.del`/`.l1`/`.l2`/`.pub` e,
-por fim, publicação no CMS.
+Guia reutilizável para toda vez que você quiser criar um novo "grupo" de
+notícias: canal no Discord, captura de feeds, triagem por IA, comandos
+`.apr`/`.del`/`.l1`/`.l2`/`.pub` e publicação de artigo no site final.
 
-Para os passos de UI do Discord (criar canal, dar permissão, gerar webhook),
-veja primeiro [DISCORD.novo-canal-mesmo-bot.md](./DISCORD.novo-canal-mesmo-bot.md).
-Este documento cobre a parte que falta: como ligar esse canal aos tasks do
-`cron-manager`.
+Use `<slug>` como o identificador do grupo em tudo (ex: `emprego-campinas`).
+Para os passos de UI do Discord (criar canal, permissão, webhook), veja
+primeiro [DISCORD.novo-canal-mesmo-bot.md](./DISCORD.novo-canal-mesmo-bot.md) —
+este documento cobre a parte que liga esse canal aos tasks do `cron-manager`
+e ao CMS.
 
 ---
 
@@ -17,106 +18,137 @@ Este documento cobre a parte que falta: como ligar esse canal aos tasks do
 
 ```text
 nome do canal no Discord (#slug)  ==  "group" nos inputs  ==  sufixo de TODOS os
-inputs-<slug>.json (rss-fetcher, rss-picker, publish-article)
+inputs-<slug>.json (rss-fetcher, rss-picker, write-article, publish-article)
 ```
 
-Isso é forçado pelo código, não é convenção — cada comando resolve o arquivo de
-input a partir do **nome literal do canal**:
+Isso é forçado pelo código, não é convenção — cada comando do Discord resolve
+o arquivo de input a partir do **nome literal do canal**:
 
-- [`commands/apr.js`](../channels/discord/commands/apr.js) → `inputs-${channelName}.json` em `tasks/rss-picker/inputs/`
-- [`commands/del.js`](../channels/discord/commands/del.js) → idem
-- [`commands/l1.js`](../channels/discord/commands/l1.js) → idem
-- [`commands/l2.js`](../channels/discord/commands/l2.js) → `inputs-${channelName}.json` em `tasks/publish-article/inputs/`
-- [`commands/pub.js`](../channels/discord/commands/pub.js) → idem
+- [`commands/apr.js`](../channels/discord/commands/apr.js), [`del.js`](../channels/discord/commands/del.js), [`l1.js`](../channels/discord/commands/l1.js) → `inputs-${channelName}.json` em `tasks/rss-picker/inputs/`
+- [`commands/l2.js`](../channels/discord/commands/l2.js), [`pub.js`](../channels/discord/commands/pub.js) → `inputs-${channelName}.json` em `tasks/publish-article/inputs/`
 
-Se o canal se chama `#emprego-campinas`, o slug tem que ser `emprego-campinas`
-em **todos** os arquivos abaixo — sem maiúsculas, sem `#`, com `-`.
+Se o canal se chama `#emprego-campinas`, o slug é `emprego-campinas` em
+**todos** os arquivos — sem maiúsculas, sem `#`, com `-`.
 
 ---
 
 ## 🗺️ Visão geral do pipeline
 
 ```
-Discord (#slug)
-   │
-   ├─ bots.config.js → autoriza o bot a ouvir esse canal
-   │
+[externo, uma vez por site]
+  microservicesadm (Django) → cria o "business" (business_id) e o "blog topic"
+  (blog_topic_slug) daquele site
+  multi-sites/sites/<site_id>/ (repo fastvistos) → site já implantado, com
+  site-config.ts referenciando o mesmo business_id + domínio
+
+[por grupo/canal, dentro do openclaw]
+Discord (#slug) ── bots.config.js autoriza o bot a ouvir esse canal
    ▼
-rss-fetcher  (feeds-<slug>.js + inputs/inputs-<slug>.json)
-   │  produz artifacts/rss-fetcher/fetched-items-<slug>-<data>.json
+rss-fetcher   (feeds-<slug>.js + inputs/inputs-<slug>.json)
+   │ produz artifacts/rss-fetcher/fetched-items-<slug>-<data>.json
    ▼
-rss-picker   (inputs/inputs-<slug>.json)
-   │  se itens novos >= min_items → chama Sonar (IA) e aprova/rejeita
-   │  se < min_items → só posta no Discord webhook, sem IA
-   │  produz approved-<slug>-<data>.json
+rss-picker    (inputs/inputs-<slug>.json)
+   │ itens novos >= min_items → Sonar (IA) julga e aprova/rejeita
+   │ itens novos <  min_items → só posta no Discord webhook, sem IA
+   │ produz approved-<slug>-<data>.json
    ▼
-comandos no canal: .apr <i> / .del <i> / .l1        (rss-picker)
-   │
+canal: .l1 (listar) / .apr <i> (aprovar manual) / .del <i> (rejeitar manual)
    ▼
-write-article (gera o texto)  →  approved vira artigo salvo
-   │
+write-article (inputs/inputs-<slug>.json)
+   │ lê approved-<slug>-<data>.json, pesquisa (Sonar Pro) e escreve o artigo
+   │ produz artifacts/write-article/<slug>/*.json + *.md
    ▼
-comandos no canal: .l2 / .pub <site_id>             (publish-article)
-   │  precisa de inputs/inputs-<slug>.json com "destinations": [...]
-   │  cada destino precisa de business_id + site_id já cadastrados no CMS
+canal: .l2 (listar artigos prontos) / .pub <site_id> (publicar + indexar)
    ▼
-CMS msitesapp → publica e indexa no Google
+publish-article (inputs/inputs-<slug>.json → "destinations": [...])
+   │ POST /blog-article no msitesapp (precisa blog_topic_slug já existir)
+   │ POST /execute-publish-script <site_id> → deploy do site
+   ▼
+site publicado + indexação no Google
 ```
 
 ---
 
-## ✅ Passo a passo
+## ✅ Parte A — pré-requisitos externos (uma vez por _site_, não por canal)
 
-### 1) Escolher o slug
+Feito **antes** de qualquer arquivo no `openclaw`. Só repete se o site de
+destino ainda não existir.
 
-`kebab-case`, minúsculo, sem espaço. Ex: `emprego-campinas`.
-Esse slug é o `"group"` em todo input e também o nome do canal.
+### A1) Cadastrar o negócio no `microservicesadm`
+
+App Django separado, já em produção (fora do repo `openclaw`). Lá se cria:
+
+- o **business** → gera um `business_id` (UUID)
+- o **blog topic** → define o `blog_topic_slug` usado nas publicações
+
+Anote os dois — são usados no `publish-article` (Parte B, passo 9). Sem o
+blog topic já criado, a publicação falha com 404 ("Blog topic não
+encontrado"): o endpoint `POST /blog-article`
+([`publish-routes.js:34-37`](/Users/edgar/Repos/fastvistos/multi-sites/core/msitesapp/api/publish-routes.js#L34-L37))
+só busca um topic existente, **não cria** um novo.
+
+### A2) Site implantado em `multi-sites/sites/<site_id>/`
+
+No repo `fastvistos/multi-sites`, o site precisa existir em
+`sites/<site_id>/` com um `site-config.ts` referenciando o **mesmo**
+`business_id` do passo A1 e o domínio certo. Exemplo real (`sites/emprego/`):
+
+```ts
+business_id: '47f72bb76ec74a078337e38f54ebc213',  // mesmo UUID de A1, sem os hífens
+domain: 'empregoaqui.com.br',
+```
+
+`site_id` (usado no `.pub <site_id>` e no script de deploy
+`publish-from-vps-v2.sh <site_id>`) é o nome dessa pasta.
+
+---
+
+## ✅ Parte B — passos dentro do `openclaw` (por canal/grupo)
+
+### 1) Escolher o `<slug>`
+
+`kebab-case`, minúsculo, sem espaço. Vira `"group"` em todo input e o nome
+do canal.
 
 ### 2) Discord — criar canal + webhook
 
 Siga [DISCORD.novo-canal-mesmo-bot.md](./DISCORD.novo-canal-mesmo-bot.md):
-criar canal `#<slug>` (sem `#`, com `-`), dar permissão ao bot, criar o
-webhook do canal, copiar o **Channel ID**.
+criar canal `#<slug>`, dar permissão ao bot, criar o webhook do canal, copiar
+o **Channel ID**.
 
-⚠️ O webhook criado aqui vai para o `rss-picker` (passo 5), **não** para o
-`rss-fetcher` — o fetcher nunca lê `discord_webhook_url`.
+⚠️ Esse webhook vai para `rss-picker` (passo 5) e `publish-article` (passo 9) — **não** para `rss-fetcher` (passo 4 ignora esse campo).
 
 ### 3) `bots.config.js` — autorizar o bot a ouvir o canal
 
 Editar [`edgar/channels/discord/bots.config.js`](../channels/discord/bots.config.js):
 
 ```js
-const EMPREGOS_CAMPINAS_CHANNEL_ID = "1522056415102107729"; // Channel ID do passo 2
+const NOVO_SLUG_CHANNEL_ID = "..."; // Channel ID do passo 2
 
 export default [
   {
     name: "FASTVISTOSARTICLES",
     token: process.env.FASTVISTOS_BOT_TOKEN,
-    channels: [VISTO_AMERICANO_CHANNEL_ID, DISNEY_ORLANDO_CHANNEL_ID, EMPREGOS_CAMPINAS_CHANNEL_ID],
+    channels: [/* ...existentes..., */ NOVO_SLUG_CHANNEL_ID],
   },
 ];
 ```
 
-Se o canal não estiver em `channels: [...]`, o bot recebe a mensagem mas
-descarta silenciosamente (`if (channels && !channels.includes(message.channel.id)) return;`
-em [`index.js`](../channels/discord/index.js)).
+Sem estar em `channels: [...]`, o bot recebe a mensagem e descarta
+silenciosamente ([`index.js`](../channels/discord/index.js), checagem
+`channels.includes(message.channel.id)`).
 
-⚠️ **Reiniciar o bot depois de editar este arquivo** (`pm2 restart discord-bot`
-no servidor). Sem restart, a mudança não é lida.
-
-⚠️ **Cuidado com sintaxe.** Esse arquivo é `export default [...]` (ESM, por
-causa do `"type": "module"` no `package.json` do bot). Qualquer erro de
-sintaxe aqui derruba o bot inteiro no boot — e o pm2 fica reiniciando em loop
-sem processar **nenhum** comando, em **nenhum** canal, não só o novo. Se
-`.apr`/`.pub`/etc pararem de responder do nada, o primeiro lugar a olhar é
-`pm2 logs discord-bot --err` procurando `SyntaxError`.
+⚠️ **`node --check edgar/channels/discord/bots.config.js` antes de reiniciar.**
+Um erro de sintaxe aqui derruba o bot inteiro no boot (todos os canais, não
+só o novo) e o pm2 fica reiniciando em loop sem processar nada. Depois de
+editar, sempre `pm2 restart discord-bot` — não há hot-reload.
 
 ### 4) `rss-fetcher` — feeds + input
 
-- Criar `tasks/rss-fetcher/feeds-<slug>.js` exportando `DEFAULT_FEEDS` e
-  `parseCustomFeeds` (contrato descrito em
+- `tasks/rss-fetcher/feeds-<slug>.js` exportando `DEFAULT_FEEDS` e
+  `parseCustomFeeds` (contrato em
   [`prompt-para-criar-feed-file.md`](../automations/cron-manager/tasks/rss-fetcher/prompt-para-criar-feed-file.md)).
-- Criar `tasks/rss-fetcher/inputs/inputs-<slug>.json`:
+- `tasks/rss-fetcher/inputs/inputs-<slug>.json`:
 
 ```json
 {
@@ -132,14 +164,11 @@ sem processar **nenhum** comando, em **nenhum** canal, não só o novo. Se
 }
 ```
 
-`discord_webhook_url` aqui é ignorado pelo código — pode deixar vazio. `group`
-é o que nomeia o artifact (`fetched-items-<slug>-<data>.json`), não precisa
-bater com o nome do canal por código, mas mantenha igual ao slug por
-consistência.
+`discord_webhook_url` aqui não é lido pelo código — deixe vazio.
 
 ### 5) `rss-picker` — input com o webhook de verdade
 
-Criar `tasks/rss-picker/inputs/inputs-<slug>.json`:
+`tasks/rss-picker/inputs/inputs-<slug>.json`:
 
 ```json
 {
@@ -152,43 +181,69 @@ Criar `tasks/rss-picker/inputs/inputs-<slug>.json`:
 }
 ```
 
-- `discord_webhook_url` **é lido aqui** ([`tasks/rss-picker/index.js:42`](../automations/cron-manager/tasks/rss-picker/index.js#L42)) — é este arquivo que precisa do webhook do passo 2.
-- `min_items`: quantos itens novos (não vistos ainda) precisam se acumular
-  para disparar a triagem por IA (Sonar/Perplexity). Abaixo disso, só
-  notifica o Discord com a lista crua, sem gastar com IA
+- `discord_webhook_url` **é lido aqui**
+  ([`index.js:42`](../automations/cron-manager/tasks/rss-picker/index.js#L42)).
+- `min_items`: quantos itens novos precisam se acumular pra chamar o Sonar
+  (IA). Abaixo disso, só notifica o Discord sem gastar com IA
   ([`index.js:211`](../automations/cron-manager/tasks/rss-picker/index.js#L211)).
-  Truque pra testar o fetcher sem acionar IA: setar `min_items` bem alto
-  (ex: `999`) temporariamente.
-- **O nome deste arquivo (`inputs-<slug>.json`) precisa bater com o nome do
-  canal** — é o que os comandos `.apr`/`.del`/`.l1` procuram.
+  Truque pra testar o fetcher sem acionar IA: `min_items` bem alto (ex:
+  `999`) e voltar pro valor normal depois.
+- Nome do arquivo precisa bater com o nome do canal — é o que
+  `.apr`/`.del`/`.l1` procuram.
 
-### 6) `run-<slug>.sh` + cron
+### 6) `run-<slug>.sh` (rss-fetcher + rss-picker) + cron
 
 Copiar um `run-*.sh` existente (ex:
 [`run-visto-americano.sh`](../automations/cron-manager/tasks/rss-fetcher/run-visto-americano.sh)),
-trocar os nomes de lock/log/inputs para `<slug>`. Ele roda `rss-fetcher` e em
-seguida `rss-picker` em sequência. Agendar no cron do servidor:
+trocar lock/log/inputs para `<slug>`. Ele roda `rss-fetcher` e, em seguida,
+`rss-picker`. Cron:
 
 ```cron
 0 8,12,16,22 * * 1-6 flock -n /tmp/rss-fetcher-<slug>.lock timeout 25m /home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/rss-fetcher/run-<slug>.sh >> /tmp/rss-fetcher-<slug>.log 2>&1
 ```
 
-### 7) Testar os comandos no canal
+### 7) Testar `.l1` / `.apr` / `.del` no canal
 
-No canal `#<slug>` do Discord (bot já reiniciado, passo 3):
+No canal `#<slug>` (bot já reiniciado): `.l1` lista pendentes, `.apr <i>`
+aprova, `.del <i>` rejeita. Se nada responder, confira nessa ordem: bot de pé
+(`pm2 logs discord-bot --err`, sem `SyntaxError`) → canal em
+`channels: [...]` → `inputs-<slug>.json` existe em
+`tasks/rss-picker/inputs/` → nome do arquivo bate com `message.channel.name`.
 
-- `.l1` → lista os itens pendentes do dia (lê `rss-picker`)
-- `.apr <i>` → aprova o item de índice `i`
-- `.del <i>` → remove o item de índice `i`
+### 8) `write-article` — gera o texto do artigo
 
-Se não responder nada: confira (nessa ordem) — bot está de pé (`pm2 logs`
-sem `SyntaxError`) → canal está em `channels: [...]` no `bots.config.js` →
-`inputs-<slug>.json` existe em `tasks/rss-picker/inputs/` → nome do arquivo
-bate exatamente com `message.channel.name`.
+⚠️ **Passo fácil de esquecer** — sem ele, `.apr` só marca o item como
+aprovado, mas nenhum artigo é escrito.
 
-### 8) `publish-article` (`.l2` / `.pub <site_id>`) — opcional, quando o site já existir
+`tasks/write-article/inputs/inputs-<slug>.json`:
 
-Criar `tasks/publish-article/inputs/inputs-<slug>.json`:
+```json
+{
+  "group": "<slug>",
+  "rss_picker_file_pattern": "approved-{group}-{date}.json",
+  "current_approved_list_path": "artifacts/rss-picker",
+  "output_dir": "artifacts/write-article",
+  "language": "pt-BR",
+  "blog_context": "mesmo texto usado no rss-picker, pra manter o tom consistente"
+}
+```
+
+E adicionar uma linha em
+[`tasks/write-article/run-write-article.sh`](../automations/cron-manager/tasks/write-article/run-write-article.sh)
+(esse script é compartilhado, roda um `node cron-manager.js run
+write-article ...` por grupo — lista hardcoded, precisa adicionar o novo
+grupo manualmente):
+
+```bash
+node cron-manager.js run write-article --template news --input-file tasks/write-article/inputs/inputs-<slug>.json
+```
+
+Produz `artifacts/write-article/<slug>/*.json` + `*.md` — é o `articles_dir`
+que o `publish-article` (próximo passo) vai ler.
+
+### 9) `publish-article` (`.l2` / `.pub <site_id>`)
+
+`tasks/publish-article/inputs/inputs-<slug>.json`:
 
 ```json
 {
@@ -196,9 +251,9 @@ Criar `tasks/publish-article/inputs/inputs-<slug>.json`:
   "articles_dir": "./artifacts/write-article/<slug>",
   "destinations": [
     {
-      "business_id": "uuid-do-negócio-no-cms",
-      "site_id": "slug-curto-do-site-no-deploy",
-      "blog_topic_slug": "topico-do-blog-no-cms",
+      "business_id": "uuid do passo A1, com hífens",
+      "site_id": "nome da pasta em multi-sites/sites/ (passo A2)",
+      "blog_topic_slug": "slug do blog topic do passo A1",
       "label": "Nome legível",
       "sitemap_url": "https://dominio-do-site.com.br/sitemap-index.xml"
     }
@@ -207,7 +262,7 @@ Criar `tasks/publish-article/inputs/inputs-<slug>.json`:
 }
 ```
 
-Exemplo real (grupo `emprego-campinas`, site EmpregoAqui):
+Exemplo real (`emprego-campinas`, site EmpregoAqui):
 
 ```json
 {
@@ -221,27 +276,14 @@ Exemplo real (grupo `emprego-campinas`, site EmpregoAqui):
       "label": "Emprego Aqui",
       "sitemap_url": "https://empregoaqui.com.br/sitemap-index.xml"
     }
-  ]
+  ],
+  "discord_webhook_url": "https://discord.com/api/webhooks/.../..."
 }
 ```
 
-`business_id` e `site_id` precisam **já existir previamente** no CMS
-multi-tenant (`msitesapp`, repo `fastvistos/multi-sites`) — é o mesmo
-cadastro que já existe pra `fastvistos` e `centraldevistos`.
-
-O cadastro do `business_id` é feito num app Django separado, já em produção,
-chamado **`microservicesadm`** (fora do repo `openclaw`). É lá que se cria o
-"negócio" (business) antes de usar `.pub`/`.l2` para ele. `business_id` é
-depois validado via `BlogService` (`dist/lib/blog-service.js` no
-`msitesapp`), e `site_id` é passado pro script de deploy
-`publish-from-vps-v2.sh <site_id>` — esse site também precisa estar
-implantado nesse sistema.
-
-Exemplo já cadastrado:
-
-```text
-business_id: 47f72bb7-6ec7-4a07-8337-e38f54ebc213   (negócio "emprego" no microservicesadm)
-```
+No canal: `.l2` lista os artigos prontos para publicar; `.pub <site_id>`
+publica todos os artigos `saved` daquele `site_id` e dispara o deploy
+(`execute-publish-script`).
 
 ---
 
@@ -249,11 +291,24 @@ business_id: 47f72bb7-6ec7-4a07-8337-e38f54ebc213   (negócio "emprego" no micro
 
 - `discord_webhook_url` só é lido pelo **rss-picker** e pelo
   **publish-article** — nunca pelo rss-fetcher. Configurar lá não faz nada.
-- `min_items` alto == forma de testar o fetcher sem gastar com Sonar.
-- Nome do canal: sem `#`, com `-`, tudo minúsculo, idêntico ao `<slug>` usado
-  nos nomes de arquivo `inputs-<slug>.json`.
-- Editar `bots.config.js` é sensível a sintaxe — um erro aí derruba o bot
-  inteiro (todos os canais, não só o novo). Sempre `node --check
-edgar/channels/discord/bots.config.js` antes de reiniciar o pm2.
-- Depois de editar `bots.config.js` ou qualquer arquivo em `commands/`,
-  reiniciar o processo (`pm2 restart discord-bot`) — não há hot-reload.
+- `blog_topic_slug` precisa **já existir** no CMS (criado no A1) — o
+  `POST /blog-article` não cria um novo, só busca; se não achar, publica com
+  404 "Blog topic não encontrado".
+- `write-article` é o passo mais fácil de esquecer: sem o
+  `inputs-<slug>.json` dele (e sem adicionar a linha no
+  `run-write-article.sh`), `.apr` funciona, mas nenhum artigo é gerado.
+- `run-write-article.sh` (e o `run-*.sh` do rss-fetcher/rss-picker) são
+  scripts compartilhados com lista hardcoded de grupos — sempre confirmar que
+  o novo grupo foi adicionado neles, não só que os `inputs-*.json` existem.
+- `min_items` alto (ex: `999`) = forma de testar o fetcher sem gastar com
+  Sonar.
+- Nome do canal: sem `#`, com `-`, minúsculo, idêntico ao `<slug>` usado nos
+  `inputs-<slug>.json`.
+- `bots.config.js` é sensível a sintaxe — um erro aí derruba o bot inteiro.
+  Sempre `node --check` antes de reiniciar o pm2, e sempre reiniciar depois
+  de editar `bots.config.js`/`commands/*.js` (sem hot-reload).
+- Pré-requisitos externos (Parte A) moram em **outros repos** que o
+  `openclaw` não controla: `microservicesadm` (Django, business + blog
+  topic) e `multi-sites/sites/<site_id>/` (repo `fastvistos`, site
+  implantado). Sem os dois prontos, os passos 8–9 falham mesmo com tudo
+  certo no `openclaw`.

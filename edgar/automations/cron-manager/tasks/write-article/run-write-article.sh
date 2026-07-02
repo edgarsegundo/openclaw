@@ -15,6 +15,7 @@ trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 echo "[1/1] Rodando write-article..."
 node cron-manager.js run write-article --template news --input-file tasks/write-article/inputs/inputs-visto-americano.json
 node cron-manager.js run write-article --template news --input-file tasks/write-article/inputs/inputs-disney-orlando.json
+node cron-manager.js run write-article --template news --input-file tasks/write-article/inputs/inputs-emprego-campinas.json
 
 echo "✅ Execuções finalizadas com sucesso."
 
