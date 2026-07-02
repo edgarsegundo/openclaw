@@ -1,0 +1,14 @@
+{
+  "group": "emprego-campinas",
+  "language": "pt",
+  "topic": "vagas de emprego Campinas e região",
+  "patterns": "vaga de emprego;vagas de emprego;emprego Campinas;contrata;contratação;mutirão de emprego;SINE Campinas;PAT Campinas;CAGED;carteira assinada;processo seletivo;vaga CLT;emprego Sumaré;emprego Hortolândia;emprego Valinhos;emprego Vinhedo;emprego Paulínia;emprego Indaiatuba;emprego Americana;fábrica contrata;indústria contrata;RH Campinas;estágio Campinas;jovem aprendiz Campinas",
+  "exclude_patterns": "patrocinado;publicidade;horóscopo;famosos;celebridades;novela;futebol;crime;violência;trânsito;concurso de beleza",
+  "feeds": "",
+  "max_items": 30,
+  "max_per_feed": 20,
+  "min_score": 0,
+  "feeds_js_file": "feeds-emprego-campinas.js",
+  "discord_webhook_url": "https://discord.com/api/webhooks/1522058743251210244/qZh6xZzMlfdXAc6YRijK7Ae2Ol6XZnD4oRtNuDDFDnhaFneoYH6jweip1hvbsZw7u7nF",
+  "ai_filter_prompt": ""
+}
