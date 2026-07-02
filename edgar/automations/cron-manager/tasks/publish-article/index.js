@@ -575,6 +575,43 @@ async function findOldest(dir, files) {
 }
 
 /**
+ * Query the CMS meta endpoint to check whether an article already has a main
+ * image set (column `image` on blog_article, exposed as `has_image`).
+ *
+ * Best-effort: returns false on any problem (missing id, CMS down, non-200,
+ * parse error) so the Discord list is never blocked just because image status
+ * couldn't be resolved.
+ */
+async function fetchHasImage(blogArticleId) {
+  if (!blogArticleId) return false;
+  try {
+    const { default: fetch } = await import("node-fetch");
+    const res = await fetch(
+      `${cmsBaseUrl()}/image-editor/articles/${encodeURIComponent(blogArticleId)}/meta/`,
+    );
+    if (!res.ok) return false;
+    const data = await res.json();
+    return Boolean(data?.has_image);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve `has_image` for a list of status entries in parallel.
+ * Returns a Map keyed by entry.index → boolean.
+ */
+async function resolveImageStatus(entries) {
+  const status = new Map();
+  await Promise.all(
+    entries.map(async (entry) => {
+      status.set(entry.index, await fetchHasImage(entry.blog_article_id));
+    }),
+  );
+  return status;
+}
+
+/**
  * Reads and parses a JSON file. Returns null on error.
  */
 async function readJson(filePath) {
@@ -755,7 +792,10 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
   const topicLabel = path.basename(articlesDir);
   const sorted = [...statusData.articles].sort((a, b) => b.index - a.index);
 
-  const header = `📋 Lista de artigos — "${topicLabel}":\n> .pub <site_id> para publicar\n`;
+  // Resolve, in parallel, which articles already have an image set in the CMS.
+  const imageStatus = await resolveImageStatus(sorted);
+
+  const header = `📋 Lista de artigos — "${topicLabel}":\n> .pub <site_id> para publicar · 🖼️ = já tem imagem\n`;
   const continuation = `🔁 Continuação da lista:\n`;
 
   let currentMsg = header;
@@ -763,6 +803,7 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
 
   for (const article of sorted) {
     const statusIcon = article.status === "published" ? "✅" : "💾";
+    const imgIcon = imageStatus.get(article.index) ? "🖼️ " : "   ";
 
     let editLink = "";
     if (article.status !== "published") {
@@ -771,7 +812,7 @@ async function sendFullListToDiscord(statusData, articlesDir, discordWebhookUrl,
     }
 
     const siteLabel = article.site_id ? ` [${article.site_id}]` : "";
-    const line = `\n[${article.index}] ${article.slug}${siteLabel} ${statusIcon}${editLink}`;
+    const line = `\n${imgIcon}[${article.index}] ${article.slug}${siteLabel} ${statusIcon}${editLink}`;
 
     if ((currentMsg + line).length > DISCORD_MSG_MAX_LENGTH) {
       await notifyDiscord(currentMsg, discordWebhookUrl);
