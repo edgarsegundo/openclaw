@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -e
+# Sem `set -e`: cada grupo é publicado de forma independente (ver run_group
+# abaixo). Um grupo que falhe não deve impedir os demais de publicarem.
 
 BASE="/home/ubuntu/openclaw/edgar/automations/cron-manager"
 LOCK_FILE="/tmp/publish-article.lock"
@@ -12,12 +13,28 @@ trap "[ -f '$LOCK_FILE' ] && rm -f '$LOCK_FILE'" EXIT
 [ -f '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/ai-client/.env' | xargs)
 [ -f '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' ] && export $(grep -v '^#' '/home/ubuntu/openclaw/edgar/automations/cron-manager/tasks/publish-article/.env' | xargs)
 
-# Executa publish-article for each input file
-echo "[1/1] Rodando publish-article..."
-node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-visto-americano.json
-node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-disney-orlando.json
+# Publica um grupo. A falha de um grupo é registrada e NÃO aborta os demais.
+run_group() {
+  local input_file="$1"
+  echo "▶ Publicando: $input_file"
+  if ! node cron-manager.js run publish-article --template skip --input-file "$input_file"; then
+    echo "⚠️ Falhou: $input_file (seguindo para o próximo grupo)"
+    failures=$((failures + 1))
+  fi
+}
 
-echo "✅ Execuções finalizadas com sucesso."
+# Executa publish-article para cada arquivo de input
+echo "Rodando publish-article..."
+failures=0
+run_group tasks/publish-article/inputs/inputs-visto-americano.json
+run_group tasks/publish-article/inputs/inputs-disney-orlando.json
+run_group tasks/publish-article/inputs/inputs-emprego-campinas.json
+
+if [ "$failures" -gt 0 ]; then
+  echo "⚠️ Execuções finalizadas com $failures grupo(s) com falha."
+else
+  echo "✅ Execuções finalizadas com sucesso."
+fi
 
 # ============================================================================
 # Como agendar este script no cron:

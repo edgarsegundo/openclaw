@@ -285,6 +285,25 @@ No canal: `.l2` lista os artigos prontos para publicar; `.pub <site_id>`
 publica todos os artigos `saved` daquele `site_id` e dispara o deploy
 (`execute-publish-script`).
 
+### 9b) `run-publish-article.sh` — adicionar o grupo ao cron automático
+
+⚠️ **Passo fácil de esquecer** — sem ele, o `.l2`/`.pub` manuais funcionam,
+mas o grupo **nunca** publica sozinho e **nunca** posta a lista diária
+(`📰 Artigos do dia`) no canal.
+
+Igual ao `run-write-article.sh` (passo 8),
+[`tasks/publish-article/run-publish-article.sh`](../automations/cron-manager/tasks/publish-article/run-publish-article.sh)
+é um script **compartilhado com lista hardcoded de grupos**. Ele roda a Parte 1
+do `publish-article` para cada grupo: pega o artigo mais antigo ainda não
+publicado, faz `POST /blog-article`, move para `published/`, registra no
+`status-<data>.json` e então envia a lista do dia para o webhook do Discord
+([`index.js` Parte 1](../automations/cron-manager/tasks/publish-article/index.js)).
+Sem a linha do grupo aqui, nada disso acontece.
+
+```bash
+node cron-manager.js run publish-article --template skip --input-file tasks/publish-article/inputs/inputs-<slug>.json
+```
+
 ---
 
 ## 🧠 Pegadinhas conhecidas
@@ -297,9 +316,12 @@ publica todos os artigos `saved` daquele `site_id` e dispara o deploy
 - `write-article` é o passo mais fácil de esquecer: sem o
   `inputs-<slug>.json` dele (e sem adicionar a linha no
   `run-write-article.sh`), `.apr` funciona, mas nenhum artigo é gerado.
-- `run-write-article.sh` (e o `run-*.sh` do rss-fetcher/rss-picker) são
-  scripts compartilhados com lista hardcoded de grupos — sempre confirmar que
-  o novo grupo foi adicionado neles, não só que os `inputs-*.json` existem.
+- `run-write-article.sh`, `run-publish-article.sh` (e o `run-*.sh` do
+  rss-fetcher/rss-picker) são scripts compartilhados com lista hardcoded de
+  grupos — sempre confirmar que o novo grupo foi adicionado em **todos** eles,
+  não só que os `inputs-*.json` existem. Esquecer o `run-publish-article.sh` é
+  silencioso: os comandos manuais `.l2`/`.pub` continuam funcionando, mas o
+  grupo nunca publica no cron nem posta a lista diária no Discord.
 - `min_items` alto (ex: `999`) = forma de testar o fetcher sem gastar com
   Sonar.
 - Nome do canal: sem `#`, com `-`, minúsculo, idêntico ao `<slug>` usado nos
