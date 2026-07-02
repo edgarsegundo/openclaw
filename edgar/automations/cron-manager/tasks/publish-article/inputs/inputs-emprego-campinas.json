@@ -1,0 +1,14 @@
+{
+  "group": "emprego-campinas",
+  "articles_dir": "./artifacts/write-article/emprego-campinas",
+  "destinations": [
+    {
+      "business_id": "47f72bb7-6ec7-4a07-8337-e38f54ebc213",
+      "site_id": "emprego",
+      "blog_topic_slug": "noticias-do-mundo-do-trabalho",
+      "label": "Emprego Aqui",
+      "sitemap_url": "https://empregoaqui.com.br/sitemap-index.xml"
+    }
+  ],
+  "discord_webhook_url": "https://discord.com/api/webhooks/1522058737827975290/l0iL6FhSyliQt1Tl2rueUQzhF-40Qf1u5KXLjesXoXFDZE1y9qu1fXdkuwf9TopQQ4iI"
+}
