@@ -3,6 +3,7 @@ initMonitoring();
 
 import fs from "fs";
 import path from "path";
+import * as cheerio from "cheerio";
 import { notifyDiscord } from "../../lib/discord.js";
 import { itemIdFromUrl } from "../../lib/url.js";
 import { writeFileAtomicSync } from "../../lib/atomic.js";
@@ -50,6 +51,56 @@ export default async function (context) {
   }
 
   console.log(`Task: ${taskName} | Mode: ${mode} | ID: ${executionId}`);
+
+  // ── Command: register a manual URL (.url) ────────────────────────────────
+  // Handled BEFORE the fetcher-file load below: a manually-supplied URL must
+  // work even when rss-fetcher never ran for this group today. Behaves like a
+  // manual .apr, but sourced from a URL instead of a fetcher index — reuses the
+  // same approved file, format and dedup as .apr.
+  if (action === "url") {
+    const rawUrl = (inputs.url || "").trim();
+    if (!rawUrl) {
+      console.error("❌ Parâmetro 'url' obrigatório para action=url");
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    fs.mkdirSync(path.resolve("artifacts/rss-picker"), { recursive: true });
+
+    const link = sanitizeGoogleLink(rawUrl);
+    const title =
+      inputs.title && String(inputs.title).trim()
+        ? stripHtmlTags(String(inputs.title).trim())
+        : (await fetchPageTitle(link)) || deriveTitleFromUrl(link);
+
+    const written = appendToApproved(group, today, [
+      {
+        title,
+        link,
+        published: null,
+        source: "manual-url",
+        score: 10,
+        approved_at: new Date().toISOString(),
+      },
+    ]);
+
+    track?.({
+      itemId: itemIdFromUrl(link),
+      group,
+      step: "pick",
+      status: written ? "ok" : "skipped",
+      reason: "manual-url",
+      title,
+      url: link,
+    });
+    flow?.("manual_url", written ? "ok" : "skipped", { title, link });
+    console.log(
+      written
+        ? `✅ URL registrada: "${title}"`
+        : "URL já estava na lista de aprovados (nada a fazer).",
+    );
+    return;
+  }
 
   const minItems = Number(inputs.min_items) || 3;
   const minScore = Number(inputs.min_score) || 7;
@@ -548,6 +599,57 @@ function stripHtmlTags(str = "") {
     .replace(/&gt;/g, ">")
     .replace(/&#39;/g, "'")
     .trim();
+}
+
+/**
+ * Best-effort fetch of a page's title for a manually-registered URL (.url).
+ * Prefers og:title → twitter:title → <title>. Returns null on any failure
+ * (network error, timeout, non-200, no title) so the caller can fall back to a
+ * URL-derived title. Uses the global fetch + cheerio (same as rss-fetcher).
+ */
+async function fetchPageTitle(url) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; OpenClawBot/1.0; +https://openclaw.ai)",
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const $ = cheerio.load(html);
+    const raw =
+      $('meta[property="og:title"]').attr("content") ||
+      $('meta[name="twitter:title"]').attr("content") ||
+      $("title").first().text() ||
+      "";
+    const title = stripHtmlTags(raw);
+    return title || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Derive a human-ish title from a URL's last path segment. Used only when no
+ * title was provided and the page title could not be fetched, guaranteeing a
+ * non-empty title (write-article requires one). Falls back to the hostname.
+ */
+function deriveTitleFromUrl(url) {
+  try {
+    const parsed = new URL(url);
+    const segment = parsed.pathname.split("/").filter(Boolean).pop() || "";
+    const cleaned = decodeURIComponent(segment)
+      .replace(/\.[a-z0-9]{1,6}$/i, "") // drop file extension (.html, .ghtml…)
+      .replace(/[-_]+/g, " ")
+      .trim();
+    if (cleaned) {
+      return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+    return parsed.hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
 }
 
 /**

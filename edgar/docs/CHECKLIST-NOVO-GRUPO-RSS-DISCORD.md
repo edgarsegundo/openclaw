@@ -4,7 +4,7 @@
 
 Guia reutilizável para toda vez que você quiser criar um novo "grupo" de
 notícias: canal no Discord, captura de feeds, triagem por IA, comandos
-`.apr`/`.del`/`.l1`/`.l2`/`.pub` e publicação de artigo no site final.
+`.apr`/`.del`/`.l1`/`.l2`/`.pub`/`.url` e publicação de artigo no site final.
 
 Use `<slug>` como o identificador do grupo em tudo (ex: `emprego-campinas`).
 Para os passos de UI do Discord (criar canal, permissão, webhook), veja
@@ -209,6 +209,20 @@ aprova, `.del <i>` rejeita. Se nada responder, confira nessa ordem: bot de pé
 (`pm2 logs discord-bot --err`, sem `SyntaxError`) → canal em
 `channels: [...]` → `inputs-<slug>.json` existe em
 `tasks/rss-picker/inputs/` → nome do arquivo bate com `message.channel.name`.
+
+#### `.url <url> [título opcional]` — registrar uma notícia manual
+
+Atalho para quando você **acha uma URL** e quer gerar o artigo sem esperar o
+feed capturar. Funciona como o `.apr`, mas por URL: registra a notícia direto no
+`approved-<slug>-<data>.json` (mesmo arquivo/formato/dedup do `.apr`), e o
+`write-article` gera no próximo ciclo. Reusa o mesmo `inputs-<slug>.json` do
+`rss-picker` que todo grupo já tem — nenhum setup extra por grupo.
+
+- `.url https://site.com/noticia` → busca o `og:title`/`<title>` da página como
+  título de referência (fallback: deriva do slug da URL se a busca falhar).
+- `.url https://site.com/noticia Meu título` → usa o título que você passar.
+- Pula o `rss-fetcher` inteiro; não aparece em `.l1` (o item nunca esteve na
+  lista do fetcher).
 
 ### 8) `write-article` — gera o texto do artigo
 
