@@ -20,6 +20,7 @@ import {
   getBadFeeds,
   getAiCostsByGroup,
   getAiCostsTimeline,
+  getRecentItems,
   wipeAll,
   pruneOlderThan,
 } from "../../lib/db.js";
@@ -167,6 +168,13 @@ const server = http.createServer(async (req, res) => {
         favoritesOnly,
       });
       return sendJson(res, { items, total, page, pageSize });
+    }
+    // Newest N items (optionally scoped to one group) with the fields needed to
+    // build an export for an external AI: title, url, source group, comment.
+    if (route === "/api/recent-items") {
+      const group = url.searchParams.get("group") || null;
+      const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 50));
+      return sendJson(res, getRecentItems(group, limit));
     }
     if (route === "/api/item/favorite" && req.method === "POST") {
       const body = JSON.parse(await readBody(req));

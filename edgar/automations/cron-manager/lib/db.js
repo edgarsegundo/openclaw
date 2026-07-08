@@ -289,6 +289,34 @@ export function getItemsByGroup(
 }
 
 /**
+ * Get the N most recent items (newest first) for a group, or across all
+ * groups when group_name is null. Returns the fields needed to build an
+ * export for an external AI: title, url, source group, comment.
+ */
+export function getRecentItems(group_name, limit = 50) {
+  const db = initDb();
+  const where = [];
+  const params = [];
+  if (group_name) {
+    where.push("s.group_name = ?");
+    params.push(group_name);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  return db
+    .prepare(`
+      SELECT s.item_id, s.group_name, s.current_step, s.current_status,
+             s.favorite, s.comment, s.updated_at,
+             i.title, i.url, i.first_seen
+      FROM item_state s
+      LEFT JOIN pipeline_items i ON i.item_id = s.item_id AND i.group_name = s.group_name
+      ${whereSql}
+      ORDER BY s.updated_at DESC
+      LIMIT ?
+    `)
+    .all(...params, limit);
+}
+
+/**
  * Set (or clear) the favorite flag on a single item's state row.
  * Returns true if a row was updated.
  */

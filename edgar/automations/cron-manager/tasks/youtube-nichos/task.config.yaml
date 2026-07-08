@@ -1,0 +1,63 @@
+schema_version: 1
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+name: "youtube-nichos"
+description: "Estima quantos vídeos foram publicados por nicho nos últimos N dias (YouTube Data API)"
+author: ""
+created_at: "2026-07-08"
+tags: ["youtube", "research", "python"]
+
+# ── Execution control ─────────────────────────────────────────────────────────
+allow_manual: true
+allow_cron: true
+
+cron_suggestion: ""
+
+entrypoint: uv run main.py  # via index.js bridge
+working_dir: ./tasks/youtube-nichos
+
+# ── Limits ────────────────────────────────────────────────────────────────────
+timeout_seconds: 120
+
+retry:
+  max_retries: 0
+  delay_seconds: 5
+  backoff: linear
+
+# ── Environment variables ─────────────────────────────────────────────────────
+# Loaded (low → high priority) from:
+#   ai-client/.env → cron-manager/.env → tasks/youtube-nichos/.env → shell env
+# and inherited by the Python subprocess via os.environ.
+env_vars:
+  common:
+    - name: YOUTUBE_API_KEY
+      required: true
+      help_tip: YouTube Data API v3 key (Google Cloud Console → APIs & Services → Credentials)
+  manual: []
+  cron: []
+
+# ── Inputs ────────────────────────────────────────────────────────────────────
+# Available in main.py via payload["inputs"].
+inputs:
+  - name: nichos
+    type: string
+    required: false
+    default: "curso de excel, curso de inteligência artificial, curso de guitarra, guitarra intensiva, receita de bolo recheado, bolos recheados"
+    help_tip: Lista de termos separados por vírgula
+  - name: days
+    type: number
+    required: false
+    default: 30
+    help_tip: Janela em dias (vídeos publicados nos últimos N dias)
+  - name: max_results
+    type: number
+    required: false
+    default: 5
+    help_tip: Tamanho da página da busca (o total vem em pageInfo.totalResults)
+
+# ── Artifacts ─────────────────────────────────────────────────────────────────
+# main.py emits a result via emit_result(); index.js saves it here.
+artifacts:
+  - name: result
+    description: Estimativa de vídeos por nicho na janela informada
+    path: result.json

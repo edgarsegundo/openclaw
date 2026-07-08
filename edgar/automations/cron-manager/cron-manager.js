@@ -58,6 +58,16 @@ program
     // Interactive prompts
     const answers = await inquirer.prompt([
       {
+        type: "list",
+        name: "runtime",
+        message: "Runtime:",
+        default: "node",
+        choices: [
+          { name: "Node.js (index.js runs in-process)", value: "node" },
+          { name: "Python (index.js bridges to main.py via uv)", value: "python" },
+        ],
+      },
+      {
         type: "input",
         name: "description",
         message: "Description (optional):",
@@ -91,13 +101,14 @@ program
         name: "includePromptTemplate",
         message: "Include prompt template scaffold? (AI structured output with runPrompt)",
         default: false,
+        when: (ans) => ans.runtime === "node",
       },
       {
         type: "input",
         name: "templateName",
         message: "Prompt template name:",
         default: "my-template",
-        when: (ans) => ans.includePromptTemplate,
+        when: (ans) => ans.runtime === "node" && ans.includePromptTemplate,
         validate(val) {
           if (!val || !val.trim()) return "Template name cannot be empty.";
           if (!/^[a-z0-9-]+$/.test(val.trim()))
@@ -107,9 +118,18 @@ program
       },
     ]);
 
-    // Read templates
+    const isPython = answers.runtime === "python";
+
+    // The runner always imports index.js in-process, so task.config.yaml is
+    // identical for both runtimes. Python tasks add a main.py and use a bridge
+    // index.js (templates/python/index.js) instead of the default one.
     const yamlTemplate = fs.readFileSync(path.join(TEMPLATES_DIR, "task.config.yaml"), "utf8");
-    const jsTemplate = fs.readFileSync(path.join(TEMPLATES_DIR, "index.js"), "utf8");
+    const jsTemplate = fs.readFileSync(
+      isPython
+        ? path.join(TEMPLATES_DIR, "python", "index.js")
+        : path.join(TEMPLATES_DIR, "index.js"),
+      "utf8",
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const templateName = answers.templateName?.trim() ?? "my-template";
@@ -121,7 +141,13 @@ program
       .replace(/\{\{DATE\}\}/g, today)
       .replace(/\{\{ALLOW_MANUAL\}\}/g, String(answers.allowManual))
       .replace(/\{\{ALLOW_CRON\}\}/g, String(answers.allowCron))
-      .replace(/\{\{CRON_SUGGESTION\}\}/g, answers.cronExpression);
+      .replace(/\{\{CRON_SUGGESTION\}\}/g, answers.cronExpression)
+      .replace(
+        /^entrypoint: .*$/m,
+        isPython
+          ? "entrypoint: uv run main.py  # via index.js bridge"
+          : "entrypoint: node index.js",
+      );
 
     const jsContent = jsTemplate
       .replace(/\{\{NAME\}\}/g, name)
@@ -132,7 +158,14 @@ program
     fs.writeFileSync(path.join(taskDir, "task.config.yaml"), yamlContent, "utf8");
     fs.writeFileSync(path.join(taskDir, "index.js"), jsContent, "utf8");
 
-    // Optionally scaffold prompt template
+    // Python runtime: scaffold the main.py entry script (PEP 723 inline deps)
+    if (isPython) {
+      const pyTemplate = fs.readFileSync(path.join(TEMPLATES_DIR, "python", "main.py"), "utf8");
+      const pyContent = pyTemplate.replace(/\{\{NAME\}\}/g, name);
+      fs.writeFileSync(path.join(taskDir, "main.py"), pyContent, "utf8");
+    }
+
+    // Optionally scaffold prompt template (Node runtime only)
     if (answers.includePromptTemplate) {
       const srcTemplateDir = path.join(TEMPLATES_DIR, "prompt_templates", "my-template");
       const destTemplateDir = path.join(taskDir, "prompt_templates", templateName);
@@ -147,10 +180,13 @@ program
       }
     }
 
-    logger.success(`Task created: ${name}`);
+    logger.success(`Task created: ${name} (${answers.runtime})`);
     console.log();
     logger.step(`tasks/${name}/task.config.yaml`);
     logger.step(`tasks/${name}/index.js`);
+    if (isPython) {
+      logger.step(`tasks/${name}/main.py`);
+    }
     if (answers.includePromptTemplate) {
       logger.step(`tasks/${name}/prompt_templates/${templateName}/prompt.template.config.yaml`);
       logger.step(`tasks/${name}/prompt_templates/${templateName}/system.md`);

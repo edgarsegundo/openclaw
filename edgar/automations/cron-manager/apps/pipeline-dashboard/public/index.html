@@ -171,6 +171,7 @@
       <span class="muted" id="lastUpdate"></span>
       <button id="inputsBtn" title="Editar arquivos de inputs dos grupos">⚙️ Inputs</button>
       <button id="pruneBtn" class="danger-soft" title="Remove eventos/runs com mais de 7 dias">🧹 Limpar &gt;7d</button>
+      <button id="exportBtn" title="Exportar os itens mais recentes (título, URL, fonte, comentário) para colar numa IA">📤 Exportar p/ IA</button>
       <button id="wipeBtn" class="danger">🗑️ Zerar banco</button>
     </header>
 
@@ -307,6 +308,44 @@
         <div class="inputs-modal-footer">
           <button onclick="closeCommentModal()">Cancelar</button>
           <button id="commentSaveBtn" onclick="saveComment()" style="background:var(--accent);border-color:var(--accent);color:#fff">💾 Salvar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="inputs-overlay" id="exportOverlay">
+      <div class="inputs-modal" style="max-width:640px">
+        <button class="close" onclick="closeExportModal()">✕ fechar</button>
+        <h2 style="margin:0 0 4px;font-size:15px">📤 Exportar itens para IA</h2>
+        <div class="muted" style="font-size:12px;margin-bottom:14px">
+          Extrai os itens mais recentes (título, URL, fonte e comentário) do grupo
+          selecionado — ou de todos os grupos — para você colar numa IA e pedir insights.
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div class="inputs-field" style="margin-bottom:0;flex:0 0 130px">
+            <label>Quantidade</label>
+            <input type="number" id="exportCount" min="1" max="500" value="30" />
+          </div>
+          <div class="inputs-field" style="margin-bottom:0;flex:1">
+            <label>Formato</label>
+            <select id="exportFormat">
+              <option value="md" selected>Markdown (recomendado)</option>
+              <option value="json">JSON</option>
+            </select>
+          </div>
+          <button id="exportGenBtn" onclick="generateExport()"
+            style="background:var(--accent);border-color:var(--accent);color:#fff;height:35px">⚙️ Gerar</button>
+        </div>
+        <div class="muted" id="exportScope" style="font-size:11px;margin-top:6px"></div>
+
+        <div id="exportResultArea" style="display:none;margin-top:16px">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <span class="muted" id="exportSummary" style="font-size:12px;flex:1"></span>
+            <button id="exportCopyBtn" onclick="copyExport(this)">📋 Copiar</button>
+            <button id="exportDownloadBtn" onclick="downloadExport()">⬇️ Baixar</button>
+          </div>
+          <textarea id="exportOutput" readonly rows="14"
+            style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;resize:vertical"></textarea>
         </div>
       </div>
     </div>
@@ -1273,6 +1312,130 @@
       $("inputsFileSelect").addEventListener("change", (e) => loadInputsFile(e.target.value));
       $("aiCostsPeriodSel").addEventListener("change", loadAiCosts);
       $("aiCostsGranSel").addEventListener("change", loadAiCosts);
+
+      // ── Exportar itens para IA ─────────────────────────────────────────────────
+      let _exportContent = "";
+      let _exportFilename = "itens.md";
+
+      function sourceFromUrl(u) {
+        if (!u) return "";
+        try {
+          return new URL(u).hostname.replace(/^www\./, "");
+        } catch {
+          return "";
+        }
+      }
+
+      function buildExportMd(items, scope) {
+        const when = new Date().toLocaleString("pt-BR");
+        const lines = [
+          `# Itens recentes — ${scope} (${items.length} ${items.length === 1 ? "item" : "itens"})`,
+          `_Exportado em ${when}_`,
+          "",
+        ];
+        items.forEach((it, idx) => {
+          const src = sourceFromUrl(it.url);
+          const cmt = (it.comment || "").trim();
+          lines.push(`## ${idx + 1}. ${it.title || it.item_id}`);
+          if (it.url) lines.push(`- **URL:** ${it.url}`);
+          lines.push(`- **Fonte:** ${src || "—"}`);
+          lines.push(`- **Grupo:** ${it.group_name}`);
+          lines.push(`- **Comentário:** ${cmt || "—"}`);
+          lines.push("");
+        });
+        return lines.join("\n");
+      }
+
+      function buildExportJson(items) {
+        return JSON.stringify(
+          items.map((it) => ({
+            title: it.title || it.item_id,
+            url: it.url || null,
+            source: sourceFromUrl(it.url) || null,
+            group: it.group_name,
+            comment: (it.comment || "").trim() || null,
+            status: it.current_status,
+            updated_at: it.updated_at,
+          })),
+          null,
+          2,
+        );
+      }
+
+      window.openExportModal = () => {
+        $("exportResultArea").style.display = "none";
+        $("exportScope").textContent = currentGroup
+          ? `Escopo: grupo "${currentGroup}"`
+          : "Escopo: todos os grupos (nenhum grupo selecionado)";
+        $("exportOverlay").classList.add("open");
+        $("exportCount").focus();
+      };
+      window.closeExportModal = () => $("exportOverlay").classList.remove("open");
+
+      window.generateExport = async () => {
+        const count = Math.min(500, Math.max(1, Number($("exportCount").value) || 30));
+        const format = $("exportFormat").value;
+        const btn = $("exportGenBtn");
+        btn.disabled = true;
+        btn.textContent = "⏳";
+        try {
+          const params = new URLSearchParams({ limit: String(count) });
+          if (currentGroup) params.set("group", currentGroup);
+          const items = await api(`/api/recent-items?${params.toString()}`);
+          if (!items.length) {
+            alert("Nenhum item encontrado para exportar.");
+            return;
+          }
+          const scope = currentGroup || "todos os grupos";
+          const stamp = new Date().toISOString().slice(0, 10);
+          const slug = (currentGroup || "todos").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+          if (format === "json") {
+            _exportContent = buildExportJson(items);
+            _exportFilename = `itens-${slug}-${stamp}.json`;
+          } else {
+            _exportContent = buildExportMd(items, scope);
+            _exportFilename = `itens-${slug}-${stamp}.md`;
+          }
+          $("exportSummary").textContent = `${items.length} item(ns) · ${_exportFilename}`;
+          $("exportOutput").value = _exportContent;
+          $("exportResultArea").style.display = "block";
+        } catch (e) {
+          alert("Erro ao gerar exportação: " + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "⚙️ Gerar";
+        }
+      };
+
+      window.copyExport = async (btn) => {
+        if (!_exportContent) return;
+        const orig = btn.textContent;
+        try {
+          await copyToClipboard(_exportContent);
+          btn.textContent = "✓ Copiado";
+          setTimeout(() => (btn.textContent = orig), 1500);
+        } catch (e) {
+          alert("Erro ao copiar: " + e.message);
+        }
+      };
+
+      window.downloadExport = () => {
+        if (!_exportContent) return;
+        const type = _exportFilename.endsWith(".json") ? "application/json" : "text/markdown";
+        const blob = new Blob([_exportContent], { type: `${type};charset=utf-8` });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = _exportFilename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      };
+
+      $("exportBtn").addEventListener("click", openExportModal);
+      $("exportOverlay").addEventListener("click", (e) => {
+        if (e.target.id === "exportOverlay") closeExportModal();
+      });
 
       $("wipeBtn").addEventListener("click", async () => {
         if (!confirm("Zerar TODO o banco de tracking (itens, eventos, estados e runs)?\n\nIsso apaga todo o histórico. Não dá pra desfazer.")) return;
