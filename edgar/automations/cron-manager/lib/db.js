@@ -293,13 +293,16 @@ export function getItemsByGroup(
  * groups when group_name is null. Returns the fields needed to build an
  * export for an external AI: title, url, source group, comment.
  */
-export function getRecentItems(group_name, limit = 50) {
+export function getRecentItems(group_name, limit = 50, { withCommentsOnly = false } = {}) {
   const db = initDb();
   const where = [];
   const params = [];
   if (group_name) {
     where.push("s.group_name = ?");
     params.push(group_name);
+  }
+  if (withCommentsOnly) {
+    where.push("TRIM(COALESCE(s.comment, '')) <> ''");
   }
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
   return db

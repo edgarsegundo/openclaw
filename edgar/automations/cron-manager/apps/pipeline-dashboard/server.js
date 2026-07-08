@@ -174,7 +174,8 @@ const server = http.createServer(async (req, res) => {
     if (route === "/api/recent-items") {
       const group = url.searchParams.get("group") || null;
       const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 50));
-      return sendJson(res, getRecentItems(group, limit));
+      const withCommentsOnly = url.searchParams.get("comments") === "1";
+      return sendJson(res, getRecentItems(group, limit, { withCommentsOnly }));
     }
     if (route === "/api/item/favorite" && req.method === "POST") {
       const body = JSON.parse(await readBody(req));

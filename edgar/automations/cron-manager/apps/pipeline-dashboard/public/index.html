@@ -336,6 +336,10 @@
           <button id="exportGenBtn" onclick="generateExport()"
             style="background:var(--accent);border-color:var(--accent);color:#fff;height:35px">⚙️ Gerar</button>
         </div>
+        <label class="muted" style="display:flex;align-items:center;gap:6px;font-size:12px;margin-top:12px;cursor:pointer">
+          <input type="checkbox" id="exportCommentsOnly" checked />
+          Somente itens com comentário (exclui os sem comentário)
+        </label>
         <div class="muted" id="exportScope" style="font-size:11px;margin-top:6px"></div>
 
         <div id="exportResultArea" style="display:none;margin-top:16px">
@@ -1381,9 +1385,14 @@
         try {
           const params = new URLSearchParams({ limit: String(count) });
           if (currentGroup) params.set("group", currentGroup);
+          if ($("exportCommentsOnly").checked) params.set("comments", "1");
           const items = await api(`/api/recent-items?${params.toString()}`);
           if (!items.length) {
-            alert("Nenhum item encontrado para exportar.");
+            alert(
+              $("exportCommentsOnly").checked
+                ? "Nenhum item com comentário encontrado para exportar."
+                : "Nenhum item encontrado para exportar.",
+            );
             return;
           }
           const scope = currentGroup || "todos os grupos";
