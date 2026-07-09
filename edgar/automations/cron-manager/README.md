@@ -44,6 +44,11 @@ cron-manager export-logs <task> --format csv --output runs.csv
 
 ## Creating a task
 
+> ⚠️ Esta seção e a "task.config.yaml reference" / "task index.js reference"
+> abaixo descrevem uma arquitetura antiga (module.exports, allow_scheduled,
+> pasta `commands/`) e estão desatualizadas. Guia atual, com Node.js **e**
+> Python: [README-how-to-create-a-task.md](README-how-to-create-a-task.md).
+
 ```bash
 cron-manager create-task my-task
 ```

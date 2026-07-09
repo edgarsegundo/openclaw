@@ -41,9 +41,15 @@ Cron:     Linux cron → node cron-manager.js run my-task --mode cron → defaul
 
 ## Modelo de execução: chamada direta
 
-A task é importada e chamada **no mesmo processo** (sem child_process.spawn).
+A task é importada e chamada **no mesmo processo** (sem child_process.spawn no runner).
 
 Justificativa: o cron-manager é one-shot. Se a task travar ou crashar, o processo morre — e o cron do Linux criará um novo na próxima execução. Timeout é garantido via `Promise.race`.
+
+> **Exceção — tasks Python**: o runner sempre importa `index.js` no mesmo processo,
+> como acima. Para rodar lógica em Python, o **próprio `index.js` da task** (não o
+> runner) dá `spawn` de `uv run main.py` via `lib/py-bridge.js`. O timeout/retry do
+> runner seguem envolvendo essa chamada normalmente. Veja
+> [README-how-to-create-a-task.md](README-how-to-create-a-task.md).
 
 ---
 
