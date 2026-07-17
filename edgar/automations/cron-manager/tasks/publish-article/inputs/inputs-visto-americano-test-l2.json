@@ -3,12 +3,6 @@
   "articles_dir": "./artifacts/write-article/visto-americano",
   "destinations": [
     {
-      "business_id": "3cfe8493-907c-4884-80f5-5c9ee10f8c05",
-      "blog_topic_slug": "noticias-central",
-      "label": "Central de Vistos",
-      "sitemap_url": "https://centraldevistos.com/sitemap-index.xml"
-    },
-    {
       "business_id": "41a5c7f9-5e92-4d54-b120-ab9a0e1843c8",
       "blog_topic_slug": "noticias-fast",
       "label": "Fast Vistos",
