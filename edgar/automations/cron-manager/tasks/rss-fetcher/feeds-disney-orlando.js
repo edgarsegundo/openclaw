@@ -20,47 +20,38 @@ export const DEFAULT_FEEDS = [
     name: 'Google Alerts - "Disney Orlando"',
     lang: "pt",
     category: "general",
-    type: "rss"
+    type: "rss",
   },
 
   {
     url: "https://g1.globo.com/tudo-sobre/walt-disney-world/",
-    name: 'G1 - Walt Disney World',
+    name: "G1 - Walt Disney World",
     lang: "pt",
     category: "general",
     type: "scraper",
     scrap_layout_tips: {
       link_selector: "a.feed-post-link",
-    }
+    },
   },
 
   {
-    url: "https://www.bbc.com/portuguese",
-    name: 'BBC - Portuguese',
+    url: "https://www.melhoresdestinos.com.br/feed",
+    name: "Melhores Destinos",
     lang: "pt",
     category: "general",
-    type: "scraper"
-  },  
-
-  {
-    url: "https://gauchazh.clicrbs.com.br/ultimas-noticias/tag/visto-americano/",
-    name: 'Gauchazh - Visto Americano',
-    lang: "pt",
-    category: "general",
-    type: "scraper",
+    type: "rss",
   },
 
   {
-    url: "https://exame.com/noticias-sobre/visto-eua/",
-    name: 'Exame - Visto EUA',
+    url: "https://brasilturis.com.br/category/noticias/atracoes-turisticas/",
+    name: "Brasilturis - Atrações Turísticas",
     lang: "pt",
     category: "general",
     type: "scraper",
     scrap_layout_tips: {
-      link_selector: "a.touch-area",
-    }
+      link_selector: "h3.entry-title a",
+    },
   },
-
 ];
 
 /**

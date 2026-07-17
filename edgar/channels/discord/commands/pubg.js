@@ -52,7 +52,12 @@ export default {
         );
       }
 
-      // Executa publish-article para cada grupo encontrado
+      // Executa publish-article para cada grupo encontrado.
+      // publish-article pode falhar num passo interno (ex: execute-publish-script)
+      // e ainda assim sair com código 0 — ele mesmo notifica o Discord nesse caso
+      // em vez de lançar erro. Por isso o resultado aqui não afirma sucesso/falha
+      // de publicação, só se o comando rodou até o fim sem crash; o resultado real
+      // de cada grupo chega via o webhook Discord próprio daquele grupo.
       const results = [];
       for (const { file, group } of matchingFiles) {
         const filePath = path.join(inputsDir, file);
@@ -74,7 +79,7 @@ export default {
               else resolve();
             });
           });
-          results.push({ group, status: "✅" });
+          results.push({ group, status: "▶️" });
         } catch (err) {
           console.error(`Erro ao publicar grupo '${group}':`, err.message);
           results.push({ group, status: "❌" });
@@ -83,13 +88,17 @@ export default {
         }
       }
 
-      // Monta resumo dos resultados
+      // Monta resumo dos resultados.
+      // "▶️" = comando rodou sem crash (não garante que a publicação em si deu certo,
+      // veja o webhook Discord do grupo para o resultado real).
+      // "❌" = o comando em si falhou (erro de execução, não de publicação).
       const summary = results.map((r) => `${r.status} ${r.group}`).join("\n");
-      const successCount = results.filter((r) => r.status === "✅").length;
+      const crashCount = results.filter((r) => r.status === "❌").length;
 
       await message.reply(
-        `**Publicação Global Concluída**\n\`\`\`\n${summary}\n\`\`\`\n` +
-          `✅ ${successCount}/${results.length} grupo(s) processado(s) com sucesso.`,
+        `**Publicação Global Disparada**\n\`\`\`\n${summary}\n\`\`\`\n` +
+          `${crashCount > 0 ? `⚠️ ${crashCount} grupo(s) falharam ao executar. ` : ""}` +
+          `Resultado real de cada grupo chega no webhook Discord dele.`,
       );
 
       console.log(`✅ Comando .pub* ${siteId} executado com sucesso.`);
