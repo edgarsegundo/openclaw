@@ -21,6 +21,20 @@ function cmsBaseUrl() {
 }
 
 /**
+ * Today's calendar date in America/Sao_Paulo (business timezone), as YYYY-MM-DD.
+ *
+ * `new Date().toISOString()` is UTC, which is 3h ahead of Brasília — from 21:00
+ * BRT onward it already reports tomorrow's date. Part 1 (cron, writes
+ * status-<date>.json) and Part 2/.l2 (Discord commands, read it) run at
+ * different times, so a UTC-based "today" desyncs them right at that boundary:
+ * articles saved earlier in the Brazilian day land in status-<X>.json, but a
+ * command run after 21:00 BRT computes today as X+1 and finds nothing.
+ */
+function todayBr() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+}
+
+/**
  * publish-article task
  *
  * Operates in two parts:
@@ -87,7 +101,7 @@ export default async function (context) {
     throw new Error("Missing required input: destinations (must be a non-empty array)");
   }
 
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = todayBr();
   const publishedDir = path.join(articlesDir, "published");
   await fs.mkdir(publishedDir, { recursive: true });
 
