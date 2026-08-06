@@ -10,6 +10,18 @@ import { writeFileAtomic } from "../../lib/atomic.js";
 
 initMonitoring();
 
+/**
+ * True when the CMS rejected the POST because an article with this
+ * slug+business_id already exists (Prisma P2002 on
+ * blogging2_blogarticle_slug_business_id_737618b5_uniq). This happens when a
+ * prior run's POST succeeded but the file was never moved to published/
+ * (e.g. crash between the POST and the fs.rename) — retrying is pointless
+ * since the CMS will always reject the same slug again.
+ */
+function isDuplicateSlugError(body) {
+  return typeof body === "string" && body.includes("blogarticle_slug_business_id");
+}
+
 /** Resolve the stable item id for an article JSON (falls back to its source link). */
 function resolveItemId(json) {
   return json?.item_id ?? (json?.reference_link ? itemIdFromUrl(json.reference_link) : null);
@@ -349,6 +361,39 @@ export default async function (context) {
 
   const apiResult = await postArticle(payload, apiKey);
   if (!apiResult || apiResult.error) {
+    // Duplicate slug: the CMS already has this article from a prior run that
+    // never got to move the file into published/. Retrying would just fail
+    // the same way forever and permanently wedge the queue on this file
+    // (findOldest always re-selects it). Archive it instead so the next
+    // article can be picked up.
+    if (isDuplicateSlugError(apiResult?.body)) {
+      console.warn(
+        `⚠️ Slug "${slug}" already exists in CMS for this business (stale local file). Archiving without re-posting.`,
+      );
+      const archivedJsonPath = path.join(publishedDir, `${slug}-${today}.json`);
+      const archivedMdPath = path.join(publishedDir, `${slug}-${today}.md`);
+      await fs.rename(jsonPath, archivedJsonPath);
+      if (await fileExists(mdPath)) {
+        await fs.rename(mdPath, archivedMdPath);
+      }
+      track?.({
+        itemId,
+        group,
+        step: "publish",
+        status: "skipped",
+        reason: "duplicate_slug_archived",
+        url: json.reference_link,
+        meta: { slug, site_id: destination.site_id ?? null },
+      });
+      flow?.(
+        "post_cms",
+        "skipped",
+        { slug, site_id: destination.site_id ?? null },
+        { reason: "duplicate_slug_archived" },
+      );
+      return;
+    }
+
     // Part 1 failed — no Discord notification
     console.error("POST failed. Article will not be moved to published/.");
     console.error(`Error status: ${apiResult ? apiResult.status : "N/A"}`);
@@ -691,7 +736,7 @@ async function postArticle(payload, apiKey) {
     if (!res.ok) {
       const body = await res.text();
       console.error(`POST failed: ${res.status} ${body}`);
-      return { error: true, status: res.status, article: null };
+      return { error: true, status: res.status, article: null, body };
     }
 
     const data = await res.json();
